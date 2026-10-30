@@ -711,7 +711,7 @@ TOOLS = [
      ["name"]),
     ("remove_pantry", "Take an item out of the pantry list altogether.",
      {"name": _p("string", "The food to take out.")}, ["name"]),
-    ("add_shopping", "Put an item on the shopping list (things to buy). Adding the same item again adds to its amount.",
+    ("add_shopping", "Put an item on the shopping list. An amount and unit are kept if given, and adding the same item again adds to its amount.",
      {"name": _p("string", "The item, like milk."), "quantity": _p("number", "How many or how much. Default 1."),
       "unit": _p("string", "Optional, like lbs, bags, gallons."),
       "category": _p("string", "Optional, like Produce.")}, ["name"]),
