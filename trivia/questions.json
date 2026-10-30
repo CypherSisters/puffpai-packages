@@ -1,5 +1,5 @@
 {"provenance": "Harvested from PuffPAIBuildBot@774e27a4:dashboard/public/trivia-app.html (adapted)",
- "about": "AeroTrivia's question bank, written by Cypher Sisters. Apache-2.0 License. The right answer is options[answer].",
+ "about": "AeroTrivia's question bank, written by Cypher Sisters. Apache-2.0 License. The right answer is options[answer]. Kids mode asks the beginner questions of the kids_categories.",
  "categories": [
   {
    "id": "random",
@@ -65,7 +65,19 @@
  "difficulties": [
   "beginner",
   "mid",
-  "jeopardy"
+  "jeopardy",
+  "kids"
+ ],
+ "kids_categories": [
+  "history",
+  "science",
+  "music",
+  "2000s",
+  "nature",
+  "sports",
+  "tech",
+  "food",
+  "geography"
  ],
  "questions": {
   "history": {
@@ -524,7 +536,7 @@
      "q": "Which film holds the record for most Oscar nominations without a win?",
      "options": [
       "The Turning Point",
-      "The Color Purple",
+      "Titanic",
       "Gangs of New York",
       "Cry Freedom"
      ],
@@ -1311,10 +1323,10 @@
      "answer": 0
     },
     {
-     "q": "What is the longest Grand Tour in professional cycling?",
+     "q": "Which is the oldest of cycling's three Grand Tours?",
      "options": [
-      "Vuelta a España",
       "Tour de France",
+      "Vuelta a España",
       "Giro d'Italia",
       "Tour of Britain"
      ],
@@ -1743,7 +1755,7 @@
      "answer": 0
     },
     {
-     "q": "What is the driest desert on Earth?",
+     "q": "What is the driest non-polar desert on Earth?",
      "options": [
       "Atacama",
       "Sahara",
@@ -1798,8 +1810,8 @@
      "q": "The Danakil Depression, one of the hottest places on Earth, is in which country?",
      "options": [
       "Ethiopia",
-      "Djibouti",
-      "Eritrea",
+      "Kenya",
+      "Sudan",
       "Somalia"
      ],
      "answer": 0

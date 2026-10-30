@@ -39,7 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "freshtable"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DOC = "freshtable.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 25 * 1024 * 1024          # a phone photo fits; a stray upload does not
@@ -88,7 +88,12 @@ class Store:
 
     def save(self, data: dict) -> str:
         with self.lock:
-            data["last_updated"] = _now()
+            # The page compares stamps, so two saves must never share one
+            # (two quick writes can land on the same clock tick).
+            stamp = _now()
+            if stamp == data.get("last_updated"):
+                stamp += "." + _uid()
+            data["last_updated"] = stamp
             fd, tmp = tempfile.mkstemp(dir=self.folder, prefix=".freshtable-", suffix=".tmp")
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -144,21 +149,78 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
+DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+
+def _day(day: str) -> str:
+    """"tue", "tuesday" or "Tuesday" -> "Tuesday"; anything else as written."""
+    d = str(day or "").strip()
+    for name in DAYS:
+        if len(d) >= 3 and name.lower().startswith(d.lower()):
+            return name
+    return d
+
+
+def _qty(value, default=1):
+    """A quantity: a positive number, kept whole when it is whole (2, not 2.0)."""
+    if value is None or value == "":
+        value = default
+    q = float(value)
+    if not q > 0:
+        raise ValueError("the quantity must be more than 0")
+    return int(q) if q.is_integer() else q
+
+
+def _amount(quantity, unit: str = "") -> str:
+    unit = str(unit or "").strip()
+    return f"{quantity} {unit}" if unit and unit != "pcs" else f"{quantity}"
+
+
+def _match(items: list[dict], name: str) -> list[dict]:
+    """Items named exactly ``name`` (any case); failing that, items whose name holds it."""
+    n = str(name or "").strip().lower()
+    if not n:
+        return []
+    exact = [i for i in items if str(i.get("name", "")).strip().lower() == n]
+    return exact or [i for i in items if n in str(i.get("name", "")).lower()]
+
+
+def _which(found: list[dict], name: str, where: str) -> str:
+    return (f"More than one thing {where} matches {name}: "
+            + ", ".join(str(i.get("name", "")) for i in found) + ". Which one?")
+
+
+def _ingredients(value) -> list[str]:
+    """A recipe keeps its ingredients as one comma list; a meal as a list."""
+    if isinstance(value, list):
+        return [str(i).strip() for i in value if str(i).strip()]
+    return [i.strip() for i in str(value or "").split(",") if i.strip()]
+
+
+def _steps(value) -> list[str]:
+    if isinstance(value, list):
+        return [str(s).strip() for s in value if str(s).strip()]
+    return [s.strip() for s in str(value or "").splitlines() if s.strip()]
+
+
 class FreshTable:
     def __init__(self, store: Store, brain: "Brain") -> None:
         self.store = store
         self.brain = brain
 
     # pantry
-    def add_pantry(self, name: str, quantity: int = 1, unit: str = "pcs", category: str | None = None) -> str:
+    def add_pantry(self, name: str, quantity=1, unit: str = "pcs", category: str | None = None) -> str:
         name = name.strip()
-        quantity = int(quantity)
+        quantity = _qty(quantity)
+        unit = str(unit or "pcs").strip()
         category = category or guess_category(name)
         with self.store.lock:
             data = self.store.load()
             for item in data["pantry"]:
                 if item.get("name", "").lower() == name.lower():
-                    item["quantity"] = int(item.get("quantity", 0)) + quantity
+                    item["quantity"] = _qty(float(item.get("quantity", 0)) + quantity)
+                    if item["quantity"] > float(item.get("maxQuantity") or 0):
+                        item["maxQuantity"] = item["quantity"]      # the page's bar stays within 100%
                     self.store.save(data)
                     return f"Updated {name}: now {item['quantity']} {item.get('unit', unit)} in the pantry."
             data["pantry"].append({
@@ -174,81 +236,274 @@ class FreshTable:
         if not pantry:
             return "The pantry is empty."
         if filter and filter.lower() == "low":
-            pantry = [i for i in pantry if i.get("quantity", 0) <= i.get("maxQuantity", 5) * 0.3]
+            pantry = [i for i in pantry if float(i.get("quantity", 0)) <= float(i.get("maxQuantity", 5)) * 0.3]
             if not pantry:
                 return "Nothing is running low in the pantry."
             label = "Running low"
         elif filter:
-            pantry = [i for i in pantry if filter.lower() in str(i.get("category", "")).lower()]
+            f = filter.lower()
+            pantry = [i for i in pantry if f in str(i.get("category", "")).lower() or f in str(i.get("name", "")).lower()]
+            if not pantry:
+                return f"Nothing in the pantry matches {filter}."
             label = f"Pantry ({filter})"
         else:
             label = "Pantry"
         lines = [f"{i['name']}: {i.get('quantity', 0)} {i.get('unit', '')} ({i.get('category', '')})" for i in pantry]
         return f"{label} ({_plural(len(pantry), 'item')}):\n" + "\n".join(lines)
 
+    def use_pantry(self, name: str, quantity=None) -> str:
+        """Use some of a pantry item, or all of it. At none left it goes on the
+        shopping list, as the page's minus button does."""
+        with self.store.lock:
+            data = self.store.load()
+            found = _match(data["pantry"], name)
+            if not found:
+                return f"{name} is not in the pantry."
+            if len(found) > 1:
+                return _which(found, name, "in the pantry")
+            item = found[0]
+            have = float(item.get("quantity", 0))
+            left = 0.0 if quantity in (None, "") else max(0.0, have - float(_qty(quantity)))
+            item["quantity"] = int(left) if left.is_integer() else left
+            unit = str(item.get("unit") or "").strip()
+            msg = f"{item['name']}: {item['quantity']}{' ' + unit if unit else ''} left in the pantry."
+            listed = [s for s in data["shoppingList"]
+                      if not s.get("checked") and str(s.get("name", "")).lower() == item["name"].lower()]
+            if not item["quantity"] and not listed:
+                data["shoppingList"].append({
+                    "id": f"id_{_uid()}", "name": item["name"], "quantity": 1, "unit": item.get("unit", "pcs"),
+                    "category": item.get("category", "Other"), "estimatedPrice": 0, "checked": False, "fromPantry": True,
+                })
+                msg += f" Put {item['name']} on the shopping list."
+            self.store.save(data)
+        return msg
+
+    def remove_pantry(self, name: str) -> str:
+        with self.store.lock:
+            data = self.store.load()
+            found = _match(data["pantry"], name)
+            if not found:
+                return f"{name} is not in the pantry."
+            if len(found) > 1:
+                return _which(found, name, "in the pantry")
+            data["pantry"] = [i for i in data["pantry"] if i is not found[0]]
+            self.store.save(data)
+        return f"Took {found[0]['name']} out of the pantry."
+
     # shopping list
-    def add_shopping(self, name: str, quantity: int = 1, category: str | None = None) -> str:
+    def add_shopping(self, name: str, quantity=1, unit: str = "", category: str | None = None) -> str:
         name = name.strip()
+        quantity = _qty(quantity)
+        unit = str(unit or "pcs").strip()
         category = category or guess_category(name)
         with self.store.lock:
             data = self.store.load()
+            for item in data["shoppingList"]:
+                if (not item.get("checked") and item.get("name", "").lower() == name.lower()
+                        and str(item.get("unit") or "pcs") == unit):
+                    item["quantity"] = _qty(float(item.get("quantity", 1)) + quantity)
+                    self.store.save(data)
+                    return f"{name} was already on the shopping list; now {_amount(item['quantity'], unit)}."
             data["shoppingList"].append({
-                "id": f"id_{_uid()}", "name": name, "quantity": int(quantity), "unit": "pcs",
+                "id": f"id_{_uid()}", "name": name, "quantity": quantity, "unit": unit,
                 "category": category, "estimatedPrice": 0, "checked": False,
             })
             self.store.save(data)
-        return f"Added {name} to the shopping list, quantity {int(quantity)}."
+        return f"Added {name} to the shopping list, quantity {_amount(quantity, unit)}."
 
     def list_shopping(self) -> str:
         items = [i for i in self.store.load()["shoppingList"] if not i.get("checked")]
         if not items:
             return "The shopping list is empty."
-        lines = [f"{i['name']}: {i.get('quantity', 1)}" for i in items]
+        lines = [f"{i['name']}: {_amount(i.get('quantity', 1), i.get('unit', ''))}" for i in items]
         return f"Shopping list ({_plural(len(items), 'item')}):\n" + "\n".join(lines)
 
     def check_off_shopping(self, name: str) -> str:
         with self.store.lock:
             data = self.store.load()
-            for item in data["shoppingList"]:
-                if not item.get("checked") and item.get("name", "").lower() == name.strip().lower():
-                    item["checked"] = True
-                    self.store.save(data)
-                    return f"Checked off {item['name']}."
-        return f"{name} is not on the shopping list."
+            found = _match([i for i in data["shoppingList"] if not i.get("checked")], name)
+            if not found:
+                return f"{name} is not on the shopping list."
+            if len({i.get("name", "").lower() for i in found}) > 1:
+                return _which(found, name, "on the shopping list")
+            for item in found:
+                item["checked"] = True
+            self.store.save(data)
+        return f"Checked off {found[0]['name']}."
 
     def remove_shopping(self, name: str) -> str:
         with self.store.lock:
             data = self.store.load()
-            keep = [i for i in data["shoppingList"] if i.get("name", "").lower() != name.strip().lower()]
+            found = _match(data["shoppingList"], name)
+            if not found:
+                return f"{name} is not on the shopping list."
+            if len({i.get("name", "").lower() for i in found}) > 1:
+                return _which(found, name, "on the shopping list")
+            data["shoppingList"] = [i for i in data["shoppingList"] if all(i is not f for f in found)]
+            self.store.save(data)
+        return f"Removed {found[0]['name']} from the shopping list."
+
+    def clear_bought_shopping(self) -> str:
+        with self.store.lock:
+            data = self.store.load()
+            keep = [i for i in data["shoppingList"] if not i.get("checked")]
             gone = len(data["shoppingList"]) - len(keep)
             if not gone:
-                return f"{name} is not on the shopping list."
+                return "Nothing on the shopping list is ticked off."
             data["shoppingList"] = keep
             self.store.save(data)
-        return f"Removed {name} from the shopping list."
+        return f"Cleared {_plural(gone, 'bought item')} from the shopping list."
+
+    def add_ingredients_to_shopping(self, recipe: str = "") -> str:
+        """A recipe's (or a planned meal's) ingredients onto the list, or every
+        planned meal's when no recipe is named. Skips what is already on the
+        list and what the pantry has plenty of, as the page's button does."""
+        with self.store.lock:
+            data = self.store.load()
+            if str(recipe or "").strip():
+                found = _match(data["recipes"], recipe) or _match(data["mealPlan"], recipe)
+                if not found:
+                    return f"There is no saved recipe or planned meal called {recipe}."
+                if len({i.get("name", "").lower() for i in found}) > 1:
+                    return _which(found, recipe, "in the recipes and the plan")
+                source, wanted = found[0]["name"], _ingredients(found[0].get("ingredients"))
+            else:
+                if not data["mealPlan"]:
+                    return "No meals are planned, so there is nothing to shop for."
+                source = "the meal plan"
+                wanted = [i for m in data["mealPlan"] for i in _ingredients(m.get("ingredients"))]
+            if not wanted:
+                return f"{source} has no ingredients listed."
+            on_list = {str(s.get("name", "")).lower() for s in data["shoppingList"] if not s.get("checked")}
+            added, have, seen = [], [], set()
+            for ing in wanted:
+                low = ing.lower()
+                if low in seen or low in on_list:
+                    seen.add(low)
+                    continue
+                seen.add(low)
+                stocked = [p for p in data["pantry"]
+                           if (str(p.get("name", "")).lower() in low or low in str(p.get("name", "")).lower())
+                           and float(p.get("quantity", 0)) > float(p.get("maxQuantity", 5)) * 0.3]
+                if stocked:
+                    have.append(ing)
+                    continue
+                data["shoppingList"].append({
+                    "id": f"id_{_uid()}", "name": ing, "quantity": 1, "unit": "pcs", "category": guess_category(ing),
+                    "estimatedPrice": 0, "checked": False, "fromMealPlan": True,
+                })
+                added.append(ing)
+            if added:
+                self.store.save(data)
+        msg = (f"Added {_plural(len(added), 'ingredient')} for {source} to the shopping list: {', '.join(added)}."
+               if added else f"Everything for {source} is already on the list or in the pantry.")
+        if have:
+            msg += f" Already in the pantry: {', '.join(have)}."
+        return msg
 
     def widget_list(self) -> dict:
-        items = [i for i in self.store.load()["shoppingList"] if not i.get("checked")]
-        return {"items": [{"text": i["name"] if int(i.get("quantity", 1)) == 1 else f"{i['name']} ({i['quantity']})"}
-                          for i in items]}
+        out = []
+        for i in self.store.load()["shoppingList"]:
+            if i.get("checked"):
+                continue
+            q, unit = i.get("quantity", 1), str(i.get("unit") or "pcs")
+            plain = unit == "pcs" and float(q) == 1
+            out.append({"text": i["name"] if plain else f"{i['name']} ({_amount(q, unit)})"})
+        return {"items": out}
 
     # meal plan
     def list_meal_plan(self) -> str:
         meals = self.store.load()["mealPlan"]
         if not meals:
             return "No meals are planned."
+        order = {d: n for n, d in enumerate(DAYS)}
+        meals = sorted(meals, key=lambda m: order.get(_day(m.get("day", "")), len(DAYS)))
         return f"Meal plan ({_plural(len(meals), 'meal')}):\n" + "\n".join(
             f"{m.get('day', '')}: {m.get('name', '')}".strip(": ") for m in meals)
 
     def add_meal(self, day: str, name: str, ingredients: list[str] | None = None) -> str:
+        day, name = _day(day), name.strip()
         with self.store.lock:
             data = self.store.load()
+            steps, note = [], ""
+            saved = [r for r in data["recipes"] if str(r.get("name", "")).strip().lower() == name.lower()]
+            if saved and not ingredients:
+                ingredients = _ingredients(saved[0].get("ingredients"))
+                steps, note = _steps(saved[0].get("instructions")), " from your saved recipe"
+                name = str(saved[0].get("name") or name).strip()
             data["mealPlan"].append({
                 "id": f"id_{_uid()}", "day": day, "name": name, "time": "", "servings": 4,
-                "ingredients": list(ingredients or []), "instructions": [], "theme": "custom", "date": _now(),
+                "ingredients": _ingredients(ingredients), "instructions": steps, "theme": "custom", "date": _now(),
             })
             self.store.save(data)
-        return f"Planned {name} for {day}."
+        return f"Planned {name} for {day}{note}."
+
+    def remove_meal(self, day: str = "", name: str = "") -> str:
+        day, name = _day(day), str(name or "").strip()
+        if not day and not name:
+            return "Say which day or which meal to take off the plan."
+        with self.store.lock:
+            data = self.store.load()
+            meals = data["mealPlan"]
+            if day:
+                meals = [m for m in meals if _day(m.get("day", "")) == day]
+            if name:
+                meals = _match(meals, name)
+            if not meals:
+                what = " ".join(x for x in (name, "on " + day if day else "") if x)
+                return f"Nothing {what} is on the meal plan."
+            data["mealPlan"] = [m for m in data["mealPlan"] if all(m is not g for g in meals)]
+            self.store.save(data)
+        return "Took off the meal plan: " + ", ".join(f"{m.get('name', '')} ({m.get('day', '')})" for m in meals) + "."
+
+    def plan_week(self, days=7, preferences: str = "", replace: bool = False) -> str:
+        """Dinners for the week. The brain picks (favouring saved recipes); when it
+        does not answer, the saved recipes take turns. Days that already have a
+        meal are kept unless ``replace`` is true."""
+        n = max(1, min(int(days or 7), 7))
+        replace = replace is True or str(replace).strip().lower() in ("true", "yes", "1")
+        snapshot = self.store.load()
+        planned = {_day(m.get("day", "")) for m in snapshot["mealPlan"]}
+        targets = DAYS[:n] if replace else [d for d in DAYS[:n] if d not in planned]
+        kept = [] if replace else [d for d in DAYS[:n] if d in planned]
+        if not targets:
+            return ("Every one of those days already has a meal planned, so nothing changed. "
+                    "Ask to replace the plan to plan over them.")
+        recipes = snapshot["recipes"]
+        note = ""
+        try:
+            meals = self.brain.plan_meals(targets, [str(r.get("name", "")) for r in recipes],
+                                          [str(p.get("name", "")) for p in snapshot["pantry"]], str(preferences or ""))
+        except BrainUnavailable:
+            meals = None
+        if not meals:
+            if not recipes:
+                return "The brain did not answer and there are no saved recipes to plan from, so nothing changed."
+            meals = [{"name": recipes[k % len(recipes)].get("name", "")} for k in range(len(targets))]
+            note = " The brain did not answer, so your saved recipes take turns."
+        by_name = {str(r.get("name", "")).strip().lower(): r for r in recipes}
+        new = []
+        for day, meal in zip(targets, meals):       # the days asked for decide, not the labels the brain used
+            name = str(meal.get("name") or meal.get("dish") or "").strip()
+            if not name:
+                continue
+            r = by_name.get(name.lower())
+            ing = _ingredients(meal.get("ingredients")) or (_ingredients(r.get("ingredients")) if r else [])
+            steps = _steps(meal.get("instructions")) or (_steps(r.get("instructions")) if r else [])
+            new.append({"id": f"id_{_uid()}", "day": day, "name": name, "time": "", "servings": 4,
+                        "ingredients": ing, "instructions": steps, "theme": "week", "date": _now()})
+        if not new:
+            return "The plan came back empty, so nothing changed. Try again."
+        with self.store.lock:
+            data = self.store.load()
+            if replace:
+                data["mealPlan"] = [m for m in data["mealPlan"] if _day(m.get("day", "")) not in targets]
+            data["mealPlan"].extend(new)
+            self.store.save(data)
+        msg = f"Planned {_plural(len(new), 'dinner')}: " + "; ".join(f"{m['day']}: {m['name']}" for m in new) + "."
+        if kept:
+            msg += f" Kept what was already planned for {', '.join(kept)}."
+        return msg + note + " Ask to add the ingredients to the shopping list when you are ready."
 
     # recipes
     def add_recipe(self, name: str, ingredients: list[str] | str, instructions: str = "") -> str:
@@ -267,22 +522,48 @@ class FreshTable:
         count = len([i for i in ingredients.split(",") if i.strip()])
         return f"Saved the recipe {name.strip()} with {_plural(count, 'ingredient')}."
 
-    def list_recipes(self) -> str:
+    def list_recipes(self, filter: str = "") -> str:
         recipes = self.store.load()["recipes"]
         if not recipes:
             return "No recipes are saved."
+        f = str(filter or "").strip().lower()
+        if f:
+            recipes = [r for r in recipes
+                       if f in str(r.get("name", "")).lower() or f in str(r.get("ingredients", "")).lower()]
+            if not recipes:
+                return f"No saved recipe matches {filter}."
+        if f and len(recipes) == 1:
+            r = recipes[0]
+            steps = str(r.get("instructions") or "").strip() or "No instructions saved."
+            return f"{r['name']}\nIngredients: {r.get('ingredients', '')}\nInstructions:\n{steps}"
         return f"Recipes ({_plural(len(recipes), 'recipe')}):\n" + "\n".join(
             f"{r['name']}: {r.get('ingredients', '')}" for r in recipes)
+
+    def remove_recipe(self, name: str) -> str:
+        with self.store.lock:
+            data = self.store.load()
+            found = _match(data["recipes"], name)
+            if not found:
+                return f"There is no saved recipe called {name}."
+            if len(found) > 1:
+                return _which(found, name, "in the recipes")
+            data["recipes"] = [r for r in data["recipes"] if r is not found[0]]
+            self.store.save(data)
+        return f"Deleted the recipe {found[0]['name']}."
 
     def import_recipes(self, file_name: str = "", mime: str = "", content_b64: str = "", text: str = "") -> str:
         """Read recipes from a file (text or a photo) and save them. Fixes v1's
         refused import (ImportRecipes.tsx:84 got 403): this is the package's own tool."""
+        if Path(file_name).suffix.lower() == ".pdf" or "pdf" in mime.lower():
+            return "FreshTable cannot read PDF files yet. Copy the recipe text into a .txt file, or send a photo of it."
         kind = _file_kind(file_name, mime)
         if not text and content_b64:
             raw = base64.b64decode(content_b64)
             if kind == "image":
                 found = self.brain.read_recipes_image(content_b64)
                 return self._save_found(found, file_name)
+            if b"\x00" in raw[:4096]:
+                return "That file is not text or a photo, so FreshTable cannot read it."
             text = raw.decode("utf-8", errors="replace")
         if not text.strip():
             return "That file has no text FreshTable can read."
@@ -386,6 +667,28 @@ class Brain:
     def read_recipes_image(self, image_b64: str) -> list[dict]:
         return self._recipes(self.chat(RECIPE_PROMPT.format(what="photo"), images=[image_b64]))
 
+    def plan_meals(self, days: list[str], recipes: list[str], pantry: list[str], preferences: str) -> list[dict]:
+        """One dinner per day, in the order of ``days``. Saved recipes come first."""
+        prompt = (f"Plan {len(days)} different family dinners, one for each of: {', '.join(days)}. "
+                  + (f"Choose from these saved recipes first, using their names exactly: {'; '.join(recipes)}. "
+                     if recipes else "")
+                  + (f"In the pantry: {', '.join(pantry)}. " if pantry else "")
+                  + (f"The household asked for: {preferences}. Every dinner must fit that. " if preferences else "")
+                  + 'Answer with JSON only, like {"meals": [{"day": "Monday", "name": "...", '
+                    '"ingredients": ["..."], "instructions": ["..."]}]}. For a saved recipe, '
+                    'ingredients and instructions may be left empty.')
+        answer = self.chat(prompt, "You plan family dinners. Answer with JSON only.")
+        match = re.search(r"\{.*\}|\[.*\]", answer, re.S)
+        try:
+            found = json.loads(match.group(0)) if match else None
+        except ValueError:
+            found = None
+        if isinstance(found, dict):
+            found = found.get("meals") or found.get("dinners") or found.get("plan")
+        if not isinstance(found, list):
+            raise BrainUnavailable("The brain's answer had no meal plan.")
+        return [m for m in found if isinstance(m, dict)]
+
 
 # --------------------------------------------------------------- MCP tools
 
@@ -394,39 +697,64 @@ def _p(kind: str, text: str) -> dict:
 
 
 TOOLS = [
-    ("add_pantry", "Add a food item to the pantry, or add to its count if it is already there.",
-     {"name": _p("string", "The food, like rice or milk."), "quantity": _p("integer", "How many. Default 1."),
-      "unit": _p("string", "Like pcs, bags, lbs. Default pcs."), "category": _p("string", "Optional, like Dairy.")},
+    ("add_pantry", "Add a food item to the pantry (food at home), or add to its count if it is already there.",
+     {"name": _p("string", "The food, like rice or milk."), "quantity": _p("number", "How many or how much. Default 1."),
+      "unit": _p("string", "Like pcs, bags, lbs, cans. Default pcs."), "category": _p("string", "Optional, like Dairy.")},
      ["name"]),
-    ("list_pantry", "List what is in the pantry. Filter by a category, or use \"low\" for items running low.",
-     {"filter": _p("string", "Optional: a category, or low.")}, []),
-    ("add_shopping", "Put an item on the shopping list.",
-     {"name": _p("string", "The item, like milk."), "quantity": _p("integer", "How many. Default 1."),
+    ("list_pantry", "List what is in the pantry. Filter by a food name (\"do we have rice\"), a category, "
+     "or use \"low\" for items running low.",
+     {"filter": _p("string", "Optional: a food name, a category, or low.")}, []),
+    ("use_pantry", "Use up some of a pantry item, or all of it (\"we ran out of milk\"). With no quantity it is "
+     "all gone. When none is left it goes on the shopping list.",
+     {"name": _p("string", "The food, like milk."),
+      "quantity": _p("number", "Optional: how much was used, in the item's own unit. Leave out for all of it.")},
+     ["name"]),
+    ("remove_pantry", "Take an item out of the pantry list altogether.",
+     {"name": _p("string", "The food to take out.")}, ["name"]),
+    ("add_shopping", "Put an item on the shopping list (things to buy). Adding the same item again adds to its amount.",
+     {"name": _p("string", "The item, like milk."), "quantity": _p("number", "How many or how much. Default 1."),
+      "unit": _p("string", "Optional, like lbs, bags, gallons."),
       "category": _p("string", "Optional, like Produce.")}, ["name"]),
     ("list_shopping", "List what is still on the shopping list.", {}, []),
     ("check_off_shopping", "Tick an item off the shopping list (bought).",
      {"name": _p("string", "The item to tick off.")}, ["name"]),
     ("remove_shopping", "Take an item off the shopping list.",
      {"name": _p("string", "The item to remove.")}, ["name"]),
+    ("clear_bought_shopping", "Clear the ticked-off (bought) items from the shopping list.", {}, []),
+    ("add_ingredients_to_shopping", "Put a recipe's or a planned meal's ingredients on the shopping list, "
+     "skipping what is already on it or well stocked in the pantry. Leave recipe out for the whole meal plan.",
+     {"recipe": _p("string", "Optional: the recipe or planned meal, like pancakes.")}, []),
     ("list_meal_plan", "List the meals planned for the week.", {}, []),
-    ("add_meal", "Plan a meal for a day of the week.",
+    ("add_meal", "Plan a meal for a day of the week. A saved recipe of the same name brings its ingredients and steps.",
      {"day": _p("string", "Like Monday."), "name": _p("string", "The meal, like chicken fajitas."),
       "ingredients": {"type": "array", "items": {"type": "string"}, "description": "Optional ingredients."}},
      ["day", "name"]),
+    ("remove_meal", "Take a meal off the plan: by day, by name, or both.",
+     {"day": _p("string", "Optional: the day, like Tuesday."), "name": _p("string", "Optional: the meal.")}, []),
+    ("plan_week", "Plan dinners for the week, favouring the saved recipes. Days that already have a meal are kept "
+     "unless replace is true; only set replace when the owner said to replace the plan.",
+     {"days": _p("integer", "How many days from Monday. Default 7."),
+      "preferences": _p("string", "Optional, like vegetarian or quick meals."),
+      "replace": _p("boolean", "Plan over days that already have a meal. Default false.")}, []),
     ("add_recipe", "Save a recipe: its name, ingredients and instructions.",
      {"name": _p("string", "The recipe name."),
-      "ingredients": {"type": "array", "items": {"type": "string"}, "description": "The ingredients."},
+      "ingredients": {"type": "array", "items": {"type": "string"},
+                      "description": "The ingredients, with amounts, like 2 cups flour."},
       "instructions": _p("string", "How to make it.")}, ["name", "ingredients"]),
-    ("list_recipes", "List the saved recipes with their ingredients.", {}, []),
-    ("import_recipes", "Read recipes from a file the owner sent (text or a photo of a recipe) and save them. "
+    ("list_recipes", "List the saved recipes with their ingredients. Name one recipe to get its instructions too.",
+     {"filter": _p("string", "Optional: a recipe name or an ingredient.")}, []),
+    ("remove_recipe", "Delete a saved recipe.",
+     {"name": _p("string", "The recipe to delete.")}, ["name"]),
+    ("import_recipes", "Read recipes from a file the owner sent (text or a photo of a recipe; not PDF) and save them. "
      "A text file comes as file_name, mime and text; any other file as file_name, mime and content_b64.",
      {"file_name": _p("string", "The file's name, like pancakes.txt."),
       "mime": _p("string", "The file type, like text/plain or image/jpeg."),
       "content_b64": _p("string", "The file's bytes, base64."),
       "text": _p("string", "Or the recipe text itself.")}, []),
 ]
-CHANGES = ["add_pantry", "add_shopping", "check_off_shopping", "remove_shopping",
-           "add_meal", "add_recipe", "import_recipes"]
+CHANGES = ["add_pantry", "use_pantry", "remove_pantry", "add_shopping", "check_off_shopping", "remove_shopping",
+           "clear_bought_shopping", "add_ingredients_to_shopping", "add_meal", "remove_meal", "plan_week",
+           "add_recipe", "remove_recipe", "import_recipes"]
 
 
 def tool_list() -> list[dict]:

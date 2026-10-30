@@ -1,0 +1,45 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "weather",
+  "kind": "tool",
+  "name": "Weather",
+  "version": "1.0.0",
+  "description": "The weather where you live: right now, a forecast for up to 7 days, and severe weather alerts in the United States. It asks free public weather services, with no account or key. It does not read Home Assistant sensors, give air quality or pollen, or check alerts outside the United States.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/sun-cloud.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_location"],
+    "tools": {
+      "set_location": "Save the place to give weather for: a town name, or coordinates like 40.71,-74.01, and the temperature unit. A town name is looked up once to get its coordinates.",
+      "current_weather": "The weather right now at the saved place: temperature, sky, feels-like, humidity and wind.",
+      "forecast": "The forecast at the saved place for today and the next days: sky, high and low, and the chance of rain or snow.",
+      "severe_alerts": "Active severe weather alerts (storms, floods, heat advisories) at the saved place, from the US National Weather Service. Outside the United States there are none to check."
+    },
+    "examples": {
+      "set_location": ["set my weather location to Asheville, North Carolina", "use Celsius for the weather"],
+      "current_weather": ["what's the weather like right now"],
+      "forecast": ["what's the forecast for the next five days", "will it rain tomorrow"],
+      "severe_alerts": ["are there any severe weather alerts"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": ["api.open-meteo.com", "geocoding-api.open-meteo.com", "api.weather.gov"],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Weather keeps your chosen place and units in its own data folder on this computer. It uses the internet: it sends only that place (its name once, then its coordinates) to geocoding-api.open-meteo.com, api.open-meteo.com and api.weather.gov, and nothing else about you. Like any web request, those sites also see your home's internet address."
+}

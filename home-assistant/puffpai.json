@@ -1,0 +1,62 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "home-assistant",
+  "kind": "tool",
+  "name": "Home Assistant",
+  "version": "1.0.0",
+  "description": "Reads and controls your own Home Assistant on your home network: list devices and their state, turn lights, switches, fans and media players on or off, open or close blinds, curtains and shades, set lights and thermostats, run scenes, list cameras and see which motion sensors changed lately. It does not lock or unlock doors, open garage doors or gates, arm or disarm alarms, run scripts or automations, or show camera pictures, and it never talks to anything on the internet.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/house.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_address", "turn_on", "turn_off", "set_light", "set_temperature", "run_scene"],
+    "tools": {
+      "set_address": "Save the address of your Home Assistant on your home network, like homeassistant.local:8123.",
+      "list_devices": "List Home Assistant devices with their state, by kind (lights, switches, thermostats, sensors and more) or by name.",
+      "device_state": "The state of one Home Assistant device, with a few details like brightness or temperature.",
+      "turn_on": "Turn on a light, switch, fan or media player, or open a blind, curtain or shade. Never a lock, garage door or gate.",
+      "turn_off": "Turn off a light, switch, fan or media player, or close a blind, curtain or shade. Never a lock, garage door or gate.",
+      "set_light": "Set a light's brightness, colour or white colour temperature.",
+      "set_temperature": "Set a thermostat's target temperature and, if asked, its mode.",
+      "run_scene": "Run a Home Assistant scene by name. A scene that touches a lock, alarm, door or gate is not run.",
+      "list_cameras": "List the cameras Home Assistant has and their state. No pictures.",
+      "recent_motion": "Which motion or occupancy sensors changed in the last few minutes."
+    },
+    "examples": {
+      "set_address": ["my Home Assistant is at homeassistant.local:8123"],
+      "list_devices": ["what lights do I have", "list my smart home devices"],
+      "device_state": ["is the porch light on", "what's the temperature in the living room"],
+      "turn_on": ["turn on the kitchen light", "open the bedroom blinds"],
+      "turn_off": ["turn off the TV", "switch off the fan"],
+      "set_light": ["dim the living room lamp to 30 percent", "make the bedroom light warm white"],
+      "set_temperature": ["set the thermostat to 21", "set the heat to 70 degrees"],
+      "run_scene": ["run the movie night scene"],
+      "list_cameras": ["list my cameras"],
+      "recent_motion": ["any motion in the last half hour", "did anyone walk past the hallway sensor"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [
+      { "name": "HOME_ASSISTANT_TOKEN", "why": "to read and control your Home Assistant", "get_it": "In Home Assistant open your profile, Security, Long-lived access tokens" }
+    ],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [
+    { "id": "address", "kind": "confirm", "title": "Find your Home Assistant address (usually http://homeassistant.local:8123)",
+      "why": "Then tell the bot, for example: my Home Assistant is at homeassistant.local:8123. The Bridge must allow that address for this package." }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Home Assistant talks only to the Home Assistant at the address you set on your home network, using your own long-lived access token from the vault. It keeps nothing but that address in its own data folder, never the token, and it does not use the internet."
+}

@@ -570,6 +570,7 @@ body {
 .diff-beginner { background: linear-gradient(135deg, #7edc5f, #2d9e1f); color: white; }
 .diff-mid { background: linear-gradient(135deg, #ffd700, #f5a623); color: #5a3e00; }
 .diff-jeopardy { background: linear-gradient(135deg, #ff6fb4, #c02060); color: white; }
+.diff-kids { background: linear-gradient(135deg, #7fd8ff, #3a8fd6); color: white; }
 
 /* ═══ MODE CARDS ═══ */
 .mode-grid {
@@ -774,6 +775,7 @@ body {
       <div class="diff-pill diff-beginner" onclick="selectDifficulty('beginner',this)">🌱 Beginner</div>
       <div class="diff-pill diff-mid" onclick="selectDifficulty('mid',this)">⚡ Mid</div>
       <div class="diff-pill diff-jeopardy" onclick="selectDifficulty('jeopardy',this)">🔥 Jeopardy</div>
+      <div class="diff-pill diff-kids" onclick="selectDifficulty('kids',this)">🧸 Kids</div>
     </div>
     <div class="spacer-sm"></div>
     <div style="font-family:var(--font-display);font-weight:700;color:white;text-shadow:0 1px 6px rgba(0,50,100,0.4);font-size:1rem;margin-bottom:8px;">Questions</div>
@@ -900,6 +902,8 @@ let CATEGORIES = [{ id:'random', icon:'🎲', name:'Random' }];
 
 // ─── QUESTION BANK ───
 let QUESTION_BANK = {};
+let KIDS_CATEGORIES = [];
+const POINTS = { kids: 100, beginner: 100, mid: 200, jeopardy: 300 };
 
 // ─── HOST QUIPS ───
 const HOST = {
@@ -951,6 +955,7 @@ async function loadBank() {
     const bank = await r.json();
     QUESTION_BANK = bank.questions || {};
     CATEGORIES = bank.categories || CATEGORIES;
+    KIDS_CATEGORIES = bank.kids_categories || [];
   } catch (e) {
     document.getElementById('welcomeSpeech').textContent =
       "Uh oh, the question bank did not load, so the show can't start. Open Trivia again from the PuffPAI Desktop.";
@@ -1012,12 +1017,16 @@ function confirmPlayers() {
 // ─── CATEGORIES ───
 function renderCategories() {
   const g = document.getElementById('catGrid');
-  g.innerHTML = CATEGORIES.map(c => `
-    <div class="cat-card glass" data-cat="${c.id}" onclick="selectCategory('${c.id}',this)">
-      <div class="cat-icon">${c.icon}</div>
-      <div>${c.name}</div>
+  // Kids mode shows only the categories that have questions for kids.
+  const shown = CATEGORIES.filter(c => selectedDiff !== 'kids' || c.id === 'random' || levelPool(c.id, 'kids').length);
+  if (selectedCat && !shown.some(c => c.id === selectedCat)) selectedCat = null;
+  g.innerHTML = shown.map(c => `
+    <div class="cat-card glass${c.id === selectedCat ? ' selected' : ''}" data-cat="${esc(c.id)}" onclick="selectCategory(this.dataset.cat,this)">
+      <div class="cat-icon">${esc(c.icon)}</div>
+      <div>${esc(c.name)}</div>
     </div>
   `).join('');
+  checkReady();
 }
 function selectCategory(cat, el) {
   selectedCat = cat;
@@ -1029,7 +1038,7 @@ function selectDifficulty(diff, el) {
   selectedDiff = diff;
   el.parentElement.querySelectorAll('.diff-pill').forEach(p => { p.classList.remove('selected'); p.style.background = ''; p.style.borderColor = ''; });
   el.classList.add('selected'); el.style.background = 'var(--glass-h)'; el.style.borderColor = 'rgba(255,255,255,0.5)';
-  checkReady();
+  renderCategories();
 }
 function selectQuestionCount(n, el) {
   TOTAL_QUESTIONS = n;
@@ -1045,31 +1054,40 @@ function startGame() {
   score = 0; streak = 0; bestStreak = 0; currentQ = 0; answered = false; currentPlayerIdx = 0;
   if (gameMode === 'group') players.forEach(p => p.score = 0);
   questions = generateQuestions(selectedCat, selectedDiff, TOTAL_QUESTIONS);
+  if (!questions.length) {
+    document.getElementById('setupSpeech').textContent = "Hmm, there are no questions for that pick. Try another category or level!";
+    return;
+  }
   showScreen('screenQuestion');
   renderQuestion();
 }
 
+// One category's questions at one level. Kids mode: the beginner questions of the kids
+// categories, plus any question added at the kids level (the same rule as the server's).
+function levelPool(cat, diff) {
+  const by = QUESTION_BANK[cat] || {};
+  if (diff !== 'kids') return by[diff] || [];
+  return (KIDS_CATEGORIES.includes(cat) ? (by.beginner || []) : []).concat(by.kids || []);
+}
+
+const shuffle = list => list.map(x => [Math.random(), x]).sort((a, b) => a[0] - b[0]).map(p => p[1]);
+
 function generateQuestions(cat, diff, count) {
-  let pool = [];
+  const cats = Object.keys(QUESTION_BANK);
+  let pool;
   if (cat === 'random') {
-    const cats = Object.keys(QUESTION_BANK);
-    cats.forEach(c => { if(QUESTION_BANK[c][diff]) pool = pool.concat(QUESTION_BANK[c][diff]); });
+    pool = shuffle(cats.flatMap(c => levelPool(c, diff)));
   } else {
-    pool = QUESTION_BANK[cat]?.[diff] || [];
-    // If not enough, pad with random
-    if (pool.length < count) {
-      const cats = Object.keys(QUESTION_BANK);
-      cats.forEach(c => { if(c !== cat && QUESTION_BANK[c][diff]) pool = pool.concat(QUESTION_BANK[c][diff]); });
-    }
+    // The chosen category first; a longer game fills up from the other categories at the same level.
+    pool = shuffle(levelPool(cat, diff));
+    if (pool.length < count) pool = pool.concat(shuffle(cats.filter(c => c !== cat).flatMap(c => levelPool(c, diff))));
   }
-  // Shuffle
-  pool = pool.map(q => {
-    // Shuffle options but track correct answer
-    const correct = q.opts[q.a];
-    const shuffled = [...q.opts].sort(() => Math.random() - 0.5);
+  // The bank keeps the right answer as options[answer]; shuffle the options and track it.
+  return pool.slice(0, count).map(q => {
+    const correct = q.options[q.answer];
+    const shuffled = shuffle(q.options);
     return { q: q.q, opts: shuffled, a: shuffled.indexOf(correct) };
-  }).sort(() => Math.random() - 0.5);
-  return pool.slice(0, count);
+  });
 }
 
 function renderQuestion() {
@@ -1108,7 +1126,7 @@ function renderQuestion() {
   grid.innerHTML = q.opts.map((opt, i) => `
     <div class="option-card glass" onclick="answer(${i})" id="opt${i}">
       <span class="option-letter">${letters[i]}</span>
-      <span>${opt}</span>
+      <span>${esc(opt)}</span>
     </div>
   `).join('');
 
@@ -1159,7 +1177,7 @@ function answer(idx) {
   // Points
   let points = 0;
   if (isCorrect) {
-    const base = selectedDiff === 'beginner' ? 100 : selectedDiff === 'mid' ? 200 : 300;
+    const base = POINTS[selectedDiff] || 100;
     const timeBonus = (gameMode === 'brain' || selectedDiff === 'jeopardy') ? Math.max(0, timeLeft * 5) : 0;
     points = base + timeBonus;
     streak++;
@@ -1237,7 +1255,7 @@ function endGame() {
       </div>`).join('');
     spawnConfetti();
   } else {
-    const maxPossible = questions.length * (selectedDiff === 'beginner' ? 100 : selectedDiff === 'mid' ? 200 : 300);
+    const maxPossible = questions.length * (POINTS[selectedDiff] || 100);
     const pct = score / maxPossible;
     let speech, stars;
     if (pct >= 0.8) { speech = HOST.resultGreat; stars = '⭐⭐⭐⭐⭐'; spawnConfetti(); }
@@ -1317,6 +1335,7 @@ function playAgain() {
 function goHome() {
   gameMode = null; selectedCat = null; selectedDiff = null;
   document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.diff-pill:not(.qc-pill)').forEach(p => { p.classList.remove('selected'); p.style.background = ''; p.style.borderColor = ''; });
   document.getElementById('btnStart').disabled = true;
   renderHighScores();
   showScreen('screenWelcome');
@@ -1332,7 +1351,7 @@ function renderHighScores() {
   const top5 = results.sort((a, b) => topScore(b) - topScore(a)).slice(0, 5);
   list.innerHTML = top5.map((r, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '  ';
-    const cat = (CATEGORIES.find(c => c.id === r.category) || {}).name || esc(r.category || 'Random');
+    const cat = esc((CATEGORIES.find(c => c.id === r.category) || {}).name || r.category || 'Random');
     const diff = esc(r.difficulty || '');
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.1);color:rgba(255,255,255,0.85)"><span>${medal} ${topScore(r)} pts</span><span style="opacity:0.6;font-size:0.8rem">${cat} · ${diff}</span></div>`;
   }).join('');

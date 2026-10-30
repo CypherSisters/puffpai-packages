@@ -53,7 +53,7 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 LIBRARY = HERE / "exercises.json"
 NAME = "fitfam"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DOC = "fitfam.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 256 * 1024
@@ -65,6 +65,14 @@ LEVEL_WORDS = {"easy": "easy", "beginner": "easy", "light": "easy", "mid": "mid"
 KIND_WORDS = {"yoga": "rom", "stretch": "rom", "stretching": "rom", "flexibility": "rom", "mobility": "rom",
               "weights": "gym", "strength": "gym", "lifting": "gym", "bodyweight": "calisthenics", "kb": "kettlebell",
               "full body": "full"}
+WEIGHT_UNITS = {"lb": "lb", "lbs": "lb", "pound": "lb", "pounds": "lb", "kg": "kg", "kgs": "kg", "kilo": "kg",
+                "kilos": "kg", "kilogram": "kg", "kilograms": "kg"}
+DISTANCE_UNITS = {"mi": "mi", "mile": "mi", "miles": "mi", "km": "km", "k": "km", "kilometer": "km",
+                  "kilometers": "km", "kilometre": "km", "kilometres": "km"}
+KG_PER_LB = 0.45359237
+MUSCLE_WORDS = {"abs": "core", "stomach": "core", "arms": "triceps", "glutes": "posterior", "butt": "posterior",
+                "hamstring": "hamstrings", "quads": "legs", "leg": "legs", "lower back": "spine",
+                "whole body": "full", "full body": "full"}
 
 
 def _uid() -> str:
@@ -143,6 +151,16 @@ def _finite(obj):
     if isinstance(obj, list):
         return [_finite(v) for v in obj]
     return obj
+
+
+def _unit(value, table: dict, name: str, default: str) -> str:
+    """A unit word ("pounds", "kg", "miles", "km") as its short form, *default* when not given."""
+    word = _text(value, name, 20).lower().rstrip(".")
+    if not word:
+        return default
+    if word not in table:
+        raise ValueError(f"{name} is {' or '.join(sorted(set(table.values())))}")
+    return table[word]
 
 
 def _no_constant(word: str):
@@ -333,27 +351,34 @@ class FitFam:
         return text.strip(), text.strip()
 
     # tools
-    def log_workout(self, type: str = "workout", minutes: int = 30, person: str = "", notes: str = "") -> str:
-        """From fit_log_workout (app_data.py:1175)."""
+    def log_workout(self, type: str = "workout", minutes: int = 30, person: str = "", notes: str = "",
+                    distance: float | None = None, unit: str = "") -> str:
+        """From fit_log_workout (app_data.py:1175), plus an optional distance in miles or km."""
         minutes = _number(minutes, "minutes", 1, 1440, whole=True)
         kind = _text(type, "type", 60, "workout")
         notes = _text(notes, "notes", 500)
+        dist = None if distance in (None, "", 0) else _number(distance, "distance", 0, 1000)
+        dist_unit = _unit(unit, DISTANCE_UNITS, "unit", "mi")
+        entry = {"date": _now(), "type": kind, "typeName": kind, "duration": minutes, "notes": notes, "source": "brain"}
+        if dist:
+            entry.update(distance=dist, distanceUnit=dist_unit)
         with self.store.lock:
             data = self.store.load()
             _pid, user = self._who(data, person)
-            user["history"].append({"date": _now(), "type": kind, "typeName": kind, "duration": minutes,
-                                    "notes": notes, "source": "brain"})
+            user["history"].append(entry)
             self._bump(user, True)
             self.store.save(data)
         streak = user["streak"]
         more = f" That's {_plural(streak, 'day')} in a row!" if streak > 1 else ""
-        return f"Logged {self._whose(user)} {minutes}-minute {kind} workout.{more}"
+        far = f" ({dist:g} {dist_unit})" if dist else ""
+        return f"Logged {self._whose(user)} {minutes}-minute {kind} workout{far}.{more}"
 
     def log_set(self, exercise: str, reps: int, weight: float = 0, person: str = "", rpe: float | None = None,
-                notes: str = "") -> str:
-        """From fit_log_set (app_data.py:1234): one set, with its weight, reps and an optional RPE."""
+                notes: str = "", unit: str = "") -> str:
+        """From fit_log_set (app_data.py:1234): one set, with its weight (lb or kg), reps and an optional RPE."""
         reps = _number(reps, "reps", 1, 1000, whole=True)
         weight = _number(0 if weight in (None, "") else weight, "weight", 0, 2000)
+        w_unit = _unit(unit, WEIGHT_UNITS, "unit", "lb")
         rpe_val = None if rpe in (None, "") else _number(rpe, "RPE", 0, 10)
         notes = _text(notes, "notes", 500)
         ex_id, ex_name = self._exercise(_text(exercise, "exercise", 80))
@@ -365,21 +390,17 @@ class FitFam:
             today = date.today()
             first_today = not any(_day(e.get("date", "")) == today for e in user["history"] + user["sets"])
             user["sets"].append({"id": f"s{_uid()}", "date": _now(), "exerciseId": ex_id, "exercise": ex_name,
-                                 "weight": weight, "reps": reps, "rpe": rpe_val, "notes": notes})
+                                 "weight": weight, "unit": w_unit, "reps": reps, "rpe": rpe_val, "notes": notes})
             self._bump(user, first_today)
             self.store.save(data)
-        load = f"{weight:g} x {reps}" if weight else f"{reps} reps"
+        load = f"{weight:g} {w_unit} x {reps}" if weight else f"{reps} reps"
         return (f"Logged a set of {ex_name} for {self._them(user)}: {load}"
                 + (f" at RPE {rpe_val:g}" if rpe_val is not None else "") + ".")
 
     def status(self, person: str = "") -> str:
         """From fit_get_status (app_data.py:1213): streaks and totals, for one person or everyone."""
         data = self.store.load()
-        if _text(person, "person", 60).lower() not in SELF_WORDS or len(self.people(data)) == 1:
-            _pid, user = self._who(data, person)
-            return self._status_line(user)
-        users = [self._who(data, p["id"])[1] for p in self.people(data)]
-        return "\n".join(self._status_line(u) for u in users)
+        return "\n".join(self._status_line(u) for u in self._everyone_or(data, person))
 
     def _status_line(self, u: dict) -> str:
         week = date.today() - timedelta(days=6)
@@ -399,17 +420,92 @@ class FitFam:
         rows = []
         for h in u["history"][-limit:][::-1]:
             d = _day(h.get("date", ""))
-            bits = [f"{h.get('duration', 0)} min"] + ([f"{h['exerciseCount']} exercises"] if h.get("exerciseCount") else [])
+            bits = [f"{h.get('duration', 0)} min"] + ([f"{h['exerciseCount']} exercises"] if h.get("exerciseCount") else []) \
+                + ([f"{_num(h['distance']):g} {h.get('distanceUnit') or ''}".strip()] if h.get("distance") else [])
             rows.append((f"{d:%b %d} " if d else "") + f"{h.get('typeName') or h.get('type') or 'workout'} ({', '.join(bits)})")
         sets = [f"{(_day(s.get('date', '')) or date.today()):%b %d} {s.get('exercise') or s.get('exerciseId')}: "
-                + (f"{_num(s.get('weight')):g} x {_num(s.get('reps')):g}" if s.get("weight") else f"{_num(s.get('reps')):g} reps")
-                for s in u["sets"][-limit:][::-1]]
+                + self._load(s) for s in u["sets"][-limit:][::-1]]
         if not rows and not sets:
             return f"No workouts are logged yet for {self._them(u)}."
         out = f"{self._whose(u, True)} recent workouts:\n" + ("\n".join(rows) if rows else "none")
         if sets:
             out += "\nRecent sets:\n" + "\n".join(sets)
         return out
+
+    @staticmethod
+    def _load(s: dict) -> str:
+        """A set as words: "135 lb x 5", or "12 reps" with no weight. An older set without a unit shows none."""
+        if not _num(s.get("weight")):
+            return f"{_num(s.get('reps')):g} reps"
+        unit = f" {s['unit']}" if s.get("unit") in ("lb", "kg") else ""
+        return f"{_num(s.get('weight')):g}{unit} x {_num(s.get('reps')):g}"
+
+    def _everyone_or(self, data: dict, person: str) -> list[dict]:
+        """One person's record, or everyone's when nobody is named and more than one person uses FitFam."""
+        if _text(person, "person", 60).lower() not in SELF_WORDS or len(self.people(data)) == 1:
+            return [self._who(data, person)[1]]
+        return [self._who(data, p["id"])[1] for p in self.people(data)]
+
+    def personal_records(self, person: str = "", exercise: str = "") -> str:
+        """Each exercise's best set (as v1's fit_personal_records, app_data.py:2723): the highest estimated
+        one-rep max by the Epley formula, weight x (1 + reps / 30), with kg and lb compared fairly. A set with no
+        weight counts by its reps."""
+        data = self.store.load()
+        words = _text(exercise, "exercise", 80)
+        want = {words.lower(), *self._exercise(words)} if words else set()
+        want = {w.lower() for w in want}
+        out = []
+        for u in self._everyone_or(data, person):
+            best: dict[str, tuple] = {}
+            for s in u["sets"]:
+                ex = str(s.get("exerciseId") or s.get("exercise") or "")
+                if not ex or (want and not want & {ex.lower(), str(s.get("exercise") or "").lower()}):
+                    continue
+                w, r = _num(s.get("weight")), _num(s.get("reps"))
+                kg = w * (1 if s.get("unit") == "kg" else KG_PER_LB)
+                score = (1, kg * (1 + r / 30) if r > 1 else kg) if w else (0, r)
+                if ex not in best or score > best[ex][0]:
+                    best[ex] = (score, s)
+            if not best:
+                out.append(f"No personal records yet for {self._them(u)}" + (f" in {words}." if words else "."))
+                continue
+            rows = []
+            for _score, s in sorted(best.values(), key=lambda b: b[0], reverse=True):
+                line = f"{s.get('exercise') or s.get('exerciseId')}: {self._load(s)}"
+                w, r = _num(s.get("weight")), _num(s.get("reps"))
+                if w and r > 1:
+                    unit = f" {s['unit']}" if s.get("unit") in ("lb", "kg") else ""
+                    line += f" (about {round(w * (1 + r / 30), 1):g}{unit} for one rep)"
+                d = _day(s.get("date", ""))
+                rows.append(line + (f", {d:%b %d}" if d else ""))
+            out.append(f"{self._whose(u, True)} personal records:\n" + "\n".join(rows))
+        return "\n".join(out)
+
+    def list_exercises(self, muscle: str = "", type: str = "") -> str:
+        """The exercise library, grouped by the muscle each one works; optionally one muscle group or one kind."""
+        muscle = _text(muscle, "muscle", 40).lower()
+        kind_word = _text(type, "type", 40).lower()
+        pools = list(self.library["exercises"])
+        if kind_word:
+            want = KIND_WORDS.get(kind_word, kind_word)
+            kind = next((t for t in self.library["types"] if want in (t["id"], t["label"].lower())), None)
+            if kind is None:
+                raise ValueError(f"there is no {type!r} kind. Kinds: "
+                                 f"{', '.join(t['label'] for t in self.library['types'])}")
+            pools = kind["pool"]
+        found = [e for cat in pools for e in self.library["exercises"].get(cat, [])]
+        muscles = sorted({e["muscle"] for e in found})
+        if muscle:
+            word = MUSCLE_WORDS.get(muscle, muscle)
+            if word not in muscles and word.rstrip("s") in muscles:
+                word = word.rstrip("s")
+            if word not in muscles and word + "s" in muscles:
+                word = word + "s"
+            if word not in muscles:
+                raise ValueError(f"no exercise here works {muscle!r}. Muscle groups: {', '.join(muscles)}")
+            muscles = [word]
+        rows = [f"{m}: " + ", ".join(e["name"] for e in found if e["muscle"] == m) for m in muscles]
+        return "Exercises by muscle group:\n" + "\n".join(rows)
 
     def suggest_workout(self, type: str = "", minutes: int = 0, level: str = "", person: str = "") -> str:
         """The page's workout maker (fitfam-app.jsx generateWorkout), for chat. Nothing is saved."""
@@ -529,27 +625,64 @@ class FitFam:
             self.store.save(data)
         return f"Logged {self._whose(user)} {typeName} workout."
 
-    def remove_workout(self, person: str, index: int) -> str:
-        index = _number(index, "index", 0, 1_000_000, whole=True)
+    def remove_workout(self, person: str = "", workout: str = "", index: int | None = None) -> str:
+        """The page removes by place in the list (*index*); the bot by words (the newest workout whose kind
+        matches *workout*, or the newest one when no words are given)."""
+        if index is not None:
+            index = _number(index, "index", 0, 1_000_000, whole=True)
+        words = _text(workout, "workout", 80).lower()
         with self.store.lock:
             data = self.store.load()
             _pid, user = self._who(data, person)
+            if index is None:
+                hits = [i for i, h in enumerate(user["history"])
+                        if not words or words in str(h.get("typeName") or h.get("type") or "").lower()]
+                if not hits:
+                    raise ValueError(f"there is no {words + ' ' if words else ''}workout logged for {self._them(user)}")
+                index = hits[-1]
             if not 0 <= index < len(user["history"]):
                 raise ValueError("there is no workout at that place in the list")
             gone = user["history"].pop(index)
             user["totalWorkouts"] = max(0, int(_num(user.get("totalWorkouts"))) - 1)
             user["streak"] = streak_of(user)
             self.store.save(data)
-        return f"Removed the {gone.get('typeName') or gone.get('type') or 'workout'} workout."
+        d = _day(gone.get("date", ""))
+        return (f"Removed {self._whose(user)} {gone.get('typeName') or gone.get('type') or 'workout'} workout"
+                + (f" from {d:%b %d}." if d else "."))
 
-    def remove_goal(self, person: str, goal: str) -> str:
+    def remove_set(self, person: str = "", exercise: str = "", id: str = "") -> str:
+        """The page removes a set by its *id*; the bot removes the newest set (of *exercise*, when named)."""
+        sid = _text(id, "id", 40)
+        words = _text(exercise, "exercise", 80)
+        want = {w.lower() for w in (words, *self._exercise(words))} if words else set()
+        with self.store.lock:
+            data = self.store.load()
+            _pid, user = self._who(data, person)
+            if sid:
+                hits = [s for s in user["sets"] if s.get("id") == sid]
+            else:
+                hits = [s for s in user["sets"] if not want or want & {str(s.get("exerciseId", "")).lower(),
+                                                                       str(s.get("exercise", "")).lower()}]
+            if not hits:
+                raise ValueError(f"there is no {words + ' ' if words else ''}set logged for {self._them(user)}")
+            gone = hits[-1]
+            user["sets"].remove(gone)
+            day = _day(gone.get("date", ""))
+            if day and not any(_day(e.get("date", "")) == day for e in user["history"] + user["sets"]):
+                user["totalWorkouts"] = max(0, int(_num(user.get("totalWorkouts"))) - 1)
+            user["streak"] = streak_of(user)
+            self.store.save(data)
+        return (f"Removed {self._whose(user)} set of {gone.get('exercise') or gone.get('exerciseId')}: "
+                f"{self._load(gone)}.")
+
+    def remove_goal(self, goal: str, person: str = "") -> str:
         with self.store.lock:
             data = self.store.load()
             _pid, user = self._who(data, person)
             g = self._goal(user, goal)
             user["goals"].remove(g)
             self.store.save(data)
-        return f"Removed the goal {g['text']}."
+        return f"Removed {self._whose(user)} goal {g['text']}."
 
     def save_prefs(self, person: str, type: str, level: str, duration: int) -> str:
         if type not in {t["id"] for t in self.library["types"]} or level not in self.library["levels"]:
@@ -574,7 +707,8 @@ class FitFam:
         return {"items": items}
 
 
-PAGE_ACTIONS = ("complete_workout", "remove_workout", "remove_goal", "save_prefs", "add_goal", "update_goal")
+PAGE_ACTIONS = ("complete_workout", "remove_workout", "remove_set", "remove_goal", "save_prefs", "add_goal",
+                "update_goal")
 
 
 # --------------------------------------------------------------- MCP tools
@@ -585,19 +719,33 @@ def _p(kind: str, text: str) -> dict:
 
 PERSON = _p("string", "Who it is for, by name. Leave empty for the person speaking when only one person uses FitFam.")
 TOOLS = [
-    ("log_workout", "Log a workout someone did: what kind and how many minutes. Updates their streak.",
+    ("log_workout", "Log a workout someone did: what kind, how many minutes and, if they say, how far. "
+     "Updates their streak.",
      {"type": _p("string", "What they did, like run, yoga, kettlebell or swim."),
       "minutes": _p("integer", "How long, in minutes."), "person": PERSON,
-      "notes": _p("string", "Optional notes.")}, ["type", "minutes"]),
-    ("log_set", "Log one strength set: the exercise, the reps, and the weight lifted.",
+      "notes": _p("string", "Optional notes."),
+      "distance": _p("number", "Optional distance covered, like 5 for a 5 km run."),
+      "unit": _p("string", "The distance unit: mi or km. Default mi.")}, ["type", "minutes"]),
+    ("log_set", "Log one strength set: the exercise, the reps, and the weight lifted in lb or kg.",
      {"exercise": _p("string", "Like bench press or goblet squat."), "reps": _p("integer", "How many reps."),
-      "weight": _p("number", "The weight lifted, in the owner's usual unit. 0 for bodyweight."), "person": PERSON,
+      "weight": _p("number", "The weight lifted. 0 for bodyweight."),
+      "unit": _p("string", "lb or kg, as they said it. Default lb."), "person": PERSON,
       "rpe": _p("number", "Optional effort from 1 to 10."), "notes": _p("string", "Optional notes.")},
      ["exercise", "reps"]),
     ("status", "Workout streaks and totals: how many days in a row, workouts this week and in all, and the last one.",
      {"person": _p("string", "Optional: one person by name. Empty for everyone.")}, []),
     ("history", "List someone's recent workouts and strength sets, newest first.",
      {"person": PERSON, "limit": _p("integer", "How many of each to list. Default 5.")}, []),
+    ("personal_records", "Personal records: the best set for each exercise, with an estimated one-rep max.",
+     {"person": _p("string", "Optional: one person by name. Empty for everyone."),
+      "exercise": _p("string", "Optional: one exercise, like bench press.")}, []),
+    ("remove_workout", "Remove a workout logged by mistake: the newest one, or the newest of one kind.",
+     {"person": PERSON, "workout": _p("string", "Optional: which kind, like run. Empty for the newest workout.")}, []),
+    ("remove_set", "Remove a strength set logged by mistake: the newest one, or the newest of one exercise.",
+     {"person": PERSON, "exercise": _p("string", "Optional: which exercise, like bench press.")}, []),
+    ("list_exercises", "List the exercises in FitFam's library by muscle group, like chest, legs, back or core.",
+     {"muscle": _p("string", "Optional: one muscle group, like legs or shoulders."),
+      "type": _p("string", "Optional: one kind, like kettlebell, gym or yoga.")}, []),
     ("suggest_workout", "Make a workout plan from the exercise library: a list of exercises with sets and reps. "
      "Nothing is logged.",
      {"type": _p("string", "Calisthenics, Kettlebell, Range of Motion, Gym Strength, Calisthenics + KB, "
@@ -607,13 +755,15 @@ TOOLS = [
     ("list_goals", "List someone's fitness goals and how close they are.", {"person": PERSON}, []),
     ("add_goal", "Add a fitness goal with a target, like 20 push-ups in a row or a 2-minute plank.",
      {"goal": _p("string", "The goal in words."), "target": _p("number", "The number to reach."),
-      "unit": _p("string", "Like reps, seconds, minutes, days, sessions or lbs. Default reps."),
+      "unit": _p("string", "Like reps, seconds, minutes, days, sessions, lbs, kg, mi or km. Default reps."),
       "person": PERSON}, ["goal", "target"]),
     ("update_goal", "Set the progress on a fitness goal: the number reached so far.",
      {"goal": _p("string", "Which goal, by a word in it, like plank."),
       "current": _p("number", "The number reached so far."), "person": PERSON}, ["goal", "current"]),
+    ("remove_goal", "Remove a fitness goal someone no longer wants.",
+     {"goal": _p("string", "Which goal, by a word in it, like plank."), "person": PERSON}, ["goal"]),
 ]
-CHANGES = ["log_workout", "log_set", "add_goal", "update_goal"]
+CHANGES = ["log_workout", "log_set", "add_goal", "update_goal", "remove_workout", "remove_set", "remove_goal"]
 
 
 def tool_list() -> list[dict]:

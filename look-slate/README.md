@@ -8,8 +8,18 @@ It is values only: CSS variables the Desktop already reads, in `puffpai.json`. N
 
 ## PuffPAI
 
-**What it does.** Changes how the PuffPAI Desktop looks: colours, corners, fonts and spacing. It is values only, CSS variables the Desktop already reads. It runs nothing.
+**What it does.** A `kind: look` package: colours, corners and fonts for the Desktop, one set for night and one for day. The Desktop switches between them by itself at 07:00 and 19:00, or follows your Day or night choice.
 
-**What it needs.** Nothing: no process, no internet, no keys, no personal data.
+**What it needs.** Nothing. It runs nothing, opens no port and uses no internet.
 
-**Setup.** Add it from Apps, PuffPAI store, then pick it on Looks. Remove it any time; the Desktop goes back to Puff.
+**Setup steps.** None. Add it from Apps, PuffPAI store, say Yes, then pick it on Looks.
+
+**Files.** `puffpai.json` (the values, under `look`), `preview.svg` (night on the left, day on the right), this README.
+
+**Rough edges.** None known.
+
+## Changes in 1.1.0
+
+- At night the teal is a little brighter and buttons use dark text on it, so button text and the teal both read more clearly on the slate ground.
+- Sets the Desktop's "no frame inside a panel" value itself (flat, as before) instead of relying on the Desktop's default.
+- `preview.svg` now shows the real colours (the teal and the faint text had drifted).

@@ -3,7 +3,7 @@
   "id": "calendar",
   "kind": "app",
   "name": "Calendar",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Events, tasks, medicines and bills for your household on one month view. Kept on this computer, never synced to an outside calendar.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
@@ -17,12 +17,14 @@
   "abilities": {
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
     "changes": ["add_event", "add_task", "add_med", "add_bill", "edit_event", "edit_task", "complete_task",
-                "delete_event", "delete_task", "take_med", "pay_bill", "delete_bill"],
+                "delete_event", "delete_task", "take_med", "delete_med", "pay_bill", "delete_bill"],
     "tools": {
       "add_event": "Add an event or appointment to the calendar, once or repeating.",
       "add_task": "Add a to-do task with a due date. It shows on the calendar on that day.",
       "add_med": "Track a medicine to take: its dose, how often and when.",
       "add_bill": "Track a bill to pay: its amount and due date. It shows on the calendar on that day.",
+      "whats_on": "What is on today or this week, all in one answer: events, tasks and bills due, medicines still to take today, and anything overdue.",
+      "list_overdue": "List the to-do tasks and unpaid bills that are past their due date.",
       "list_events": "List what is on the calendar: one day, or today and the next few days.",
       "list_tasks": "List the to-do tasks: open ones by default, or done ones.",
       "list_meds": "List the medicines being tracked and whether each was taken today.",
@@ -32,7 +34,8 @@
       "complete_task": "Mark a to-do task as done.",
       "delete_event": "Delete an event from the calendar.",
       "delete_task": "Delete a to-do task.",
-      "take_med": "Note that a medicine was taken today.",
+      "take_med": "Log a dose of a medicine as taken, with the time: now, or when it was taken.",
+      "delete_med": "Stop tracking a medicine and delete it, with its dose log.",
       "pay_bill": "Mark a bill as paid.",
       "delete_bill": "Delete a bill so it is no longer tracked."
     },
@@ -41,6 +44,8 @@
       "add_task": ["add taking the bins out to my to-do tasks, due tomorrow"],
       "add_med": ["track my vitamin D medicine, one tablet daily at 8 AM"],
       "add_bill": ["track the electric bill, $84.50, due November 5"],
+      "whats_on": ["what's on today", "what do we have going on this week"],
+      "list_overdue": ["is anything overdue", "which bills are past due"],
       "list_events": ["what is on my calendar tomorrow"],
       "list_tasks": ["what tasks are still on my to-do list"],
       "list_meds": ["which medicines am I tracking"],
@@ -50,7 +55,8 @@
       "complete_task": ["I took the bins out, mark that task done"],
       "delete_event": ["delete the dentist appointment from my calendar"],
       "delete_task": ["delete the bins task from my to-do list"],
-      "take_med": ["I took my vitamin D today"],
+      "take_med": ["I took my vitamin D", "I took my blood pressure pill at 8am"],
+      "delete_med": ["stop tracking my vitamin D, delete it"],
       "pay_bill": ["I paid the electric bill"],
       "delete_bill": ["stop tracking the electric bill, delete it"]
     }
@@ -75,5 +81,5 @@
     "keep_on_remove": "ask",
     "labels": [ { "path": "meds[]", "label": "health.medication" } ]
   },
-  "consent": "Calendar keeps your events, tasks, medicines and bills in its own data folder on this computer. Medicines are health details and are labelled so. It does not use the internet and never syncs to an outside calendar."
+  "consent": "Calendar keeps your events, tasks, medicines and bills in its own data folder on this computer. Medicines and the times each dose was taken are health details and are labelled so. It does not use the internet and never syncs to an outside calendar."
 }

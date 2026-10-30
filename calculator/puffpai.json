@@ -1,0 +1,43 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "calculator",
+  "kind": "tool",
+  "name": "Calculator",
+  "version": "1.0.0",
+  "description": "Exact arithmetic for the bot: sums, percentages like 15% of 80, tips split between people, and unit conversions for length, weight, volume, temperature and speed. It only works out numbers; it does not solve equations, do algebra or convert currencies, and it stores nothing.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/equals.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": [],
+    "tools": {
+      "calculate": "Work out arithmetic exactly: + - * / // % ** and brackets, sqrt, abs, round, min, max, pi and e, and percentages like 15% of 80 or 80 + 15%. Answers in a plain sentence.",
+      "tip": "Work out a tip on a bill and the total, and what each person pays when the bill is split.",
+      "convert": "Convert a number between units of length, weight, volume (US cups, pints, gallons), temperature or speed, like 5 miles to km or 350 F to C."
+    },
+    "examples": {
+      "calculate": ["what's 847 times 62", "what is 15% of 80"],
+      "tip": ["what's an 18 percent tip on 64 dollars split four ways"],
+      "convert": ["how many kilometres is 5 miles", "convert 350 fahrenheit to celsius"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "delete" },
+  "consent": "Calculator runs on this computer only and uses no internet. It stores nothing."
+}

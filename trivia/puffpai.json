@@ -3,8 +3,8 @@
   "id": "trivia",
   "kind": "app",
   "name": "Trivia",
-  "version": "2.0.0",
-  "description": "Quiz rounds with scores: play AeroTrivia on its page, or ask the bot to quiz you in chat.",
+  "version": "2.1.0",
+  "description": "Quiz rounds with scores: play AeroTrivia on its page, or ask the bot to quiz you in chat. Kids mode, and room for questions of your own.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
   "icon": "icons/question.svg",
@@ -16,18 +16,26 @@
 
   "abilities": {
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
-    "changes": ["record_result"],
+    "changes": ["end_round", "record_result", "add_question", "remove_question"],
     "tools": {
-      "stats": "Trivia scores so far: games played, the average score, the best score and the last game.",
+      "stats": "Trivia scores so far: games played, the average score, the best score, the last game, and the score of a round going in chat.",
       "list_categories": "List the trivia question categories and how many questions each has.",
-      "ask_question": "Get one multiple-choice trivia question to quiz people with. Read the question and the options A to D; the answer comes last, to say after they guess.",
-      "record_result": "Save the score of a trivia round played in chat: how many answers were right out of how many."
+      "ask_question": "Ask the next multiple-choice trivia question of a round in chat: the question and options A to D. The answer is kept back until check_answer. A round does not repeat a question until the category runs out.",
+      "check_answer": "Check a guess at the question just asked: says if it is right, gives the answer, and keeps each player's score for the round.",
+      "end_round": "End the trivia round played in chat and save each player's score.",
+      "record_result": "Save the score of a trivia round played some other way: how many answers were right out of how many.",
+      "add_question": "Add a question of your own to the trivia bank, for the game page and for chat. A category that is not on the list becomes a new category.",
+      "remove_question": "Remove a question you added to the trivia bank."
     },
     "examples": {
       "stats": ["what are the trivia scores"],
       "list_categories": ["which trivia categories are there"],
-      "ask_question": ["ask me a science trivia question"],
-      "record_result": ["save our trivia round: we got 7 out of 10 right in history"]
+      "ask_question": ["quiz me on science", "ask the kids an easy trivia question"],
+      "check_answer": ["is it B", "I think it's Mars"],
+      "end_round": ["that's enough trivia, save our scores"],
+      "record_result": ["save our trivia round: we got 7 out of 10 right in history"],
+      "add_question": ["add a trivia question: what is our dog's name, the answer is Biscuit"],
+      "remove_question": ["take my question about the dog out of trivia"]
     }
   },
 
@@ -46,5 +54,5 @@
 
   "setup_steps": [],
   "data": { "keep_on_remove": "ask" },
-  "consent": "Trivia keeps your scores in its own data folder on this computer. Its questions come with it. It does not use the internet."
+  "consent": "Trivia keeps your scores and any questions you add in its own data folder on this computer. Its other questions come with it. It does not use the internet."
 }

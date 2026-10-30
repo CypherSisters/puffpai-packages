@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Node-RED flows">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#8f0000"/>
+  <path d="M22 22c12 0 8 20 20 20" fill="none" stroke="#ffffff" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M22 42c6 0 9-4 11-8" fill="none" stroke="#ffd7d7" stroke-width="3" stroke-linecap="round"/>
+  <rect x="10" y="16" width="14" height="12" rx="3" fill="#ffffff"/>
+  <rect x="10" y="36" width="14" height="12" rx="3" fill="#ffd7d7"/>
+  <rect x="40" y="36" width="14" height="12" rx="3" fill="#ffffff"/>
+  <circle cx="24" cy="22" r="2.5" fill="#8f0000"/>
+  <circle cx="40" cy="42" r="2.5" fill="#8f0000"/>
+</svg>

@@ -1,0 +1,55 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "node-red-flows",
+  "kind": "tool",
+  "name": "Node-RED flows",
+  "version": "1.0.0",
+  "description": "Lists, runs, and turns on or off the flows in the Node-RED you already run, on this computer or your home network, and ships 14 ready-made home flows (news, weather, a daily briefing, Home Assistant routines and more) for you to import by hand. It does not install or start Node-RED, does not import or change the flows' contents for you, and runs a flow only through a web path that flow itself defines. Several shipped flows were written for the HomeBot and need editing before they work elsewhere.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/node-wire.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["run_flow", "enable_flow", "disable_flow", "set_address"],
+    "tools": {
+      "list_flows": "List the flows in your Node-RED: each flow's name, id, whether it is on or off, and the web paths it answers.",
+      "run_flow": "Run one Node-RED flow by calling one of its own web paths (GET or POST), with an optional small JSON body. Only paths your flows define are called.",
+      "enable_flow": "Turn one Node-RED flow on, by its name or id.",
+      "disable_flow": "Turn one Node-RED flow off, by its name or id.",
+      "node_red_status": "Say whether Node-RED is running at the saved address, and its version.",
+      "set_address": "Save the address of your Node-RED (on this computer or your home network), like http://192.168.1.20:1880. Port 1880 if none is given."
+    },
+    "examples": {
+      "list_flows": ["which Node-RED flows do I have", "list my Node-RED flows"],
+      "run_flow": ["run the daily news flow in Node-RED"],
+      "enable_flow": ["turn on the weather alerts flow in Node-RED"],
+      "disable_flow": ["turn off the health check flow in Node-RED"],
+      "node_red_status": ["is Node-RED running"],
+      "set_address": ["my Node-RED is at 192.168.1.20 port 1880"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [
+      { "name": "NODE_RED_TOKEN", "why": "only if your Node-RED admin API asks for a login", "get_it": "Node-RED settings.js adminAuth" }
+    ],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [
+    { "id": "import-flows", "kind": "confirm", "title": "Import the flows into your Node-RED",
+      "why": "This package lists and runs the flows in your Node-RED. Its 14 ready-made flows are a file you import yourself, so nothing changes in Node-RED without you.",
+      "text": "Open flows/README.md in this package. In Node-RED, open the menu, choose Import, pick flows/homebot-flows.json, and choose new flows. Then set the environment values the README lists. Skip this if you only want to manage flows you already have." }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "This package talks only to the Node-RED at the address you set (on this computer or your home network, default this computer), and keeps nothing but that address, in its own data folder. It does not use the internet itself; the flows it ships are files you import by hand, and some of them, once you import them, fetch weather from api.weather.gov and headlines from rss.nytimes.com inside your Node-RED."
+}

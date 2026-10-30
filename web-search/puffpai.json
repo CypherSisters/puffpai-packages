@@ -1,0 +1,50 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "web-search",
+  "kind": "tool",
+  "name": "Web search",
+  "version": "1.0.0",
+  "description": "Searches the web through a SearXNG you run yourself, on this computer or your home network: web results and news, the top 8 each, with the title, a one-line snippet, the address and the engine that found it. It does not use a public SearXNG or ask any search company directly, does not search images, does not open or read the pages it finds, and does not install or run SearXNG for you.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/magnifier.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_address"],
+    "tools": {
+      "web_search": "Search the web through the owner's own SearXNG and get the top 8 results: the title, a one-line snippet, the address and the engine that found it. Good for news, prices, opening hours and anything that changes.",
+      "news_search": "Search recent news through the owner's own SearXNG and get the top 8 stories: the title, a one-line snippet, the address and the engine that found it.",
+      "search_settings": "Which SearXNG address web search uses, and whether it answers right now.",
+      "set_address": "Save the address of the owner's own SearXNG, like http://192.168.1.20:8888 or http://127.0.0.1:8888. Only an address on this computer or the home network is taken; a public SearXNG is refused."
+    },
+    "examples": {
+      "web_search": ["search the web for how to store fresh basil", "look up what time the hardware store on Main Street closes"],
+      "news_search": ["what's in the news about the Mars mission", "search the news for storm damage in our county"],
+      "search_settings": ["is web search set up", "which search box does web search use"],
+      "set_address": ["set my SearXNG address to http://192.168.1.20:8888"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [
+    { "id": "searxng", "kind": "confirm",
+      "title": "Run SearXNG and enable its JSON format",
+      "why": "Web search asks your own SearXNG. It needs SearXNG running on this computer or your home network, with the json format turned on (in SearXNG's settings, under search, formats, add json next to html).",
+      "get_it": "https://docs.searxng.org/" }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Web search keeps the address of your own SearXNG in its own data folder on this computer. When you search, it sends only your search words to that SearXNG, at the address you set, and nothing else about you. SearXNG then asks search engines on the internet itself (outside this package): they see the words but no cookies, account or device details from you, and like any web request they see the internet address SearXNG uses, which is your home's address when SearXNG runs at home."
+}

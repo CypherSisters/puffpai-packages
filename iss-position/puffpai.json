@@ -1,0 +1,39 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "iss-position",
+  "kind": "tool",
+  "name": "ISS position",
+  "version": "1.0.0",
+  "description": "Where the International Space Station is right now: latitude, longitude, height, speed and a plain place like over the Pacific Ocean, west of Peru. It asks one public website for the position each time. It does not predict when the station passes over your house, and it stores nothing.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/satellite.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": [],
+    "tools": {
+      "iss_position": "Where the International Space Station is right now: latitude, longitude, height in km, speed in km/h, and a plain place such as over the Pacific Ocean, west of Peru."
+    },
+    "examples": {
+      "iss_position": ["where is the space station right now", "where is the ISS"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": ["api.wheretheiss.at"],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "delete" },
+  "consent": "ISS position uses the internet: each time you ask, it asks one public website, api.wheretheiss.at, for the space station's position. It sends nothing about you or your home (the website sees only your internet address, as any website does), and it stores nothing on this computer."
+}

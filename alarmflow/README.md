@@ -12,13 +12,13 @@ Timers and alarms that ring on this computer. By Cypher Sisters, Apache-2.0.
 
 | Tool | What it does | Changes |
 |---|---|---|
-| `create_timer` | Start a countdown for some hours, minutes and seconds, up to 7 days | yes |
-| `create_alarm` | Ring at a clock time, today or tomorrow, once, daily, on weekdays or on weekends | yes |
+| `create_timer` | Start a countdown, said the way people say it (`duration`: "20 minutes", "an hour and a half", "1h30m") or as hours, minutes and seconds (parts allowed, like 1.5 hours), up to 7 days | yes |
+| `create_alarm` | Ring at a time of day (`time`: "6:30 AM", "7pm", "18:30", "noon", or `hour` and `minute`), once, daily, on weekdays, on weekends or weekly | yes |
 | `list` | The timers and alarms that are set, with the time left | no |
 | `snooze` | Push a ringing item back some minutes (default 9, up to 24 hours) | yes |
 | `add_time` | Add minutes to a running item, or take some off (up to 24 hours either way) | yes |
 | `pause` / `resume` | Freeze a timer, or start it again | yes |
-| `dismiss` | Stop a ringing item, or cancel one that is set. A ringing repeating alarm moves to its next day. | yes |
+| `dismiss` | Stop a ringing item, or cancel one that is set. A ringing repeating alarm moves to its next day. "all" stops everything. | yes |
 | `dismiss_all` | Stop and cancel everything | yes |
 | `delete` | Remove an item for good | yes |
 
@@ -26,12 +26,14 @@ Every argument is checked before anything is saved (text must be text, numbers m
 
 Items are found by name, the way people say them: "the pasta timer" finds "Pasta". When two names match, the tool asks which one.
 
-**How alarms ring.** The ringing clock is part of AlarmFlow's own process, not the page. Once a second it marks every item that is due as ringing and asks the Core to tell the owner (`POST /v1/notify`, urgency high, with sound and speech asked for). The Desktop shows that as a notice card. The AlarmFlow page, when it is open, also plays the item's sound every few seconds until it is stopped or snoozed.
+**How alarms ring.** The ringing clock is part of AlarmFlow's own process, not the page. Once a second it marks every item that is due as ringing and asks the Core to tell the owner (`POST /v1/notify`, urgency high, with sound and speech asked for). The Desktop shows that as a notice card. On Windows, AlarmFlow also beeps through this computer's speakers itself (Python's `winsound`), every 5 seconds for up to 10 minutes or until the item is stopped or snoozed, so it is heard with no page open. The AlarmFlow page, when it is open, also plays the item's sound every few seconds until it is stopped or snoozed.
+
+**Restarts.** A running timer is saved as its start time and length, a paused one as the time it has left, and an alarm as its ring time, so after a restart each one has the right time left. A repeating alarm keeps its own time of day, so a snooze never moves tomorrow's ring.
 
 - AlarmFlow needs to keep running in the background for this. Steward starts it again each time BuildBot starts (it was running at the last stop), and Caretaker restarts it if it stops (up to 3 tries, then it is marked broken with a plain reason). `/health` answers 503 if the ringing clock stopped, if `alarmflow.json` will not read, or if the last 3 clock ticks failed, so Caretaker sees that nothing would ring. The page shows the same problem in a banner.
 - While BuildBot is off, nothing rings. An item that came due meanwhile rings at the next start, and its notice says how late it is.
 
-**What it needs.** Nothing from the internet, no keys, no brain.
+**What it needs.** Nothing from the internet, no keys, no brain. Speakers for the beep (Windows only).
 
 **Setup steps.** One: "Let AlarmFlow play sound". Browsers stay silent until you tap a page once, so open AlarmFlow and tap Test sound.
 
@@ -47,7 +49,22 @@ Items are found by name, the way people say them: "the pasta timer" finds "Pasta
 - The page's Voice button is gone. It used the browser's speech service, which can send audio off this computer. Ask the bot instead.
 - The n8n message bridge on the page is gone; the MCP tools replace it.
 
+## Changes in 2.1.0
+
+- Ringing is heard with no page open: on Windows AlarmFlow beeps through the speakers for up to 10 minutes.
+- Say a timer the way you say it: "20 minutes", "an hour and a half", "half an hour", "1h30m". Parts of an hour (1.5) work too.
+- Say an alarm the way you say it: "6:30 AM", "7pm", "18:30", "noon".
+- New repeat: weekly, on the same day each week (tool and page).
+- Bug fix: snoozing a repeating alarm no longer moves its time for the days after.
+- Bug fix: deleting by name picks the timer that is set, not an old stopped one with the same name.
+- "Stop" with no name and several ringing now asks which one; "stop all" stops everything.
+- An unknown repeat is refused with a plain answer instead of quietly becoming "once".
+- Alarms show their day (tomorrow, Monday) in the list, the brain's answers and the page.
+
 ## Rough edges
 
-- The Desktop shows a notice card for a ringing item but does not play a sound itself; the sound plays on the AlarmFlow page when it is open.
-- Alarms take a clock time in the next 24 hours (or a repeat). There is no "on the 3rd of next month" alarm; use Calendar for that.
+- The Desktop shows a notice card for a ringing item but does not play a sound itself. The beep comes from AlarmFlow on Windows only; on other systems the sound plays on the AlarmFlow page when it is open.
+- The beep is a plain tone pattern per sound, not the page's softer sound, and both play when the page is open.
+- After 10 minutes the beep stops; the item stays ringing on the card, the widget and the page until stopped.
+- Alarms take a time of day in the next 24 hours (or a repeat). There is no "on the 3rd of next month" alarm, and no pick-your-own days (like Monday and Thursday); use Calendar for that.
+- "Wake me in 45 minutes" is a timer, not an alarm.

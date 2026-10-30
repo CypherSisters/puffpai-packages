@@ -1,0 +1,45 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "news-headlines",
+  "kind": "tool",
+  "name": "News headlines",
+  "version": "1.0.0",
+  "description": "Reads the news feeds you add (RSS or Atom) and gives the latest headlines: title, source, time and link. It comes with no feeds, does not fetch or summarize articles, and each feed's site must be allowed on the Bridge before it loads.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/newspaper.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_feed", "remove_feed"],
+    "tools": {
+      "add_feed": "Add a news feed (an RSS or Atom address) with a short name. Its host must then be allowed on the Bridge before its headlines load.",
+      "remove_feed": "Remove a news feed by its name or address.",
+      "list_feeds": "List the news feeds that have been added, with their addresses.",
+      "headlines": "The latest news headlines from the added feeds, or from one feed: title, source, time and link. No article text."
+    },
+    "examples": {
+      "add_feed": ["add the news feed at https://www.example.org/news/rss.xml and call it Local Paper"],
+      "remove_feed": ["remove the Local Paper news feed"],
+      "list_feeds": ["which news feeds do I have"],
+      "headlines": ["what are the latest headlines", "give me five headlines from Local Paper"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "News headlines keeps your feed list and the last headlines it read in its own data folder on this computer. It uses the internet only to fetch the feeds you add, from the sites you allow on the Bridge, and sends those sites nothing about you except a plain request for the feed (like any web request, they see your home's internet address)."
+}

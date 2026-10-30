@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Daily briefing">
+  <path d="M14 44a18 18 0 0 1 36 0z" fill="#ffca28" stroke="#3d1a55" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M32 10v8M12 22l6 5M52 22l-6 5M6 38h6M52 38h6" stroke="#3d1a55" stroke-width="4" stroke-linecap="round"/>
+  <path d="M6 44h52M14 52h36" stroke="#3d1a55" stroke-width="4" stroke-linecap="round"/>
+</svg>

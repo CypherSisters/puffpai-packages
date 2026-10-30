@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Weather">
+  <g stroke="#f5a623" stroke-width="3.5" stroke-linecap="round">
+    <path d="M24 6v6M8 22h6M12.7 10.7l4.2 4.2M35.3 10.7l-4.2 4.2M12.7 33.3l4.2-4.2"/>
+  </g>
+  <circle cx="24" cy="22" r="10" fill="#ffc83d"/>
+  <path d="M20 52a10 10 0 0 1 1.5-19.9A13 13 0 0 1 46 30a9 9 0 0 1 2 18v4z" fill="#ffffff" stroke="#7aa7d6" stroke-width="3" stroke-linejoin="round"/>
+</svg>

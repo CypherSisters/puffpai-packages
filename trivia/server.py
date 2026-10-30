@@ -4,7 +4,7 @@
 One small server, Python standard library only, bound to 127.0.0.1:
 - ``/``            the game page (web/index.html), shown in the Desktop at /pkg/trivia/
 - ``/health``      "ok"
-- ``/questions``   the question bank (questions.json in this package)
+- ``/questions``   the question bank (questions.json in this package, plus the owner's own questions)
 - ``/data``        the scores document (GET), ``/updated`` its stamp
 - ``/api/result``  the page saves one finished game (POST)
 - ``/mcp``         the MCP server (JSON-RPC over HTTP)
@@ -13,7 +13,9 @@ Every route refuses a request without this package's PUFFPAI_TOKEN (D48d). The
 Desktop reaches the page through the Core's /pkg/trivia/, which adds it.
 
 The scores are one JSON document in PUFFPAI_DATA (``trivia.json``, the v1 shape
-``{results: [...], last_updated}``, so a v1 file can be copied in). Writes
+``{results: [...], last_updated}``, so a v1 file can be copied in), with the
+owner's own questions added beside them (``my_questions``, ``my_categories``).
+A round played in chat is kept in memory until ``end_round`` saves it. Writes
 replace the whole file at once (temp file, then rename). A file that exists
 but will not read is never written over.
 
@@ -39,16 +41,19 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 BANK = HERE / "questions.json"
 NAME = "trivia"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DOC = "trivia.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 256 * 1024
-POINTS = {"beginner": 100, "mid": 200, "jeopardy": 300}     # per right answer, as the game page counts
+POINTS = {"kids": 100, "beginner": 100, "mid": 200, "jeopardy": 300}     # per right answer, as the page counts
+LEVELS = tuple(POINTS)
 LETTERS = "ABCD"
 MODES = ("casual", "brain", "group", "chat")
 #: The page's own scoring goes past 1,000 (up to 300 a question plus time and streak bonuses, 20 questions),
 #: so a score is a whole number from 0 to 100,000.
 MAX_SCORE = 100_000
+MAX_OWN = 2000              # questions of the owner's own, at most
+OWN_ICON = "\u2b50"         # the icon of a category the owner adds
 
 
 def _now() -> str:
@@ -190,29 +195,74 @@ def _top_score(result: dict) -> tuple[float, str]:
     return _num(score), str(result.get("player") or "")[:40]
 
 
+def _slug(name: str) -> str:
+    return "".join(ch if ch.isascii() and ch.isalnum() else "-" for ch in name.lower()).strip("-")[:30] or "mine"
+
+
+def _same(a: str, b: str) -> bool:
+    return " ".join(a.lower().split()) == " ".join(b.lower().split())
+
+
+def _own_question(item) -> bool:
+    """An owner's question as kept in trivia.json: sound enough to ask."""
+    return (isinstance(item, dict) and isinstance(item.get("q"), str) and isinstance(item.get("category"), str)
+            and item.get("difficulty") in LEVELS and isinstance(item.get("options"), list)
+            and len(item["options"]) == 4 and all(isinstance(o, str) for o in item["options"])
+            and item.get("answer") in (0, 1, 2, 3))
+
+
 # ------------------------------------------------------------- the logic
 
 class Trivia:
     def __init__(self, store: Store, bank: dict) -> None:
         self.store = store
         self.bank = bank
-        self.names = {c["id"]: c["name"] for c in bank["categories"]}
-        self.recent: deque[str] = deque(maxlen=40)     # questions asked lately, so a quiz does not repeat
+        self.recent: deque[str] = deque(maxlen=40)     # questions asked lately, so a new round does not repeat
         self.rng = random.Random()
+        self.lock = threading.Lock()
+        self.round: dict | None = None                 # the chat round going now (in memory; end_round saves it)
+
+    # the bank with the owner's own questions added
+    def view(self) -> dict:
+        """The bank as the page and the brain see it: the questions that came with Trivia plus the owner's own
+        (``my_categories`` and ``my_questions`` in trivia.json). A scores file that will not read leaves the
+        bank as it came."""
+        try:
+            doc = self.store.load()
+        except Unreadable:
+            doc = {}
+        cats = [dict(c) for c in self.bank["categories"]]
+        ids = {c["id"] for c in cats}
+        for c in doc.get("my_categories") or []:
+            if isinstance(c, dict) and isinstance(c.get("id"), str) and isinstance(c.get("name"), str) \
+                    and c["id"] not in ids:
+                cats.append({"id": c["id"], "icon": OWN_ICON, "name": c["name"][:40], "own": True})
+                ids.add(c["id"])
+        questions = {cid: {d: list(items) for d, items in by.items()} for cid, by in self.bank["questions"].items()}
+        for item in doc.get("my_questions") or []:
+            if _own_question(item) and item["category"] in ids and item["category"] != "random":
+                questions.setdefault(item["category"], {}).setdefault(item["difficulty"], []).append(
+                    {"q": item["q"], "options": item["options"], "answer": item["answer"], "own": True})
+        return {**{k: v for k, v in self.bank.items() if k not in ("categories", "questions")},
+                "categories": cats, "questions": questions}
 
     # helpers
-    def _category(self, category: str | None) -> str:
+    def _names(self, view: dict | None = None) -> dict:
+        return {c["id"]: c["name"] for c in (view or self.view())["categories"]}
+
+    def _category(self, category: str | None, view: dict | None = None) -> str:
         """A category id from an id or a name ("Food & Drink", "food", "the 2000s"); random if empty."""
+        names = self._names(view)
         text = str(category or "").strip().lower()
         if not text or text in ("any", "random", "mixed", "anything"):
             return "random"
-        for cid, name in self.names.items():
+        for cid, name in names.items():
             if text in (cid, name.lower()) or text.removeprefix("the ") in (cid, name.lower().removeprefix("the ")):
                 return cid
-        for cid, name in self.names.items():
+        for cid, name in names.items():
             if cid != "random" and (cid in text or text in name.lower()):
                 return cid
-        raise ValueError(f"there is no {category!r} category. Categories: {', '.join(self.names.values())}")
+        raise ValueError(f"there is no {category!r} category. Categories: {', '.join(names.values())}")
 
     def _difficulty(self, difficulty: str | None) -> str:
         text = str(difficulty or "").strip().lower()
@@ -222,58 +272,172 @@ class Trivia:
             return "mid"
         if text in ("jeopardy", "hard", "difficult", "expert"):
             return "jeopardy"
-        raise ValueError("difficulty is beginner, mid or jeopardy")
+        if text in ("kids", "kid", "children", "child", "kids mode"):
+            return "kids"
+        raise ValueError("difficulty is beginner, mid, jeopardy or kids")
 
-    def _label(self, cid: str) -> str:
+    def _label(self, cid, view: dict | None = None) -> str:
         cid = cid if isinstance(cid, str) else ""
-        return self.names.get(cid, cid[:40] or "Random")
+        return self._names(view).get(cid, cid[:40] or "Random")
+
+    def _pool(self, view: dict, cid: str, diff: str) -> list[tuple[str, dict]]:
+        """(category, question) pairs to ask from. Kids mode: the beginner questions of the kids categories,
+        plus any question the owner added at the kids level."""
+        q = view["questions"]
+        kids_ok = set(view.get("kids_categories") or [])
+        out = []
+        for c in (q if cid == "random" else [cid]):
+            by = q.get(c, {})
+            items = ((by.get("beginner", []) if c in kids_ok else []) + by.get("kids", [])) if diff == "kids" \
+                else by.get(diff, [])
+            out += [(c, x) for x in items]
+        return out
+
+    def _scores(self) -> str:
+        """The round's score line: "Sam: 3 of 4 right (300 points), Ada: 2 of 4 right (200 points)"."""
+        players = self.round["players"] if self.round else {}
+        return ", ".join(f"{name or 'you'}: {p['right']} of {p['asked']} right ({p['points']} points)"
+                         for name, p in players.items())
 
     # tools
     def stats(self) -> str:
-        """From trivia_get_stats (app_data.py:1301), plus the last game and group games."""
+        """From trivia_get_stats (app_data.py:1301), plus the last game, group games and the round going now."""
         results = [r for r in self.store.load()["results"] if isinstance(r, dict)]
+        with self.lock:
+            scores_now = self._scores()
+        going = f" A round is going in chat: {scores_now}." if scores_now else ""
         if not results:
-            return "No trivia games played yet."
+            return "No trivia games played yet." + going
+        view = self.view()
         total = len(results)
         scores = [_top_score(r)[0] for r in results]
         best_i = max(range(total), key=lambda i: scores[i])
         best, (_, who) = results[best_i], _top_score(results[best_i])
         last = results[-1]
         line = (f"Trivia stats: {_plural(total, 'game')} played. Average score: {sum(scores) / total:.1f}. "
-                f"Best: {scores[best_i]:g}{f' by {who}' if who else ''} in {self._label(best.get('category'))} "
+                f"Best: {scores[best_i]:g}{f' by {who}' if who else ''} in {self._label(best.get('category'), view)} "
                 f"({str(best.get('difficulty') or 'unknown')[:20]}).")
         if total > 1:
-            line += (f" Last game: {_top_score(last)[0]:g} in {self._label(last.get('category'))} "
+            line += (f" Last game: {_top_score(last)[0]:g} in {self._label(last.get('category'), view)} "
                      f"({str(last.get('difficulty') or 'unknown')[:20]}).")
-        return line
+        return line + going
 
     def list_categories(self) -> str:
-        q = self.bank["questions"]
-        rows = [f"{c['name']}: {sum(len(v) for v in q.get(c['id'], {}).values())} questions"
-                for c in self.bank["categories"] if c["id"] != "random"]
-        return ("Trivia categories (each at beginner, mid and jeopardy level; Random mixes them all):\n"
-                + "\n".join(rows))
+        view = self.view()
+        q = view["questions"]
+        rows = []
+        for c in view["categories"]:
+            if c["id"] == "random":
+                continue
+            by = q.get(c["id"], {})
+            own = sum(1 for v in by.values() for x in v if x.get("own"))
+            kids = len(self._pool(view, c["id"], "kids"))
+            rows.append(f"{c['name']}: {_plural(sum(len(v) for v in by.values()), 'question')}"
+                        + (f", {own} of them yours" if own else "") + (f", {kids} for kids mode" if kids else ""))
+        return ("Trivia categories, at beginner, mid and jeopardy level (Random mixes them all; "
+                "kids mode asks the easy ones that suit children):\n" + "\n".join(rows))
 
-    def ask_question(self, category: str = "random", difficulty: str = "beginner") -> str:
-        cid = self._category(_text(category, "category", 40))
+    def ask_question(self, category: str = "random", difficulty: str = "beginner", player: str = "") -> str:
+        view = self.view()
+        cid = self._category(_text(category, "category", 40), view)
         diff = self._difficulty(_text(difficulty, "difficulty", 20))
-        q = self.bank["questions"]
-        if cid == "random":
-            pool = [(c, x) for c, by in q.items() for x in by.get(diff, [])]
-        else:
-            pool = [(cid, x) for x in q.get(cid, {}).get(diff, [])]
-        fresh = [p for p in pool if p[1]["q"] not in self.recent] or pool
-        if not fresh:
-            return f"There are no {diff} questions in {self._label(cid)}."
-        got_cat, item = self.rng.choice(fresh)
-        self.recent.append(item["q"])
-        options = list(item["options"])
-        right = options[item["answer"]]
-        self.rng.shuffle(options)
-        letter = LETTERS[options.index(right)]
+        player = _text(player, "player", 40)
+        pool = self._pool(view, cid, diff)
+        if not pool:
+            kids = [self._label(c, view) for c in view.get("kids_categories") or []]
+            more = f" Kids mode has: {', '.join(kids)}." if diff == "kids" else ""
+            return f"There are no {diff} questions in {self._label(cid, view)}.{more}"
+        with self.lock:
+            if self.round is None:
+                self.round = {"asked": [], "pending": None, "players": {}, "kinds": []}
+            rnd = self.round
+            fresh = [p for p in pool if p[1]["q"] not in rnd["asked"]]
+            note = "" if fresh else "Every question here was asked this round, so this one comes round again. "
+            fresh = [p for p in fresh if p[1]["q"] not in self.recent] or fresh or pool
+            got_cat, item = self.rng.choice(fresh)
+            self.recent.append(item["q"])
+            rnd["asked"].append(item["q"])
+            options = list(item["options"])
+            right = options[item["answer"]]
+            self.rng.shuffle(options)
+            rnd["pending"] = {"q": item["q"], "options": options, "right": options.index(right),
+                              "category": got_cat, "difficulty": diff, "player": player}
+            rnd["kinds"].append((got_cat, diff))
+            number = len(rnd["asked"])
         lines = "\n".join(f"{LETTERS[i]}. {o}" for i, o in enumerate(options))
-        return (f"{self._label(got_cat)} ({diff}) question: {item['q']}\n{lines}\n"
-                f"Answer, to say only after they guess: {letter}. {right}.")
+        who = f", for {player}" if player else ""
+        return (f"{note}Question {number} of this round{who}. {self._label(got_cat, view)} ({diff}): "
+                f"{item['q']}\n{lines}")
+
+    @staticmethod
+    def _guess(answer: str, options: list[str]) -> int:
+        """The option a guess names: a letter (A, "b.", "c)") or the option's words."""
+        low = answer.strip().rstrip(".!").strip().lower()
+        for prefix in ("the answer is ", "answer ", "option ", "letter "):
+            low = low.removeprefix(prefix)
+        if len(low) == 1 and low.upper() in LETTERS:
+            return LETTERS.index(low.upper())
+        if len(low) >= 2 and low[0].upper() in LETTERS and low[1] in ".):":
+            rest = low[2:].strip()
+            if not rest or any(_same(rest, o) for o in options):
+                return LETTERS.index(low[0].upper())
+        exact = [i for i, o in enumerate(options) if _same(low, o)]
+        if exact:
+            return exact[0]
+        near = [i for i, o in enumerate(options) if len(low) >= 3 and (low in o.lower() or o.lower() in low)]
+        if len(near) == 1:
+            return near[0]
+        raise ValueError("answer is a letter A to D, or the words of one of the options")
+
+    def check_answer(self, answer: str, player: str = "") -> str:
+        answer = _text(answer, "answer", 200)
+        player = _text(player, "player", 40)
+        with self.lock:
+            pending = self.round["pending"] if self.round else None
+            if not pending:
+                return "There is no question waiting for an answer. Ask one first."
+            pick = self._guess(answer, pending["options"])
+            right = pick == pending["right"]
+            p = self.round["players"].setdefault(player or pending["player"], {"right": 0, "asked": 0, "points": 0})
+            p["asked"] += 1
+            if right:
+                p["right"] += 1
+                p["points"] += POINTS[pending["difficulty"]]
+            self.round["pending"] = None
+            scores = self._scores()
+        said = "Right!" if right else f"Not quite, it is not {LETTERS[pick]}."
+        return (f"{said} The answer is {LETTERS[pending['right']]}. {pending['options'][pending['right']]}. "
+                f"Score: {scores}.")
+
+    def end_round(self, save: bool = True) -> str:
+        if not isinstance(save, bool):
+            raise ValueError("save is true or false")
+        with self.lock:
+            rnd, self.round = self.round, None
+        players = {n: p for n, p in (rnd or {}).get("players", {}).items() if p["asked"]}
+        if not players:
+            return "No round to end: nobody has answered a question yet."
+        cats = {c for c, _ in rnd["kinds"]}
+        diffs = {d for _, d in rnd["kinds"]}
+        board = ", ".join(f"{n or 'you'}: {p['right']} of {p['asked']} right ({p['points']} points)"
+                          for n, p in players.items())
+        if not save:
+            return f"Round over, not saved. {board}."
+        result = {"date": _now(), "mode": "chat", "category": cats.pop() if len(cats) == 1 else "random",
+                  "difficulty": diffs.pop() if len(diffs) == 1 else "mixed", "source": "brain",
+                  "totalQuestions": sum(p["asked"] for p in players.values())}
+        if len(players) == 1:
+            ((name, p),) = players.items()
+            result.update(score=p["points"], correct=p["right"], player=name)
+        else:
+            result["score"] = [{"name": n or "Player", "score": p["points"]} for n, p in players.items()]
+        self.store.add_result(result)
+        win = ""
+        if len(players) > 1:
+            top = max(p["points"] for p in players.values())
+            best = [n or "you" for n, p in players.items() if p["points"] == top]
+            win = f" Winner: {best[0]}." if len(best) == 1 else f" A tie: {' and '.join(best)}."
+        return f"Round over and saved. {board}.{win}"
 
     def record_result(self, correct: int, total_questions: int, category: str = "random",
                       difficulty: str = "beginner", player: str = "") -> str:
@@ -292,6 +456,64 @@ class Trivia:
         who = f" for {player}" if player else ""
         return (f"Saved{who}: {correct} of {total_questions} right in {self._label(cid)} ({diff}), "
                 f"{score} points.")
+
+    def add_question(self, question: str, right_answer: str, wrong_answers: list, category: str,
+                     difficulty: str = "beginner") -> str:
+        question = _text(question, "question", 300)
+        right = _text(right_answer, "right_answer", 120)
+        if len(question) < 5 or not right:
+            raise ValueError("a question needs its words and the right answer")
+        if not isinstance(wrong_answers, list) or len(wrong_answers) != 3:
+            raise ValueError("wrong_answers is a list of 3 wrong answers")
+        options = [right, *(_text(w, "a wrong answer", 120) for w in wrong_answers)]
+        if not all(options) or len({" ".join(o.lower().split()) for o in options}) != 4:
+            raise ValueError("the right answer and the 3 wrong ones must be 4 different answers")
+        diff = self._difficulty(_text(difficulty, "difficulty", 20))
+        name = _text(category, "category", 40)
+        if not name:
+            raise ValueError("a question needs a category: one on the list, or a new one")
+        with self.store.lock:
+            data = self.store.load()
+            view = self.view()
+            mine = [x for x in data.get("my_questions") or [] if isinstance(x, dict)]
+            if len(mine) >= MAX_OWN:
+                raise ValueError(f"Trivia keeps at most {MAX_OWN} questions of your own; remove one first")
+            if any(_same(question, x["q"]) for by in view["questions"].values() for v in by.values() for x in v):
+                raise ValueError("that question is already in the bank")
+            new = ""
+            try:
+                cid = self._category(name, view)
+            except ValueError:
+                cid, ids = _slug(name), {c["id"] for c in view["categories"]}
+                while cid in ids:
+                    cid += "-2"
+                data["my_categories"] = [*(data.get("my_categories") or []),
+                                         {"id": cid, "icon": OWN_ICON, "name": name}]
+                new = f" It starts a new category, {name}."
+            if cid == "random":
+                raise ValueError("pick a category for it; Random mixes them all")
+            data["my_questions"] = [*mine, {"category": cid, "difficulty": diff, "q": question,
+                                            "options": options, "answer": 0, "added": _now()}]
+            self.store.save(data)
+        return f"Added to {self._label(cid)} ({diff}): {question} The answer: {right}.{new}"
+
+    def remove_question(self, question: str) -> str:
+        question = _text(question, "question", 300)
+        with self.store.lock:
+            data = self.store.load()
+            mine = [x for x in data.get("my_questions") or [] if isinstance(x, dict)]
+            keep = [x for x in mine if not _same(question, str(x.get("q") or ""))]
+            if len(keep) == len(mine):
+                if any(_same(question, x["q"]) for by in self.bank["questions"].values()
+                       for v in by.values() for x in v):
+                    return "That question came with Trivia; only questions you added can be removed."
+                return f"None of your own questions is {question!r}."
+            data["my_questions"] = keep
+            used = {x.get("category") for x in keep}
+            data["my_categories"] = [c for c in data.get("my_categories") or []
+                                     if isinstance(c, dict) and c.get("id") in used]
+            self.store.save(data)
+        return f"Removed: {question}"
 
     # the page
     def page_result(self, body: dict) -> str:
@@ -330,21 +552,40 @@ def _p(kind: str, text: str) -> dict:
     return {"type": kind, "description": text}
 
 
+_LEVEL = "beginner, mid, jeopardy, or kids (easy questions that suit children). Default beginner."
 TOOLS = [
-    ("stats", "Trivia scores so far: games played, the average score, the best score and the last game.", {}, []),
+    ("stats", "Trivia scores so far: games played, the average score, the best score, the last game, and the "
+     "score of a round going in chat.", {}, []),
     ("list_categories", "List the trivia question categories and how many questions each has.", {}, []),
-    ("ask_question", "Get one multiple-choice trivia question to quiz people with. Read the question and the "
-     "options A to D; the answer comes last, to say after they guess.",
+    ("ask_question", "Ask the next multiple-choice trivia question of a round in chat: the question and options A "
+     "to D. The answer is kept back until check_answer. A round does not repeat a question until the category "
+     "runs out.",
      {"category": _p("string", "Like history, science, movies, music, sports, geography, or random. Default random."),
-      "difficulty": _p("string", "beginner, mid or jeopardy. Default beginner.")}, []),
-    ("record_result", "Save the score of a trivia round played in chat: how many answers were right out of how many.",
+      "difficulty": _p("string", _LEVEL),
+      "player": _p("string", "Optional: whose turn it is, for a game with several players.")}, []),
+    ("check_answer", "Check a guess at the question just asked: says if it is right, gives the answer, and keeps "
+     "each player's score for the round.",
+     {"answer": _p("string", "The guess: a letter A to D, or the words of an option."),
+      "player": _p("string", "Optional: who answered. Default the player the question was for.")}, ["answer"]),
+    ("end_round", "End the trivia round played in chat and save each player's score.",
+     {"save": _p("boolean", "False to end it without saving. Default true.")}, []),
+    ("record_result", "Save the score of a trivia round played some other way: how many answers were right out of "
+     "how many.",
      {"correct": _p("integer", "How many answers were right."),
       "total_questions": _p("integer", "How many questions were asked."),
       "category": _p("string", "The category played. Default random."),
-      "difficulty": _p("string", "beginner, mid or jeopardy. Default beginner."),
+      "difficulty": _p("string", _LEVEL),
       "player": _p("string", "Optional: who played.")}, ["correct", "total_questions"]),
+    ("add_question", "Add a question of your own to the trivia bank, for the game page and for chat. A category "
+     "that is not on the list becomes a new category.",
+     {"question": _p("string", "The question."), "right_answer": _p("string", "The right answer."),
+      "wrong_answers": {"type": "array", "items": {"type": "string"}, "description": "Exactly 3 wrong answers."},
+      "category": _p("string", "Like history or science, or a new one like Our Family."),
+      "difficulty": _p("string", _LEVEL)}, ["question", "right_answer", "wrong_answers", "category"]),
+    ("remove_question", "Remove a question you added to the trivia bank.",
+     {"question": _p("string", "The question's words, as added.")}, ["question"]),
 ]
-CHANGES = ["record_result"]
+CHANGES = ["end_round", "record_result", "add_question", "remove_question"]
 
 
 def tool_list() -> list[dict]:
@@ -485,7 +726,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/health":
                 return self._send(200, b"ok", "text/plain")
             if path == "/questions":
-                return self._json(200, self.app.bank)
+                return self._json(200, self.app.view())
             if path == "/data":
                 return self._json(200, self.app.store.load())
             if path == "/updated":

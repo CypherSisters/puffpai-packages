@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Network devices">
+  <g stroke="#7aa7d6" stroke-width="3" stroke-linecap="round">
+    <path d="M32 32L14 14M32 32L50 14M32 32L14 50M32 32L50 50M32 32V10"/>
+  </g>
+  <circle cx="32" cy="32" r="8" fill="#3d6fa8"/>
+  <g fill="#9cc3ea">
+    <circle cx="14" cy="14" r="6"/>
+    <circle cx="50" cy="14" r="6"/>
+    <circle cx="14" cy="50" r="6"/>
+    <circle cx="50" cy="50" r="6"/>
+    <circle cx="32" cy="9" r="5"/>
+  </g>
+</svg>

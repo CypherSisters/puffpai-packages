@@ -1,0 +1,48 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "document-search",
+  "kind": "tool",
+  "name": "Document search",
+  "version": "1.0.0",
+  "description": "Keeps the owner's documents (.txt, .md, .csv, .json, .docx, .html and other text files) on this computer and searches their words, so the bot can find and read them back. It matches words, not meanings (no embedding model), and it does not read PDFs, pictures or spreadsheets.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/page-magnifier.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_document", "remove_document"],
+    "tools": {
+      "add_document": "Keep a document (.txt, .md, .csv, .json, .docx, .html or another text file) on this computer and index its words so it can be searched.",
+      "search_documents": "Search the owner's kept documents for words, and get the ten best matches with a short snippet and each document's id.",
+      "read_document": "Read the full text of one kept document by its id.",
+      "list_documents": "List the kept documents, newest first, with their ids.",
+      "remove_document": "Remove one kept document and its words from the index, by its id."
+    },
+    "examples": {
+      "add_document": ["keep this document so I can search it later", "add my roof warranty to my documents"],
+      "search_documents": ["what did I save about the roof warranty", "find my lasagna recipe in my documents"],
+      "read_document": ["read me the whole of document 3"],
+      "list_documents": ["what documents have I saved"],
+      "remove_document": ["remove document 4 from my documents"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "accepts": [ { "types": [".txt", ".md", ".csv", ".json", ".docx", ".html", "text/*"], "tool": "add_document" } ],
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Your documents are indexed and kept on this computer, in one file in this tool's own data folder (documents.sqlite). It does not use the internet."
+}

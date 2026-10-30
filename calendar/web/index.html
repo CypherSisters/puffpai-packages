@@ -32,7 +32,8 @@ h1{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:1.8
 .dow{font-size:.7rem;text-transform:uppercase;color:var(--ink2);text-align:center;padding:2px}
 .day{min-height:64px;background:#fff;border:1px solid var(--paper2);border-radius:4px;padding:3px;cursor:pointer;overflow:hidden}
 .day.blank{background:transparent;border:none;cursor:default}
-.day.today{border-color:var(--coral)}
+.day.today{border:2px solid var(--coral);background:#fff4ef}
+.day.today .n{color:var(--coral)}
 .day.sel{outline:2px solid var(--ink)}
 .day .n{font-size:.75rem;font-weight:700;color:var(--ink2)}
 .dot{display:block;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--sky);padding-left:3px;margin-top:2px}
@@ -75,7 +76,7 @@ form.add .wide{grid-column:1/-1}
   <div class="pane on" id="pane-events">
     <div class="grid2">
       <div class="card">
-        <div class="month-head"><button class="nav" id="prev">&lsaquo;</button><b id="monthName"></b><button class="nav" id="next">&rsaquo;</button></div>
+        <div class="month-head"><button class="nav" id="prev" title="Last month">&lsaquo;</button><b id="monthName"></b><span><button class="nav" id="today" title="Back to today">Today</button> <button class="nav" id="next" title="Next month">&rsaquo;</button></span></div>
         <div class="cal" id="cal"></div>
       </div>
       <div>
@@ -163,7 +164,8 @@ form.add .wide{grid-column:1/-1}
   const pad = n => String(n).padStart(2, '0');
   const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
   let doc = null, month = null, stamp = '', who = 'all', tab = 'events', showMore = false;
-  const today = new Date();
+  const today = new Date();                      // when the page opened; todayKey() is read fresh (the page can stay open past midnight)
+  const todayKey = () => iso(new Date());
   let y = today.getFullYear(), m = today.getMonth() + 1, sel = iso(today);
 
   function toast(t) { const n = document.createElement('div'); n.className = 'toast'; n.textContent = t; document.body.appendChild(n); setTimeout(() => n.remove(), 3000); }
@@ -207,7 +209,7 @@ form.add .wide{grid-column:1/-1}
     for (let d = 1; d <= days; d++) {
       const key = y + '-' + pad(m) + '-' + pad(d);
       const rows = ((month.days || {})[key] || []).filter(mine);
-      html += '<div class="day' + (key === iso(today) ? ' today' : '') + (key === sel ? ' sel' : '') + '" data-day="' + key + '"><div class="n">' + d + '</div>'
+      html += '<div class="day' + (key === todayKey() ? ' today' : '') + (key === sel ? ' sel' : '') + '" data-day="' + key + '"><div class="n">' + d + '</div>'
         + rows.slice(0, 3).map(r => '<span class="dot ' + esc(r.kind) + (r.done ? ' done' : '') + '">' + esc(r.title) + '</span>').join('')
         + (rows.length > 3 ? '<span class="dot" style="border:none">+' + (rows.length - 3) + ' more</span>' : '') + '</div>';
     }
@@ -242,8 +244,9 @@ form.add .wide{grid-column:1/-1}
   function renderMeds() {
     const meds = (doc.meds || []).filter(mine);
     $('meds').innerHTML = meds.length ? meds.map(x => '<div class="row' + (x.takenToday ? ' done' : '') + '"><div class="what"><b>' + esc(x.name) + '</b>'
-      + '<div class="meta">' + esc([x.dose, x.freq, x.next, 'for ' + nameOf(x.to), x.takenToday ? 'taken today' : 'due'].filter(Boolean).join(' · ')) + '</div></div>'
-      + (x.takenToday ? '' : '<button class="btn" data-act="take_med" data-arg="med" data-id="' + esc(x.id) + '">Taken</button>') + '</div>').join('')
+      + '<div class="meta">' + esc([x.dose, x.freq, x.next, 'for ' + nameOf(x.to), x.state || (x.takenToday ? 'taken today' : 'due'), x.lastTaken ? 'last taken ' + x.lastTaken : ''].filter(Boolean).join(' · ')) + '</div></div>'
+      + (x.takenToday && x.freq !== 'as-needed' ? '' : '<button class="btn" data-act="take_med" data-arg="med" data-id="' + esc(x.id) + '">Taken</button>')
+      + '<button class="btn x" data-act="delete_med" data-arg="med" data-id="' + esc(x.id) + '">Delete</button></div>').join('')
       : '<div class="empty">No medicines are tracked.</div>';
   }
 
@@ -282,15 +285,20 @@ form.add .wide{grid-column:1/-1}
   form('f-bill', 'add_bill', a => ({...a, amount: parseFloat(a.amount || '0'), autopay: !!a.autopay}));
 
   document.addEventListener('click', e => {
-    const t = e.target.closest('[data-act],[data-day],[data-who],.tab,#more,#prev,#next'); if (!t) return;
-    if (t.dataset.act) return act(t.dataset.act, {[t.dataset.arg]: t.dataset.id});
+    const t = e.target.closest('[data-act],[data-day],[data-who],.tab,#more,#prev,#next,#today'); if (!t) return;
+    if (t.dataset.act) {
+      if (t.dataset.act === 'delete_med' && !confirm('Stop tracking this medicine and delete its dose log?')) return;
+      return act(t.dataset.act, {[t.dataset.arg]: t.dataset.id});
+    }
     if (t.dataset.day) { sel = t.dataset.day; renderMonth(); renderDay(); return; }
     if (t.dataset.who) { who = t.dataset.who; render(); return; }
     if (t.classList.contains('tab')) { tab = t.dataset.tab; renderTabs(); return; }
     if (t.id === 'more') { showMore = true; renderTabs(); return; }
+    if (t.id === 'today') { const n = new Date(); y = n.getFullYear(); m = n.getMonth() + 1; sel = todayKey(); load(true); return; }
     if (t.id === 'prev' || t.id === 'next') {
       m += t.id === 'prev' ? -1 : 1; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
-      sel = y + '-' + pad(m) + '-01'; load(true);
+      // the month that holds today opens on today; any other month on its 1st
+      sel = todayKey().slice(0, 7) === y + '-' + pad(m) ? todayKey() : y + '-' + pad(m) + '-01'; load(true);
     }
   });
 

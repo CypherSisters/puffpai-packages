@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="News headlines">
+  <path d="M12 14h38v34a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6V24h4z" fill="#ffffff" stroke="#3b4a5a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M12 24v24a3 3 0 0 1-6 0" fill="none" stroke="#3b4a5a" stroke-width="3" stroke-linecap="round"/>
+  <rect x="18" y="20" width="26" height="6" rx="1.5" fill="#3b4a5a"/>
+  <rect x="18" y="31" width="11" height="11" rx="1.5" fill="#e8b04a"/>
+  <path d="M33 32h11M33 37h11M33 42h11M18 47h26" stroke="#8a97a6" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

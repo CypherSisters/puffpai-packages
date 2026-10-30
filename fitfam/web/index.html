@@ -171,6 +171,14 @@ const typeLabel = id => (lib.types.find(t => t.id === id) || {}).label || id;
 const typeEmoji = id => (lib.types.find(t => t.id === id) || {}).emoji || '⚡';
 const two = n => String(n).padStart(2, '0');
 const hName = h => h.typeName || h.type || 'Workout';
+const setLoad = s => Number(s.weight) ? `${esc(s.weight)}${s.unit ? ' ' + esc(s.unit) : ''} x ${esc(s.reps)}` : `${esc(s.reps)} reps`;
+const hDist = h => h.distance ? ` · ${esc(h.distance)} ${esc(h.distanceUnit || '')}` : '';
+const levelName = l => (lib.levels[l] || l || '');
+// The last 7 calendar days, today included: the same week the bot's "status" counts.
+function thisWeek(u) {
+  const from = new Date(); from.setHours(0, 0, 0, 0); from.setDate(from.getDate() - 6);
+  return u.history.filter(h => new Date(h.date) >= from).length;
+}
 
 // ─── SCREENS ───
 function render() {
@@ -204,7 +212,7 @@ function renderNav() {
 function renderDashboard(u) {
   const today = new Date().toDateString();
   const workedOut = u.history.some(h => new Date(h.date).toDateString() === today);
-  const week = u.history.filter(h => Date.now() - new Date(h.date).getTime() < 7 * 86400000).length;
+  const week = thisWeek(u);
   const goal = u.goals.find(g => g.current < g.target);
   let html = `<div class="page"><div style="margin-bottom:24px"><h2 style="font-size:26px">Hey ${esc(u.name)} ${esc(u.emoji)}</h2>` +
     `<p class="dim" style="font-size:13px">${workedOut ? 'Great work today! 🔥' : 'Ready to train?'}</p></div>` +
@@ -222,7 +230,7 @@ function renderDashboard(u) {
   if (u.history.length) {
     html += `<div style="margin-top:20px"><h3>Recent Workouts</h3>` + u.history.slice(-3).reverse().map(h =>
       `<div class="glass-light item"><div><div style="font-size:13px;font-weight:600">${esc(hName(h))}</div>` +
-      `<div class="dim" style="font-size:11px">${new Date(h.date).toLocaleDateString()} · ${esc(h.duration)} min${h.level ? ' · ' + esc(h.level) : ''}</div></div>` +
+      `<div class="dim" style="font-size:11px">${new Date(h.date).toLocaleDateString()} · ${esc(h.duration)} min${hDist(h)}${h.level ? ' · ' + esc(levelName(h.level)) : ''}</div></div>` +
       `<div style="font-size:13px;font-weight:700">${h.exerciseCount ? '✓ ' + esc(h.exerciseCount) + ' exercises' : ''}</div></div>`).join('') + `</div>`;
   }
   return html + `</div>`;
@@ -304,7 +312,7 @@ function renderProgress(u) {
   if (u.history.length) {
     html += `<div class="glass-light" style="padding:16px"><h3 style="font-size:14px">Workout History</h3>` + u.history.map((h, i) => [h, i]).reverse().map(([h, i]) =>
       `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.08)"><div>` +
-      `<div style="font-size:13px;font-weight:600">${esc(hName(h))}</div><div class="dim" style="font-size:11px">${new Date(h.date).toLocaleDateString()} · ${esc(h.duration || 0)} min${h.exerciseCount ? ' · ' + esc(h.exerciseCount) + ' exercises' : ''}</div></div>` +
+      `<div style="font-size:13px;font-weight:600">${esc(hName(h))}</div><div class="dim" style="font-size:11px">${new Date(h.date).toLocaleDateString()} · ${esc(h.duration || 0)} min${hDist(h)}${h.exerciseCount ? ' · ' + esc(h.exerciseCount) + ' exercises' : ''}</div></div>` +
       `<button class="btn-x" onclick="if(confirm('Remove this workout?'))act('remove_workout',{index:${i}}).then(render)">✕</button></div>`).join('') + `</div>`;
   } else {
     html += `<div class="glass-light" style="padding:32px;text-align:center"><div style="font-size:40px;margin-bottom:12px">🌟</div><b style="font-size:15px">No workouts yet</b><div class="dim" style="font-size:13px;margin-top:6px">Finish a workout, or tell the bot about one, to start tracking.</div></div>`;
@@ -312,7 +320,9 @@ function renderProgress(u) {
   if (u.sets.length) {
     html += `<div class="glass-light" style="padding:16px;margin-top:20px"><h3 style="font-size:14px">Recent Sets</h3>` + u.sets.slice(-10).reverse().map(s =>
       `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);font-size:13px"><span>${esc(s.exercise || s.exerciseId)}</span>` +
-      `<span class="dim">${s.weight ? esc(s.weight) + ' x ' : ''}${esc(s.reps)}${s.weight ? '' : ' reps'}${s.rpe ? ' · RPE ' + esc(s.rpe) : ''} · ${new Date(s.date).toLocaleDateString()}</span></div>`).join('') + `</div>`;
+      `<span style="display:flex;align-items:center;gap:8px"><span class="dim">${setLoad(s)}${s.rpe ? ' · RPE ' + esc(s.rpe) : ''} · ${new Date(s.date).toLocaleDateString()}</span>` +
+      (s.id ? `<button class="btn-x" onclick="if(confirm('Remove this set?'))act('remove_set',{id:${esc(JSON.stringify(String(s.id)))}}).then(render)">✕</button>` : '') +
+      `</span></div>`).join('') + `</div>`;
   }
   return html + `</div>`;
 }
@@ -323,7 +333,7 @@ function renderGoals(u) {
   if (adding) {
     html += `<div class="glass-light" style="padding:16px;margin-bottom:16px"><input class="field" id="gText" placeholder="Goal, like 20 push-ups in a row" style="margin-bottom:8px">` +
       `<div class="row"><input class="field" id="gTarget" type="number" min="1" placeholder="Target number"><select class="field" id="gUnit">` +
-      ['reps', 'seconds', 'minutes', 'days', 'sessions', '% ROM', 'lbs', 'kg'].map(x => `<option>${x}</option>`).join('') +
+      ['reps', 'seconds', 'minutes', 'days', 'sessions', '% ROM', 'lbs', 'kg', 'mi', 'km'].map(x => `<option>${x}</option>`).join('') +
       `</select></div><button class="btn green" style="width:100%;padding:10px;font-size:13px;margin-top:10px" onclick="addGoal()">Save Goal</button></div>`;
   }
   if (!u.goals.length && !adding) html += `<div class="glass-light dim" style="padding:24px;text-align:center">No goals yet. Add one here, or tell the bot.</div>`;

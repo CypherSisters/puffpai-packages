@@ -3,8 +3,8 @@
   "id": "alarmflow",
   "kind": "app",
   "name": "AlarmFlow",
-  "version": "2.0.0",
-  "description": "Timers and alarms. They ring on this computer while BuildBot runs, even with no page open.",
+  "version": "2.1.0",
+  "description": "Timers and alarms. While BuildBot runs they ring here even with no page open: a notice card, and on Windows a beep through the speakers.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
   "icon": "icons/alarm.svg",
@@ -19,8 +19,8 @@
     "changes": ["create_timer", "create_alarm", "snooze", "add_time", "pause", "resume",
                 "dismiss", "dismiss_all", "delete"],
     "tools": {
-      "create_timer": "Start a countdown timer for some hours, minutes and seconds, up to 7 days. It rings on this computer.",
-      "create_alarm": "Set an alarm for a clock time (24-hour), today or tomorrow, once or repeating.",
+      "create_timer": "Start a countdown timer, like 20 minutes or an hour and a half, up to 7 days. It rings on this computer.",
+      "create_alarm": "Set an alarm for a time of day, like 6:30 AM, once or repeating daily, on weekdays, on weekends or weekly.",
       "list": "List the timers and alarms that are set, with the time left on each.",
       "snooze": "Snooze a ringing timer or alarm for some minutes, up to 24 hours.",
       "add_time": "Add minutes to a running timer or alarm, or take some off with a negative number, up to 24 hours either way.",
@@ -31,14 +31,14 @@
       "delete": "Delete a timer or alarm for good, by its name."
     },
     "examples": {
-      "create_timer": ["set a timer for ten minutes for the pasta"],
-      "create_alarm": ["set an alarm for 6:30 in the morning to wake up"],
+      "create_timer": ["set a timer for ten minutes for the pasta", "set a timer for an hour and a half for the roast"],
+      "create_alarm": ["set an alarm for 6:30 in the morning to wake up", "wake me at 7 every weekday", "remind me with an alarm at 5pm every Sunday"],
       "list": ["what timers are running right now"],
       "snooze": ["snooze the wake up alarm for ten minutes"],
       "add_time": ["add five more minutes to the pasta timer"],
       "pause": ["pause the pasta timer"],
       "resume": ["resume the pasta timer"],
-      "dismiss": ["stop the pasta timer"],
+      "dismiss": ["stop the pasta timer", "turn off the alarm"],
       "dismiss_all": ["cancel all my timers and alarms"],
       "delete": ["delete the wake up alarm for good"]
     }
@@ -63,5 +63,5 @@
       "why": "Browsers stay silent until you tap a page once. Open AlarmFlow and tap Test sound." }
   ],
   "data": { "keep_on_remove": "ask" },
-  "consent": "AlarmFlow keeps your timers and alarms in its own data folder on this computer and rings them here. It does not use the internet."
+  "consent": "AlarmFlow keeps your timers and alarms in its own data folder on this computer and rings them here, with a notice card and, on Windows, a beep through the speakers. It does not use the internet."
 }

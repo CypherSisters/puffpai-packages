@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Jellyfin media">
+  <circle cx="32" cy="32" r="26" fill="#7a4fd6"/>
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.35"/>
+  <path d="M26 21 L45 32 L26 43 Z" fill="#ffffff" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
+</svg>

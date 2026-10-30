@@ -1,0 +1,57 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "radio",
+  "kind": "app",
+  "name": "World Radio",
+  "version": "1.0.0",
+  "description": "Internet radio: find stations by name, country, genre or language and play them on the World Radio page, with favorites. Sound plays only while that page is open in the Desktop; it does not play on a speaker by itself, and it has no podcasts or recording.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/radio.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["play_station", "stop", "add_favorite", "remove_favorite"],
+    "tools": {
+      "find_stations": "Find internet radio stations by name, country, genre or language, without playing one. Gives the top 15, numbered, with country, bitrate and stream address.",
+      "play_station": "Play an internet radio station on the World Radio page. The page must be open in the Desktop to hear it.",
+      "stop": "Stop the internet radio on the World Radio page.",
+      "now_playing": "Say which radio station World Radio is set to, and whether its page is open.",
+      "favorites": "List the saved favorite radio stations.",
+      "add_favorite": "Save a radio station to the favorites. With no station, saves the one playing now.",
+      "remove_favorite": "Remove a radio station from the favorites, by its name or number."
+    },
+    "examples": {
+      "find_stations": ["what jazz radio stations are there", "find radio stations from Ireland"],
+      "play_station": ["play KEXP on the radio", "play the second station"],
+      "stop": ["stop the radio"],
+      "now_playing": ["what radio station is playing"],
+      "favorites": ["what are my favorite radio stations"],
+      "add_favorite": ["save this radio station to my favorites"],
+      "remove_favorite": ["remove KEXP from my radio favorites"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "World Radio", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "World Radio", "icon": "icons/radio.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": ["de1.api.radio-browser.info", "all.api.radio-browser.info"],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Station search asks radio-browser.info (de1.api.radio-browser.info, all.api.radio-browser.info) and sends only the search words. A station you pick streams straight to the World Radio page from that station's own server, which sees your internet address as any website does. Nothing else about you is sent; your favorites stay in World Radio's data folder on this computer."
+}

@@ -83,7 +83,7 @@ body{
 <div class="app">
   <div class="hdr">
     <h1>&#9200; AlarmFlow <span class="count" id="activeCount"></span></h1>
-    <p>Timers and alarms. They ring on this computer, even with this page closed.</p>
+    <p>Timers and alarms. They ring on this computer while BuildBot runs, even with this page closed.</p>
     <div class="hdr-row"><button class="hdr-btn" id="testSound" onclick="A.testSound()">&#128264; Test sound</button></div>
   </div>
   <div class="problem" id="problem"></div>
@@ -122,7 +122,7 @@ body{
       </div>
       <div class="row"><div class="field"><label for="aRepeat">Repeat</label>
         <select id="aRepeat"><option value="none">Once</option><option value="daily">Daily</option>
-          <option value="weekdays">Weekdays</option><option value="weekends">Weekends</option></select></div></div>
+          <option value="weekdays">Weekdays</option><option value="weekends">Weekends</option><option value="weekly">Weekly</option></select></div></div>
       <button class="go-btn alarm-go" onclick="A.addAlarm()">Set alarm</button>
     </div>
   </div>
@@ -207,7 +207,7 @@ const A = (() => {
       const left = secsLeft(a), isAlarm = a.mode === 'alarm', id = esc(a.id);
       const tot = Number(a.tot) || 0, pct = tot > 0 ? Math.max(0, Math.min(100, (tot - left) / tot * 100)) : 100;
       const sub = a.status === 'ringing' ? '⚠️ TIME\'S UP' : a.status === 'paused' ? 'Paused'
-        : isAlarm ? 'Rings at ' + fmtTime12(a.due) : 'of ' + fmtSec(a.tot);
+        : isAlarm ? 'Rings at ' + fmtTime12(a.due) + (a.day && a.day !== 'today' ? ' ' + esc(a.day) : '') : 'of ' + fmtSec(a.tot);
       // No ids inside inline script: each button carries its tool (and minutes); one click handler reads them.
       const btn = (label, tool, minutes, cls) => '<button class="ib' + (cls ? ' ' + cls : '') + '" data-tool="' + tool + '"'
         + (minutes == null ? '' : ' data-minutes="' + minutes + '"') + '>' + label + '</button>';

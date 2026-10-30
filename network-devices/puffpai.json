@@ -1,0 +1,47 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "network-devices",
+  "kind": "tool",
+  "name": "Network devices",
+  "version": "1.0.0",
+  "description": "A list of the devices on your home network that this computer has talked to: address, hardware address, name if known, a maker guess, when each was first and last seen, and labels you give them. It reads this computer's own neighbour table and asks your home network's usual name lookup for names. It does not scan or ping the network, check ports, watch traffic, or block anything.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/network-dots.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["scan", "new_devices", "name_device", "forget_device"],
+    "tools": {
+      "scan": "Read this computer's own list of devices it has talked to on the home network and save it: addresses, hardware addresses, names where known and a maker guess. Sends nothing to the devices.",
+      "list_devices": "List the saved devices: address, hardware address, name if known, maker guess, first seen, last seen and the owner's label. Optional filter word.",
+      "new_devices": "Scan now, then list the devices that first showed up since the owner last asked.",
+      "name_device": "Give a device a label the owner chooses, like the kitchen tablet.",
+      "forget_device": "Take a device off the saved list. It comes back as new if this computer sees it again."
+    },
+    "examples": {
+      "scan": ["scan my home network for devices", "refresh the device list"],
+      "list_devices": ["what devices are on my network", "list the Apple devices on my network"],
+      "new_devices": ["any new devices on my network since I last asked"],
+      "name_device": ["call the device at 192.168.1.23 the kitchen tablet"],
+      "forget_device": ["forget the device called old printer"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Network devices reads this computer's own list of devices it has talked to on your home network, asks your home network's usual name lookup (normally your router) for their names, and keeps the list in its own data folder on this computer. It sends nothing to the devices or anywhere else, and it does not use the internet."
+}

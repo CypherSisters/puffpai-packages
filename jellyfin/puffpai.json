@@ -1,0 +1,63 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "jellyfin",
+  "kind": "tool",
+  "name": "Jellyfin media",
+  "version": "1.0.0",
+  "description": "Search your own Jellyfin library and play music, movies and shows on one of its players (a TV app, a phone, a browser tab): pause, skip, stop, volume, what is playing, and music playlists. It needs your Jellyfin address on your home network and a Jellyfin API key. It does not play on this computer's own speakers, and it does not handle books, favorites, radio or library scans.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/play.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_address", "play", "control", "create_playlist", "add_to_playlist"],
+    "tools": {
+      "set_address": "Save the address of your Jellyfin server on your home network, like http://192.168.1.20:8096.",
+      "search_media": "Search your Jellyfin library for songs, albums, artists, movies or shows by words, with item ids.",
+      "list_players": "List the Jellyfin players that can be controlled: client, device, user and what each is playing.",
+      "play": "Play a song, album, playlist, movie or show from your Jellyfin library on one of its players.",
+      "control": "Pause, unpause, stop, skip to next or previous, or set the volume on a Jellyfin player.",
+      "now_playing": "Say what each Jellyfin player is playing now.",
+      "playlists": "List your Jellyfin playlists.",
+      "create_playlist": "Make a new Jellyfin music playlist, optionally with songs found by name.",
+      "add_to_playlist": "Add songs, found by name, to one of your Jellyfin playlists."
+    },
+    "examples": {
+      "set_address": ["set my Jellyfin address to http://192.168.1.20:8096"],
+      "search_media": ["do I have any Fleetwood Mac in Jellyfin", "find the movie Arrival in my library"],
+      "list_players": ["which Jellyfin players are on"],
+      "play": ["play Abbey Road on the living room TV", "put on the movie Paddington in Jellyfin"],
+      "control": ["pause the music", "turn the Jellyfin volume down to 30"],
+      "now_playing": ["what is playing on Jellyfin"],
+      "playlists": ["list my Jellyfin playlists"],
+      "create_playlist": ["make a playlist called Road Trip with Dreams by Fleetwood Mac and Africa by Toto"],
+      "add_to_playlist": ["add Here Comes the Sun to my Road Trip playlist"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [
+      { "name": "JELLYFIN_API_KEY", "why": "to search your library and play on your players",
+        "get_it": "In Jellyfin open Dashboard, API Keys, and add one" }
+    ],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [
+    { "id": "address", "kind": "confirm",
+      "title": "Tell the bot where your Jellyfin is",
+      "why": "Jellyfin media talks only to the Jellyfin you name, on your home network. Jellyfin's usual address is http://<the computer running Jellyfin>:8096. In chat, say: set my Jellyfin address to http://192.168.1.20:8096 (with your own address). Then allow that address on the Bridge page.",
+      "text": "http://<your Jellyfin>:8096" }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Jellyfin media talks only to the Jellyfin server at the address you set on your home network, with your own Jellyfin API key, to search your library, start and control playback and make playlists. It keeps nothing but that address, in its own data folder on this computer, and it does not use the internet."
+}

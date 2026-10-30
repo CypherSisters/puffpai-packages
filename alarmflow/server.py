@@ -14,7 +14,9 @@ change anything (D55).
 
 The ringing clock is a thread in this process: once a second it marks every item that is due
 as ``ringing`` and asks the Core to tell the owner (``POST /v1/notify``, through the Core API with
-this package's token). So an alarm rings while AlarmFlow runs, with no page open. Steward starts
+this package's token). On Windows it also beeps through this computer's speakers (``winsound``, standard
+library) every few seconds for up to 10 minutes, so an alarm rings while AlarmFlow runs, with no page
+open. Elsewhere there is no beep; the Desktop card and the open page carry the ring. Steward starts
 AlarmFlow again when BuildBot starts, and Caretaker restarts it if it stops. While BuildBot is off
 nothing rings; an item that came due meanwhile rings at the next start and says how late it is.
 
@@ -31,6 +33,7 @@ import argparse
 import hmac
 import json
 import os
+import re
 import secrets
 import tempfile
 import threading
@@ -44,12 +47,12 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "alarmflow"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DOC = "alarmflow.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 1024 * 1024
 SOUNDS = ("chime", "alert", "gentle", "bell", "none")
-REPEATS = ("none", "daily", "weekdays", "weekends")
+REPEATS = ("none", "daily", "weekdays", "weekends", "weekly")
 ACTIVE = ("running", "paused", "ringing")
 
 
@@ -69,8 +72,14 @@ def _plural(n: int, word: str) -> str:
     return f"{n} {word}{'' if n == 1 else 's'}"
 
 
-MAX_TIMER_S = 7 * 24 * 3600          # a timer runs at most 7 days
+def _things(n: int) -> str:
+    return "1 timer or alarm" if n == 1 else f"{n} timers or alarms"
+
+
+MAX_TIMER_S = 7 * 24 * 3600         # a timer runs at most 7 days
 MAX_SHIFT_MIN = 24 * 60              # snooze and add_time move an item at most 24 hours
+RING_EVERY_MS = 5_000                # a ringing item beeps every 5 seconds ...
+RING_FOR_MS = 10 * 60_000            # ... for up to 10 minutes; then the notice card and the page still show it
 
 
 def clock(ms: int) -> str:
@@ -105,6 +114,107 @@ def _whole(value, name: str, lo: int, hi: int) -> int:
     if not lo <= n <= hi:
         raise ValueError(f"{name} must be from {lo} to {hi}")
     return n
+
+
+def _amount(value, name: str, hi: float) -> float:
+    """A length from the brain or the page: a whole or part number (1.5 hours), from 0 to hi."""
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a number")
+    try:
+        n = float(value or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number") from None
+    if n != n or n in (float("inf"), float("-inf")) or n < 0:
+        raise ValueError(f"{name} must be a number, 0 or more")
+    if n > hi:
+        raise ValueError(f"{name} must be from 0 to {hi:g}")
+    return n
+
+
+_NUMBERS = {w: n for n, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve "
+                                       "thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split())}
+_NUMBERS.update({"a": 1, "an": 1, "couple": 2, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50,
+                 "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90})
+_UNITS = {**dict.fromkeys(("hours", "hour", "hrs", "hr", "h"), 3600),
+          **dict.fromkeys(("minutes", "minute", "mins", "min", "m"), 60),
+          **dict.fromkeys(("seconds", "second", "secs", "sec", "s"), 1)}
+
+
+def parse_duration(text: str) -> int | None:
+    """Seconds from the way people say a length: "20 minutes", "an hour and a half", "half an hour",
+    "1h30m", "two and a half hours", "90 seconds". None when there is no unit in it."""
+    words = re.findall(r"\d+(?:\.\d+)?|[a-z]+", re.sub(r"(?<=\d)(?=[a-z])|(?<=[a-z])(?=\d)", " ", str(text).lower()))
+    total, n, last, i = 0.0, None, 0, 0
+    while i < len(words):
+        w, rest = words[i], words[i + 1:i + 3]
+        if w in _UNITS:
+            total += (1 if n is None else n) * _UNITS[w]
+            last, n = _UNITS[w], None
+        elif w == "and" and rest == ["a", "half"]:              # "two and a half hours", "an hour and a half"
+            if n is not None:
+                n += 0.5
+            elif last:
+                total += last / 2
+            i += 2
+        elif w in ("half", "quarter") and rest and (rest[0] in ("a", "an", "of") or rest[0] in _UNITS):
+            n = 0.5 if w == "half" else 0.25                     # "half an hour", "quarter of an hour"
+            while i + 1 < len(words) and words[i + 1] in ("a", "an", "of"):
+                i += 1
+        elif re.fullmatch(r"\d+(?:\.\d+)?", w):
+            n = float(w)
+        elif w in _NUMBERS:
+            v = _NUMBERS[w]
+            n = n + v if n is not None and n >= 20 and n % 10 == 0 and v < 10 else v     # "twenty five"
+        i += 1
+    return round(total) if total > 0 else None
+
+
+def parse_clock(text: str) -> tuple[int, int] | None:
+    """(hour, minute) from a time of day as people say it: "7:30 AM", "6pm", "18:30", "noon", "midnight",
+    "6:30 in the evening". None when it does not read as a time of day."""
+    t = re.sub(r"\b([ap])\.?\s?m\b\.?", r"\1m", str(text).lower().strip())
+    if re.search(r"\b(noon|midday)\b", t):
+        return 12, 0
+    if "midnight" in t:
+        return 0, 0
+    m = re.search(r"\b(\d{1,2})(?:[:.]?(\d{2}))?\s*(am|pm)?\b", t)
+    if not m:
+        return None
+    hour, minute = int(m.group(1)), int(m.group(2) or 0)
+    if m.group(3):
+        if not 1 <= hour <= 12:
+            return None
+        hour = hour % 12 + (12 if m.group(3) == "pm" else 0)
+    elif re.search(r"\b(evening|afternoon|tonight|night)\b", t) and hour < 12:
+        hour += 12
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return hour, minute
+
+
+_REPEAT_WORDS = {"": "none", "once": "none", "never": "none", "no": "none", "every day": "daily",
+                 "everyday": "daily", "weekday": "weekdays", "weekend": "weekends", "every week": "weekly"}
+
+
+def say_span(seconds: int) -> str:
+    """1 hour and 30 minutes, the way the brain says a length back."""
+    h, rest = divmod(int(seconds), 3600)
+    m, s = divmod(rest, 60)
+    return " and ".join(_plural(n, w) for n, w in ((h, "hour"), (m, "minute"), (s, "second")) if n) or "0 seconds"
+
+
+def day_word(ms: int, now: datetime | None = None) -> str:
+    """today, tomorrow, or the weekday's name."""
+    now = now or datetime.now()
+    try:
+        when = datetime.fromtimestamp(int(ms) / 1000)
+    except (OverflowError, OSError, ValueError, TypeError):
+        return ""
+    if when.date() == now.date():
+        return "today"
+    if when.date() == now.date() + timedelta(days=1):
+        return "tomorrow"
+    return f"{when:%A}"
 
 
 def span(seconds: int) -> str:
@@ -219,20 +329,25 @@ def next_repeat(item: dict, now: datetime) -> int | None:
     if repeat == "none" or not item.get("targetMs"):
         return None
     first = datetime.fromtimestamp(int(item["targetMs"]) / 1000)
-    days = {"daily": range(7), "weekdays": range(5), "weekends": (5, 6)}.get(repeat)
+    # The alarm's own time of day, kept on the item since 2.1.0, so a snooze never moves the schedule.
+    hour, minute = _num(item.get("hour", first.hour), 0, 23), _num(item.get("minute", first.minute), 0, 59)
+    days = {"daily": range(7), "weekdays": range(5), "weekends": (5, 6),
+            "weekly": (_num(item.get("weekday", first.weekday()), 0, 6),)}.get(repeat)
     if days is None:
         return None
     for d in range(0, 8):
-        t = (now + timedelta(days=d)).replace(hour=first.hour, minute=first.minute, second=0, microsecond=0)
+        t = (now + timedelta(days=d)).replace(hour=hour, minute=minute, second=0, microsecond=0)
         if t > now and t.weekday() in days:
             return int(t.timestamp() * 1000)
     return None
 
 
 class AlarmFlow:
-    def __init__(self, store: Store, notify=None) -> None:
+    def __init__(self, store: Store, notify=None, ring=None) -> None:
         self.store = store
         self.notify = notify or (lambda title, text: False)
+        self.ring = ring or (lambda sound: False)      # the speaker beep (``Speaker``); silent by default
+        self._beeped = 0
 
     def _add(self, item: dict) -> None:
         with self.store.lock:
@@ -240,14 +355,19 @@ class AlarmFlow:
             data["items"].append(item)
             self.store.save(data)
 
-    def create_timer(self, desc: str = "Timer", hours: int = 0, minutes: int = 0, seconds: int = 0,
-                     sound: str = "chime") -> str:
+    def create_timer(self, desc: str = "Timer", hours: float = 0, minutes: float = 0, seconds: float = 0,
+                     sound: str = "chime", duration: str = "") -> str:
         desc = _text(desc, "desc") or "Timer"
         sound = _text(sound, "sound", "chime")
-        hours = _whole(hours or 0, "hours", 0, MAX_TIMER_S // 3600)
-        minutes = _whole(minutes or 0, "minutes", 0, MAX_TIMER_S // 60)
-        seconds = _whole(seconds or 0, "seconds", 0, MAX_TIMER_S)
-        total = hours * 3600 + minutes * 60 + seconds
+        duration = _text(duration, "duration")
+        if duration:
+            total = parse_duration(duration)
+            if total is None:
+                return f"I could not read '{duration}' as a length. Say it like 20 minutes or 1 hour 30 minutes."
+        else:
+            total = round(_amount(hours, "hours", MAX_TIMER_S // 3600) * 3600
+                          + _amount(minutes, "minutes", MAX_TIMER_S // 60) * 60
+                          + _amount(seconds, "seconds", MAX_TIMER_S))
         if total <= 0:
             return "A timer needs a length: some hours, minutes or seconds."
         if total > MAX_TIMER_S:
@@ -255,36 +375,46 @@ class AlarmFlow:
         self._add({"id": f"a{_uid()}", "mode": "timer", "desc": desc, "tot": total, "rem": total,
                    "sound": sound if sound in SOUNDS else "chime", "status": "running", "source": "puffpai",
                    "ts": _ms(), "targetMs": None})
-        parts = [_plural(n, w) for n, w in ((hours, "hour"), (minutes, "minute"), (seconds, "second")) if n]
-        return f"Timer set: {desc}, {' and '.join(parts)}. It rings at {clock(_ms() + total * 1000)}."
+        return f"Timer set: {desc}, {say_span(total)}. It rings at {clock(_ms() + total * 1000)}."
 
-    def create_alarm(self, desc: str = "Alarm", hour: int = 7, minute: int = 0, sound: str = "chime",
-                     repeat: str = "none") -> str:
+    def create_alarm(self, desc: str = "Alarm", hour: int | None = None, minute: int = 0, sound: str = "chime",
+                     repeat: str = "none", time: str = "") -> str:
         desc = _text(desc, "desc") or "Alarm"
         sound = _text(sound, "sound", "chime")
+        said = _text(time, "time")
         repeat = _text(repeat, "repeat", "none").lower()
+        repeat = _REPEAT_WORDS.get(repeat, repeat)
+        if repeat not in REPEATS:
+            return "Repeat is once, daily, weekdays, weekends or weekly."
+        if said:
+            got = parse_clock(said)
+            if got is None:
+                return f"I could not read '{said}' as a time of day. Say it like 7:30 AM or 18:30."
+            hour, minute = got
+        elif hour is None:
+            return "An alarm needs a time, like 7:30 AM."
         try:
             hour = _whole(hour, "hour", 0, 23)
             minute = _whole(minute or 0, "minute", 0, 59)
         except ValueError:
             return "An alarm needs an hour from 0 to 23 and a minute from 0 to 59."
-        repeat = repeat if repeat in REPEATS else "none"
         now = datetime.now()
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if target <= now:
             target += timedelta(days=1)
         item = {"id": f"a{_uid()}", "mode": "alarm", "desc": desc, "tot": 0, "rem": 0,
                 "sound": sound if sound in SOUNDS else "chime", "status": "running", "source": "puffpai",
-                "ts": _ms(), "targetMs": int(target.timestamp() * 1000), "repeat": repeat}
+                "ts": _ms(), "targetMs": int(target.timestamp() * 1000), "repeat": repeat,
+                "hour": hour, "minute": minute, "weekday": target.weekday()}
         if repeat != "none":
-            nxt = next_repeat({**item, "targetMs": item["targetMs"]}, now - timedelta(seconds=1))
+            nxt = next_repeat(item, now - timedelta(seconds=1))
             item["targetMs"] = nxt or item["targetMs"]
+            item["weekday"] = datetime.fromtimestamp(item["targetMs"] / 1000).weekday()
         item["tot"] = item["rem"] = max(0, (item["targetMs"] - _ms()) // 1000)
         self._add(item)
-        when = datetime.fromtimestamp(item["targetMs"] / 1000)
-        day = "today" if when.date() == now.date() else ("tomorrow" if when.date() == now.date() + timedelta(days=1)
-                                                         else when.strftime("%A"))
-        again = "" if repeat == "none" else f", then {repeat}"
+        day = day_word(item["targetMs"], now)
+        weekday = f"{datetime.fromtimestamp(item['targetMs'] / 1000):%A}"
+        again = {"none": "", "weekly": f", then every {weekday}"}.get(repeat, f", then {repeat}")
         return f"Alarm set: {item['desc']}, ringing at {clock(item['targetMs'])} {day}{again}."
 
     def list(self) -> str:
@@ -298,29 +428,32 @@ class AlarmFlow:
                 lines.append(f"{i['desc']}: ringing now")
             elif i.get("mode") == "alarm":
                 again = "" if (i.get("repeat") or "none") == "none" else f", {i['repeat']}"
-                lines.append(f"{i['desc']}: alarm at {clock(due_ms(i) or 0)}{again}")
+                lines.append(f"{i['desc']}: alarm at {clock(due_ms(i) or 0)} {day_word(due_ms(i) or 0)}{again}")
             else:
                 paused = " (paused)" if i["status"] == "paused" else ""
                 lines.append(f"{i['desc']}: {span(left(i, now))} left{paused}")
-        return f"{_plural(len(items), 'timer or alarm')}:\n" + "\n".join(lines)
+        return f"{_things(len(items))}:\n" + "\n".join(lines)
 
     @staticmethod
     def _find(data: dict, item: str, active_only: bool = True) -> tuple[dict | None, str | None]:
         """Voice-friendly lookup (v1 _alarm_find, app_data.py:479): an exact id or name, then one
         unambiguous part of a name. Returns (item, None) or (None, a plain question)."""
         ident = str(item or "").lower().strip()
-        pool = [i for i in data["items"] if not active_only or i.get("status") in ACTIVE]
-        for i in pool:
-            if i["id"] == item or i["desc"].lower() == ident:
-                return i, None
-        if len(ident) >= 3:
-            hits = [i for i in pool if ident in i["desc"].lower() or i["desc"].lower() in ident]
-            if len(hits) == 1:
-                return hits[0], None
-            if len(hits) > 1:
-                return None, f"Several match '{item}': {', '.join(i['desc'] for i in hits[:4])}. Which one?"
-        if not ident and len(pool) == 1:
-            return pool[0], None
+        active = [i for i in data["items"] if i.get("status") in ACTIVE]
+        for pool in ([active] if active_only else [active, data["items"]]):    # a set item wins over an old one
+            for i in pool:
+                if i["id"] == item or i["desc"].lower() == ident:
+                    return i, None
+            if len(ident) >= 3:
+                hits = [i for i in pool if ident in i["desc"].lower() or i["desc"].lower() in ident]
+                if len(hits) == 1:
+                    return hits[0], None
+                if len(hits) > 1:
+                    return None, f"Several match '{item}': {', '.join(i['desc'] for i in hits[:4])}. Which one?"
+        if not ident and len(active) == 1:
+            return active[0], None
+        if not ident and active:
+            return None, f"Which one: {', '.join(i['desc'] for i in active[:4])}?"
         return None, f"No timer or alarm matches '{item}'."
 
     def _change(self, item: str, fn, active_only: bool = True) -> str:
@@ -405,6 +538,8 @@ class AlarmFlow:
 
     def dismiss(self, item: str = "") -> str:
         ident = str(item or "").strip()
+        if ident.lower() in ("all", "everything", "all of them", "all timers", "all alarms"):
+            return self.dismiss_all()
         if not ident:
             with self.store.lock:
                 data = self.store.load()
@@ -413,6 +548,8 @@ class AlarmFlow:
                     said = self._stop(ringing[0])
                     self.store.save(data)
                     return said
+                if len(ringing) > 1:
+                    return f"Several are ringing: {', '.join(i['desc'] for i in ringing[:4])}. Which one?"
         return self._change(item, lambda i, _d: self._stop(i))
 
     def dismiss_all(self) -> str:
@@ -425,7 +562,7 @@ class AlarmFlow:
                 i["status"] = "stopped"
                 i.pop("rangAt", None)
             self.store.save(data)
-        return f"Stopped {_plural(len(hits), 'timer or alarm')}."
+        return f"Stopped {_things(len(hits))}."
 
     def delete(self, item: str = "") -> str:
         if len(str(item or "").strip()) < 2:
@@ -450,6 +587,11 @@ class AlarmFlow:
                     rang.append(i)
             if rang:
                 self.store.save(data)
+            loud = [i for i in data["items"] if i.get("status") == "ringing" and i.get("sound") != "none"
+                    and 0 <= now_ms - int(i.get("rangAt") or 0) < RING_FOR_MS]
+        if loud and now_ms - self._beeped >= RING_EVERY_MS:      # heard with no page open (``Speaker``)
+            self._beeped = now_ms
+            self.ring(loud[0].get("sound") or "chime")
         for i in rang:
             late = (now_ms - (i.get("targetMs") if i.get("mode") == "alarm" else
                               int(i.get("ts") or 0) + int(i.get("tot") or 0) * 1000)) // 60_000
@@ -478,7 +620,8 @@ class AlarmFlow:
         data = self.store.load()
         now = _ms()
         data["now"] = now
-        data["items"] = [{**i, "left": left(i, now), "due": due_ms(i)} for i in data["items"] if i.get("status") in ACTIVE]
+        data["items"] = [{**i, "left": left(i, now), "due": due_ms(i), "day": day_word(due_ms(i)) if due_ms(i) else ""}
+                         for i in data["items"] if i.get("status") in ACTIVE]
         return data
 
 
@@ -513,6 +656,38 @@ class Clock(threading.Thread):
         return ""
 
 
+class Speaker:
+    """Beeps through this computer's speakers with ``winsound`` (Windows, standard library), so a ringing
+    item is heard with no page open. Elsewhere it does nothing. One pattern at a time, off the clock thread."""
+
+    PATTERNS = {"chime": ((523, 150), (659, 150), (784, 300)), "alert": ((880, 120), (440, 120)) * 2,
+                "gentle": ((392, 600),), "bell": ((440, 100), (554, 100), (659, 400))}
+
+    def __init__(self) -> None:
+        try:
+            import winsound
+        except ImportError:
+            winsound = None
+        self._beep = getattr(winsound, "Beep", None)
+        self._busy = threading.Lock()
+
+    def __call__(self, sound: str) -> bool:
+        tones = self.PATTERNS.get(sound, self.PATTERNS["chime"])
+        if self._beep is None or sound == "none" or not self._busy.acquire(blocking=False):
+            return False
+
+        def play() -> None:
+            try:
+                for freq, ms in tones:
+                    self._beep(freq, ms)
+            except RuntimeError:         # no sound device: the card and the page still show the ring
+                pass
+            finally:
+                self._busy.release()
+        threading.Thread(target=play, name="alarmflow-beep", daemon=True).start()
+        return True
+
+
 class Notifier:
     """Tells the owner through the Core API ``notify`` route, with this package's token (02)."""
 
@@ -545,14 +720,19 @@ def _p(kind: str, text: str) -> dict:
 _ITEM = _p("string", "The timer or alarm's name, like pasta. Leave empty when only one is set or ringing.")
 _SOUND = {"type": "string", "enum": list(SOUNDS), "description": "The sound. Default chime."}
 TOOLS = [
-    ("create_timer", "Start a countdown timer for some hours, minutes and seconds, up to 7 days. It rings on this computer.",
-     {"desc": _p("string", "What it is for, like pasta."), "hours": _p("integer", "Hours. Default 0."),
-      "minutes": _p("integer", "Minutes. Default 0."), "seconds": _p("integer", "Seconds. Default 0."),
-      "sound": _SOUND}, []),
-    ("create_alarm", "Set an alarm for a clock time (24-hour), today or tomorrow, once or repeating.",
-     {"desc": _p("string", "What it is for, like wake up."), "hour": _p("integer", "Hour 0 to 23, like 6 for 6 AM or 18 for 6 PM."),
+    ("create_timer", "Start a countdown timer, like 20 minutes or an hour and a half, up to 7 days. It rings on this computer.",
+     {"desc": _p("string", "What it is for, like pasta."),
+      "duration": _p("string", "The length as said, like 20 minutes, an hour and a half or 1h30m. Use this or the numbers."),
+      "hours": _p("number", "Hours, like 1.5. Default 0."), "minutes": _p("number", "Minutes. Default 0."),
+      "seconds": _p("number", "Seconds. Default 0."), "sound": _SOUND}, []),
+    ("create_alarm", "Set an alarm for a time of day, like 6:30 AM, once or repeating daily, on weekdays, on weekends or weekly.",
+     {"desc": _p("string", "What it is for, like wake up."),
+      "time": _p("string", "The time as said, like 6:30 AM, 7pm, 18:30 or noon. Use this or hour and minute."),
+      "hour": _p("integer", "Hour 0 to 23, like 6 for 6 AM or 18 for 6 PM."),
       "minute": _p("integer", "Minute 0 to 59. Default 0."), "sound": _SOUND,
-      "repeat": {"type": "string", "enum": list(REPEATS), "description": "Repeat it. Default none."}}, ["hour"]),
+      "repeat": {"type": "string", "enum": list(REPEATS),
+                 "description": "none (once), daily, weekdays, weekends, or weekly (the same day each week). Default none."}},
+     []),
     ("list", "List the timers and alarms that are set, with the time left on each.", {}, []),
     ("snooze", "Snooze a ringing timer or alarm for some minutes, up to 24 hours.",
      {"item": _ITEM, "minutes": _p("integer", "How long. Default 9.")}, []),
@@ -766,10 +946,10 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def make_server(port: int, data: Path | str, token: str | None, api: str | None,
-                every_s: float = 1.0) -> ThreadingHTTPServer:
-    """The server, bound to 127.0.0.1 only, with its ringing clock started.
-    Call serve_forever(); stop with shutdown() and server.clock.halt.set()."""
-    app = AlarmFlow(Store(data), Notifier(api, token))
+                every_s: float = 1.0, beep: bool = False) -> ThreadingHTTPServer:
+    """The server, bound to 127.0.0.1 only, with its ringing clock started (``beep``: ring the speakers
+    too; ``main`` turns it on). Call serve_forever(); stop with shutdown() and server.clock.halt.set()."""
+    app = AlarmFlow(Store(data), Notifier(api, token), Speaker() if beep else None)
     ticker = Clock(app, every_s)
     handler = type("AlarmFlowHandler", (Handler,), {"app": app, "clock": ticker, "token": token or ""})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
@@ -786,7 +966,8 @@ def main(argv: list[str] | None = None) -> int:
     data = os.environ.get("PUFFPAI_DATA")
     if not args.port or not data:
         p.error("PuffPAI starts AlarmFlow with PUFFPAI_PORT (or --port) and PUFFPAI_DATA set.")
-    server = make_server(args.port, data, os.environ.get("PUFFPAI_TOKEN"), os.environ.get("PUFFPAI_API"))
+    server = make_server(args.port, data, os.environ.get("PUFFPAI_TOKEN"), os.environ.get("PUFFPAI_API"),
+                         beep=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

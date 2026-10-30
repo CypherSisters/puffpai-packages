@@ -45,7 +45,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "calendar"
-VERSION = "2.0.0"
+VERSION = "2.1.0"
 DOC = "calendar.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 1024 * 1024
@@ -114,7 +114,8 @@ def _in_range(when: datetime) -> datetime:
 
 # ---------------------------------------------------------------- dates
 # The brain often does not know today's date, so a tool takes plain words too:
-# "2026-10-30", "2026-10-30T10:00", "today", "tomorrow", "friday", "next monday", "friday at 10am".
+# "2026-10-30", "2026-10-30T10:00", "today", "tomorrow", "yesterday", "friday", "next monday",
+# "friday at 10am", "2026-11-03 at 3pm", "in 3 days", "next week", "tomorrow at noon".
 
 _DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 _MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -122,6 +123,7 @@ _MON = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?"
 # "october 30", "oct 30th", "30 october", "30th of oct 2027": groups month, day | day, month, then year
 _MONTH_DAY = re.compile(r"\b(?:" + _MON + r"\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?"
                         + _MON + r")(?:\s+(\d{4}))?\b")
+_AHEAD = r"\bin\s+(\d{1,3}|a|one)\s+(day|week)s?\b|\bnext\s+week\b"       # "in 3 days", "in a week", "next week"
 _TIME = re.compile(r"(?:\bat\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)?(?=\s|$)", re.I)
 
 
@@ -150,10 +152,18 @@ def _parse_when(text, now: datetime | None = None) -> tuple[datetime, bool]:
         pass
     words = raw.lower().replace(",", " ")
     day = None
+    ahead_n = re.search(_AHEAD, words)
     if re.search(r"\btoday\b|\btonight\b", words):
         day = now.date()
     elif re.search(r"\btomorrow\b", words):
         day = now.date() + timedelta(days=1)
+    elif re.search(r"\byesterday\b", words):
+        day = now.date() - timedelta(days=1)
+    elif ahead_n and ahead_n.group(1):
+        n = 1 if ahead_n.group(1) in ("a", "one") else int(ahead_n.group(1))
+        day = now.date() + timedelta(days=n * (7 if ahead_n.group(2) == "week" else 1))
+    elif ahead_n:
+        day = now.date() + timedelta(days=7)                       # "next week": a week from today
     else:
         m = re.search(r"\b(next\s+)?(" + "|".join(_DAYS) + r")\b", words)
         if m:
@@ -172,12 +182,16 @@ def _parse_when(text, now: datetime | None = None) -> tuple[datetime, bool]:
                 day = date(year, month, num)
                 if not n.group(5) and day < now.date():
                     day = date(year + 1, month, num)              # "march 3" said in November is next March
-    rest = re.sub(r"\b(today|tonight|tomorrow|next|" + "|".join(_DAYS) + r"|\d{4}-\d{2}-\d{2})\b", " ", words)
+    rest = re.sub(_AHEAD, " ", words)
+    rest = re.sub(r"\b(today|tonight|tomorrow|yesterday|next|" + "|".join(_DAYS) + r"|\d{4}-\d{2}-\d{2})\b", " ", rest)
     rest = _MONTH_DAY.sub(" ", rest)
     t = _TIME.search(rest)
-    if day is None and t is None:
+    noon = re.search(r"\b(noon|midday|midnight)\b", rest)
+    if day is None and t is None and noon is None:
         raise ValueError(f"'{raw}' is not a date I can read; use a date like 2026-10-30 or a word like tomorrow")
     day = day or now.date()
+    if t is None and noon:
+        return datetime.combine(day, datetime.min.time()).replace(hour=0 if noon.group(1) == "midnight" else 12), True
     if t is None:
         if "tonight" in words:
             return datetime.combine(day, datetime.min.time()).replace(hour=19), True
@@ -205,6 +219,12 @@ def _read(stamp) -> datetime | None:
     except (TypeError, ValueError):
         return None
     return when if YEARS[0] <= when.year <= YEARS[1] else None
+
+
+def _late(row: dict) -> bool:
+    """Its due date is before today."""
+    at = _read(row.get("due"))
+    return at is not None and at.date() < date.today()
 
 
 def _has_time(stamp) -> bool:
@@ -539,14 +559,37 @@ class Calendar:
         for t in tasks:
             prio = f" [{t['prio']}]" if t.get("prio") in ("urgent", "high") else ""
             whom = "" if t.get("to") in (None, "", "all") else f", for {self._name(t['to'], people)}"
-            done = " (done)" if status == "all" and t.get("status") == "completed" else ""
+            done = " (done)" if t.get("status") == "completed" else " (overdue)" if _late(t) else ""
+            done = "" if done == " (done)" and status != "all" else done
             lines.append(f"{t['title']}, due {say_when(t.get('due'))}{whom}{prio}{done}")
         return f"{_plural(len(tasks), (word + ' ' if word else '') + 'task')}:\n" + "\n".join(lines)
 
     @staticmethod
-    def _med_taken(m: dict) -> bool:
-        """Taken today. v1 kept "taken" forever after one tap; here it counts for the day it was taken."""
-        return m.get("status") == "taken" and m.get("takenOn", date.today().isoformat()) == date.today().isoformat()
+    def _doses(m: dict) -> list[datetime]:
+        """When each dose was taken: the dose log, or v1's one "taken" day for a medicine saved before the log."""
+        log = [d for d in (_read(x) for x in m.get("log") or []) if d]
+        if not log and m.get("status") == "taken":
+            day = _read(m.get("takenOn") or date.today().isoformat())
+            log = [day] if day else []
+        return sorted(log)
+
+    @classmethod
+    def _med_state(cls, m: dict) -> str:
+        """"taken today", "1 of 2 taken today", "taken this week", "due" or "as needed".
+        v1 kept "taken" forever after one tap; here doses count for their day (their week for weekly)."""
+        today, doses = date.today(), cls._doses(m)
+        freq = m.get("freq", "daily")
+        if freq == "weekly":
+            return "taken this week" if any(d.date() > today - timedelta(days=7) for d in doses) else "due"
+        n = sum(1 for d in doses if d.date() == today)
+        if freq == "as-needed":
+            return "taken today" if n else "as needed"
+        need = 2 if freq == "twice-daily" else 1
+        return "taken today" if n >= need else f"{n} of {need} taken today" if n else "due"
+
+    @classmethod
+    def _med_taken(cls, m: dict) -> bool:
+        return cls._med_state(m).startswith("taken")
 
     def list_meds(self) -> str:
         data = self.store.load()
@@ -554,8 +597,12 @@ class Calendar:
         if not meds:
             return "No medicines are tracked."
         people = self.people.list(data.get("family"))
-        lines = [f"{m['name']}{' (' + m['dose'] + ')' if m.get('dose') else ''}: {m.get('freq', 'daily')} at {m.get('next', '')}, "
-                 f"for {self._name(m.get('to'), people)}, {'taken today' if self._med_taken(m) else 'due'}" for m in meds]
+        lines = []
+        for m in meds:
+            doses = self._doses(m)
+            last = f", last taken {say_when(_stamp(doses[-1], True))}" if doses and m.get("log") else ""
+            lines.append(f"{m['name']}{' (' + m['dose'] + ')' if m.get('dose') else ''}: {m.get('freq', 'daily')} at "
+                         f"{m.get('next', '')}, for {self._name(m.get('to'), people)}, {self._med_state(m)}{last}")
         return f"{_plural(len(meds), 'medicine')}:\n" + "\n".join(lines)
 
     def list_bills(self, status: str = "pending") -> str:
@@ -568,6 +615,7 @@ class Calendar:
         total = sum(float(b.get("amt") or 0) for b in bills)
         lines = [f"{b['name']}: ${float(b.get('amt') or 0):.2f}, due {say_when(b.get('due'))}"
                  + (" (autopay)" if b.get("auto") else "") + (" (paid)" if status == "all" and b.get("status") == "paid" else "")
+                 + (" (overdue)" if b.get("status") != "paid" and _late(b) else "")
                  for b in bills]
         return f"{_plural(len(bills), (word + ' ' if word else '') + 'bill')}, ${total:.2f} in all:\n" + "\n".join(lines)
 
@@ -613,6 +661,10 @@ class Calendar:
                 for t in data["tasks"]:
                     if t["id"] == e["taskId"]:
                         t["due"] = e["start"]
+            if e.get("billId") and "start" in changed:          # moving a bill's entry moves the bill
+                for b in data["bills"]:
+                    if b["id"] == e["billId"]:
+                        b["due"] = e["start"][:10]
             self.store.save(data)
         return f"Changed the {', '.join(changed)} of {e['title']}. It is on {say_when(e['start'])}."
 
@@ -669,6 +721,10 @@ class Calendar:
             e, err = _find(data["events"], event, "title", "event")
             if err:
                 return err
+            if e.get("taskId") and any(t.get("id") == e["taskId"] for t in data["tasks"]):
+                return self.delete_task(e["taskId"])        # a task's entry: the task goes too, or it stays on the month
+            if e.get("billId") and any(b.get("id") == e["billId"] for b in data["bills"]):
+                return self.delete_bill(e["billId"])
             data["events"] = [x for x in data["events"] if x["id"] != e["id"]]
             self.store.save(data)
         return f"Deleted the event {str(e['title']).removeprefix(DONE)}."
@@ -684,15 +740,42 @@ class Calendar:
             self.store.save(data)
         return f"Deleted the task {t['title']}."
 
-    def take_med(self, med: str) -> str:
+    def take_med(self, med: str, when: str = "") -> str:
+        """Log one dose with its time: now, or when it was said ("at 8am", "yesterday at 9pm")."""
+        when = _text(when, "when")
+        now = datetime.now().replace(second=0, microsecond=0)
+        if when:
+            at, timed = parse_when(when, now)
+            at = at if timed else at.replace(hour=now.hour, minute=now.minute)
+            if at > now + timedelta(minutes=5):
+                return "That time is still to come. Say when it was taken, like at 8am or yesterday at 9pm."
+        else:
+            at = now
         with self.store.lock:
             data = self.store.load()
             m, err = _find(data["meds"], med, "name", "medicine")
             if err:
                 return err
-            m["status"], m["takenOn"] = "taken", date.today().isoformat()
+            log = [x for x in m.get("log") or [] if isinstance(x, str)]
+            log.append(_stamp(at, True))
+            m["log"] = sorted(log)[-200:]                               # the last 200 doses
+            m["status"], m["takenOn"] = "taken", m["log"][-1][:10]
             self.store.save(data)
-        return f"Noted: {m['name']} taken today."
+            state = self._med_state(m)
+        day = "today" if at.date() == now.date() else f"on {at:%A %b} {at.day}"
+        clock = f"{at.hour % 12 or 12}:{at.minute:02d} {'AM' if at.hour < 12 else 'PM'}"
+        tail = f", {state}" if " of " in state else ""                 # "1 of 2 taken today"
+        return f"Noted: {m['name']} taken at {clock} {day}{tail}."
+
+    def delete_med(self, med: str) -> str:
+        with self.store.lock:
+            data = self.store.load()
+            m, err = _find(data["meds"], med, "name", "medicine")
+            if err:
+                return err
+            data["meds"] = [x for x in data["meds"] if x["id"] != m["id"]]
+            self.store.save(data)
+        return f"Stopped tracking {m['name']}; it and its dose log are deleted."
 
     def pay_bill(self, bill: str) -> str:
         with self.store.lock:
@@ -718,6 +801,81 @@ class Calendar:
             data["events"] = [x for x in data["events"] if x.get("billId") != b["id"]]
             self.store.save(data)
         return f"Deleted the bill {b['name']}."
+
+    # today, this week, overdue
+    @staticmethod
+    def _overdue(data: dict) -> tuple[list[dict], list[dict]]:
+        """Open tasks and unpaid bills due before today, oldest first."""
+        tasks = [t for t in data["tasks"] if t.get("status") != "completed" and _late(t)]
+        bills = [b for b in data["bills"] if b.get("status") != "paid" and _late(b)]
+        return (sorted(tasks, key=lambda r: str(r.get("due"))), sorted(bills, key=lambda r: str(r.get("due"))))
+
+    def whats_on(self, days_ahead: int = 0, day: str = "") -> str:
+        """Events, tasks due, bills due, medicines still to take today and anything overdue, in one answer."""
+        data = self.store.load()
+        today = date.today()
+        if day:
+            first = parse_when(day)[0].date()
+            last, label = first, f"on {say_when(first.isoformat())}"
+        else:
+            if isinstance(days_ahead, bool) or not isinstance(days_ahead, (int, float, str, type(None))):
+                raise ValueError("days_ahead must be a whole number")
+            try:
+                n = max(0, min(int(float(days_ahead if days_ahead is not None else 0)), 366))
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError("days_ahead must be a whole number") from None
+            first, last = today, today + timedelta(days=n)
+            label = "today" if n == 0 else f"today and the next {_plural(n, 'day')}"
+        start = datetime.combine(first, datetime.min.time())
+        end = datetime.combine(last, datetime.max.time())
+        people = self.people.list(data.get("family"))
+        whom = lambda r: "" if r.get("to") in (None, "", "all") else f", for {self._name(r['to'], people)}"  # noqa: E731
+        inside = lambda r: (lambda at: at is not None and first <= at.date() <= last)(_read(r.get("due")))  # noqa: E731
+        parts = []
+        events = [f"{say_when(_stamp(at, _has_time(e.get('start'))))}: {str(e['title']).removeprefix(DONE)}"
+                  f"{' at ' + e['loc'] if e.get('loc') else ''}{whom(e)}"
+                  for at, e in self._between(data, start, end) if not (e.get("taskId") or e.get("billId"))]
+        if events:
+            parts.append("Events:\n" + "\n".join(events))
+        tasks = sorted((t for t in data["tasks"] if t.get("status") != "completed" and inside(t)), key=lambda t: str(t["due"]))
+        if tasks:
+            parts.append("Tasks due:\n" + "\n".join(f"{t['title']}, due {say_when(t['due'])}{whom(t)}" for t in tasks))
+        bills = sorted((b for b in data["bills"] if b.get("status") != "paid" and inside(b)), key=lambda b: str(b["due"]))
+        if bills:
+            parts.append("Bills due:\n" + "\n".join(f"{b['name']}: ${float(b.get('amt') or 0):.2f}, due {say_when(b['due'])}"
+                                                   + (" (autopay)" if b.get("auto") else "") for b in bills))
+        if first <= today <= last:
+            meds = [m for m in data["meds"] if self._med_state(m) not in ("taken today", "taken this week", "as needed")]
+            if meds:
+                parts.append("Medicines still to take today:\n" + "\n".join(
+                    f"{m['name']}{' (' + m['dose'] + ')' if m.get('dose') else ''} at {m.get('next', '')}{whom(m)}"
+                    f"{', ' + self._med_state(m) if ' of ' in self._med_state(m) else ''}" for m in meds))
+        if first <= today:
+            late_tasks, late_bills = self._overdue(data)
+            late = [f"Task {t['title']}, was due {say_when(t['due'])}" for t in late_tasks]
+            late += [f"Bill {b['name']}: ${float(b.get('amt') or 0):.2f}, was due {say_when(b['due'])}" for b in late_bills]
+            if late:
+                parts.append("Overdue:\n" + "\n".join(late))
+        if not parts:
+            return f"Nothing is on the calendar {label}, and nothing is overdue." if first <= today else \
+                f"Nothing is on the calendar {label}."
+        return f"{label[0].upper()}{label[1:]}:\n\n" + "\n\n".join(parts)
+
+    def list_overdue(self) -> str:
+        data = self.store.load()
+        tasks, bills = self._overdue(data)
+        if not tasks and not bills:
+            return "Nothing is overdue: no open task or unpaid bill is past its due date."
+        parts = []
+        if tasks:
+            parts.append(f"{_plural(len(tasks), 'overdue task')}:\n"
+                         + "\n".join(f"{t['title']}, was due {say_when(t['due'])}" for t in tasks))
+        if bills:
+            total = sum(float(b.get("amt") or 0) for b in bills)
+            parts.append(f"{_plural(len(bills), 'overdue bill')}, ${total:.2f} in all:\n" + "\n".join(
+                f"{b['name']}: ${float(b.get('amt') or 0):.2f}, was due {say_when(b['due'])}"
+                + (" (autopay)" if b.get("auto") else "") for b in bills))
+        return "\n\n".join(parts)
 
     # the page and the widget
     def widget_upcoming(self) -> dict:
@@ -767,7 +925,9 @@ class Calendar:
     def view(self) -> dict:
         data = self.store.load()
         for m in data["meds"]:
-            m["takenToday"] = self._med_taken(m)
+            m["takenToday"], m["state"] = self._med_taken(m), self._med_state(m)
+            doses = self._doses(m)
+            m["lastTaken"] = say_when(_stamp(doses[-1], True)) if doses and m.get("log") else ""
         data["people"] = self.people.list(data.get("family"))
         return data
 
@@ -782,7 +942,8 @@ def _enum(values, text: str) -> dict:
     return {"type": "string", "enum": list(values), "description": text}
 
 
-_WHEN = "A date and time like 2026-10-30T10:00, or words like tomorrow at 3pm or friday at 10am."
+_WHEN = ("A date and time like 2026-10-30T10:00, or words like tomorrow at 3pm, friday at 10am, next monday, "
+         "in 3 days or 2026-11-03 at 3pm.")
 _WHO = "Who it is for: a person's name, or all for everyone. Default all."
 TOOLS = [
     ("add_event", "Add an event or appointment to the calendar, once or repeating.",
@@ -803,6 +964,11 @@ TOOLS = [
      {"name": _p("string", "The bill, like electric."), "amount": _p("number", "How much, like 84.50 (0 to 10,000,000)."),
       "due": _p("string", "The due date, like 2026-11-05 or friday."), "category": _enum(BILL_CATEGORIES, "Default utilities."),
       "autopay": _p("boolean", "True if it pays itself.")}, ["name", "amount", "due"]),
+    ("whats_on", "What is on today or this week, all in one answer: events, tasks and bills due, medicines still "
+                 "to take today, and anything overdue.",
+     {"days_ahead": _p("integer", "How many days after today. Default 0 for today only; 6 for this week."),
+      "day": _p("string", "Or one day, like tomorrow, friday or 2026-10-30.")}, []),
+    ("list_overdue", "List the to-do tasks and unpaid bills that are past their due date.", {}, []),
     ("list_events", "List what is on the calendar: one day, or today and the next few days.",
      {"days_ahead": _p("integer", "How many days after today. Default 7; 0 for today only."),
       "day": _p("string", "Or one day, like tomorrow, friday or 2026-10-30.")}, []),
@@ -824,12 +990,16 @@ TOOLS = [
     ("complete_task", "Mark a to-do task as done.", {"task": _p("string", "The task's title.")}, ["task"]),
     ("delete_event", "Delete an event from the calendar.", {"event": _p("string", "The event's title.")}, ["event"]),
     ("delete_task", "Delete a to-do task.", {"task": _p("string", "The task's title.")}, ["task"]),
-    ("take_med", "Note that a medicine was taken today.", {"med": _p("string", "The medicine's name.")}, ["med"]),
+    ("take_med", "Log a dose of a medicine as taken, with the time: now, or when it was taken.",
+     {"med": _p("string", "The medicine's name."),
+      "when": _p("string", "Optional, when it was taken, like at 8am or yesterday at 9pm. Default now.")}, ["med"]),
+    ("delete_med", "Stop tracking a medicine and delete it, with its dose log.",
+     {"med": _p("string", "The medicine's name.")}, ["med"]),
     ("pay_bill", "Mark a bill as paid.", {"bill": _p("string", "The bill's name.")}, ["bill"]),
     ("delete_bill", "Delete a bill so it is no longer tracked.", {"bill": _p("string", "The bill's name.")}, ["bill"]),
 ]
 CHANGES = ["add_event", "add_task", "add_med", "add_bill", "edit_event", "edit_task", "complete_task",
-           "delete_event", "delete_task", "take_med", "pay_bill", "delete_bill"]
+           "delete_event", "delete_task", "take_med", "delete_med", "pay_bill", "delete_bill"]
 TOOL_NAMES = {t[0] for t in TOOLS}
 
 

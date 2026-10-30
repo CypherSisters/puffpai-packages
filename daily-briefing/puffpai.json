@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "daily-briefing",
+  "kind": "skill",
+  "name": "Daily briefing",
+  "version": "1.0.0",
+  "description": "Teaches the brain to give a short good-morning briefing: the date, then weather, today's events, tasks, medicines and bills, the shopping list, headlines and timers, from whichever of the weather, calendar, freshtable, news-headlines and alarmflow packages are installed, then one line of encouragement. It adds no tools of its own and fetches nothing itself.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/sunrise.svg",
+  "consent": "This skill is text the brain reads. It runs nothing and uses no internet."
+}

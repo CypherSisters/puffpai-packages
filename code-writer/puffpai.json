@@ -1,0 +1,46 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "code-writer",
+  "kind": "tool",
+  "name": "Code writer",
+  "version": "1.0.0",
+  "description": "Ask in plain words for a script in Python, PowerShell, Bash, JavaScript or HTML; the brain writes it and it is saved as a file you can read, list and delete. It never runs the code, never edits your own files, and never installs anything. Read a script before you use it.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/code.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["write_script", "delete_script"],
+    "tools": {
+      "write_script": "Have the brain write a script or small program from a plain request and save it as a file. It is never run. Answers the file path and the first lines.",
+      "list_scripts": "List the scripts written so far, newest first.",
+      "read_script": "Show the whole text of one saved script.",
+      "delete_script": "Delete one saved script."
+    },
+    "examples": {
+      "write_script": ["write me a Python script that renames my photos by the date they were taken", "I need a PowerShell script that lists the biggest files in my Downloads folder"],
+      "list_scripts": ["which scripts have you written for me"],
+      "read_script": ["show me the photo renaming script"],
+      "delete_script": ["delete the script rename-photos.py"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": true }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Code writer asks the brain on this computer to write the code, saves each script in its own data folder on this computer, and runs nothing. It does not use the internet."
+}

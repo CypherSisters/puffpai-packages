@@ -1,0 +1,68 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "adguard",
+  "kind": "tool",
+  "name": "AdGuard Home",
+  "version": "1.0.0",
+  "description": "Read and change your own AdGuard Home: whether protection is on, how many lookups were blocked, the most blocked domains, the latest lookups per device, the devices it knows, and blocking or unblocking a domain, turning protection on or off, or pausing it. It only works with an AdGuard Home you already run on this computer or your home network. It does not install or set up AdGuard Home, edit filter lists, change per-device settings, or remove rules it did not add.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/shield.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_address", "block_domain", "unblock_domain", "protection", "pause_protection"],
+    "tools": {
+      "set_address": "Save where the owner's AdGuard Home is, like http://192.168.1.2:3000. Only an address on this computer or the home network is taken. Without a port it tries 3000, then 80.",
+      "status": "AdGuard Home's state: protection on or off, DNS lookups and blocked lookups in its stats period, and how many filter lists and rules it has.",
+      "top_blocked": "The most blocked domains and the busiest devices, from AdGuard Home's stats.",
+      "query_log": "The latest DNS lookups from AdGuard Home's log: which device asked for which domain, and whether it was blocked. Optional filter by device address or name.",
+      "list_clients": "The devices AdGuard Home knows: the ones named in it and the ones it found on its own.",
+      "block_domain": "Block a domain and its sub-domains in AdGuard Home by adding the rule ||domain^.",
+      "unblock_domain": "Unblock a domain: take off the rule PuffPAI added, or add an allow rule @@||domain^.",
+      "protection": "Turn AdGuard Home's protection on or off for the whole home network.",
+      "pause_protection": "Turn AdGuard Home's protection off for some minutes; it comes back on by itself."
+    },
+    "examples": {
+      "set_address": ["set my AdGuard address to http://192.168.1.2:3000"],
+      "status": ["is AdGuard blocking ads right now", "how many lookups did AdGuard block today"],
+      "top_blocked": ["what is AdGuard blocking the most"],
+      "query_log": ["what has the TV been looking up", "show the last 20 DNS lookups"],
+      "list_clients": ["which devices does AdGuard know about"],
+      "block_domain": ["block ads.example.com in AdGuard"],
+      "unblock_domain": ["unblock example.com, it broke a site"],
+      "protection": ["turn AdGuard protection back on"],
+      "pause_protection": ["pause AdGuard for 15 minutes"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [
+      { "name": "ADGUARD_USER", "why": "To read and change your AdGuard Home.", "get_it": "The login you set up in AdGuard Home." },
+      { "name": "ADGUARD_PASSWORD", "why": "To read and change your AdGuard Home.", "get_it": "The login you set up in AdGuard Home." }
+    ],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [
+    { "id": "adguard-user", "kind": "enter_secret", "title": "Enter your AdGuard Home user name",
+      "why": "The package signs in to your AdGuard Home with your own login.",
+      "get_it": "The login you set up in AdGuard Home.", "key": "ADGUARD_USER" },
+    { "id": "adguard-password", "kind": "enter_secret", "title": "Enter your AdGuard Home password",
+      "why": "The package signs in to your AdGuard Home with your own login. It goes into the vault, never into a file.",
+      "get_it": "The login you set up in AdGuard Home.", "key": "ADGUARD_PASSWORD" },
+    { "id": "adguard-address", "kind": "confirm", "title": "Tell the bot where AdGuard Home is",
+      "why": "The package talks only to the address you give it, on this computer or your home network.",
+      "text": "Say: set my AdGuard address to http://<its address>:<its port>. If AdGuard Home is on another computer, the Bridge must also allow that exact address and port for this package." }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "AdGuard Home talks only to the AdGuard Home at the address you set, on this computer or your home network, never the internet, signing in with your own AdGuard login from the vault, and keeps nothing but that address in its own data folder. Its answers, including which sites your household's devices looked up, go only to the brain on this computer."
+}

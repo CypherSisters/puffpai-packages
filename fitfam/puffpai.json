@@ -3,7 +3,7 @@
   "id": "fitfam",
   "kind": "app",
   "name": "FitFam",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Workouts for each person in the household, with streaks, goals and a history that stays on this computer.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
@@ -16,26 +16,36 @@
 
   "abilities": {
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
-    "changes": ["log_workout", "log_set", "add_goal", "update_goal"],
+    "changes": ["log_workout", "log_set", "add_goal", "update_goal", "remove_workout", "remove_set", "remove_goal"],
     "tools": {
-      "log_workout": "Log a workout someone did: what kind and how many minutes. Updates their streak.",
-      "log_set": "Log one strength set: the exercise, the reps, and the weight lifted.",
+      "log_workout": "Log a workout someone did: what kind, how many minutes and, if they say, how far. Updates their streak.",
+      "log_set": "Log one strength set: the exercise, the reps, and the weight lifted in lb or kg.",
       "status": "Workout streaks and totals: how many days in a row, workouts this week and in all, and the last one.",
       "history": "List someone's recent workouts and strength sets, newest first.",
+      "personal_records": "Personal records: the best set for each exercise, with an estimated one-rep max.",
+      "remove_workout": "Remove a workout logged by mistake: the newest one, or the newest of one kind.",
+      "remove_set": "Remove a strength set logged by mistake: the newest one, or the newest of one exercise.",
+      "list_exercises": "List the exercises in FitFam's library by muscle group, like chest, legs, back or core.",
       "suggest_workout": "Make a workout plan from the exercise library: a list of exercises with sets and reps. Nothing is logged.",
       "list_goals": "List someone's fitness goals and how close they are.",
       "add_goal": "Add a fitness goal with a target, like 20 push-ups in a row or a 2-minute plank.",
-      "update_goal": "Set the progress on a fitness goal: the number reached so far."
+      "update_goal": "Set the progress on a fitness goal: the number reached so far.",
+      "remove_goal": "Remove a fitness goal someone no longer wants."
     },
     "examples": {
-      "log_workout": ["log a 30 minute run for me"],
-      "log_set": ["log a set of bench press: 135 pounds for 5 reps"],
+      "log_workout": ["log a 30 minute run for me", "log a 45 minute run for Sam, 5 km"],
+      "log_set": ["log a set of bench press: 135 pounds for 5 reps", "log a goblet squat set, 16 kg for 10"],
       "status": ["how long is my workout streak"],
       "history": ["what workouts did I do lately"],
+      "personal_records": ["what are my personal records", "what's my best bench press"],
+      "remove_workout": ["remove that run, I logged it by mistake"],
+      "remove_set": ["delete the last bench press set"],
+      "list_exercises": ["what exercises work the legs", "list the kettlebell exercises"],
       "suggest_workout": ["make me a 30 minute kettlebell workout"],
       "list_goals": ["what are my fitness goals"],
       "add_goal": ["add a fitness goal: 20 push-ups in a row"],
-      "update_goal": ["update my plank goal: I held it for 90 seconds"]
+      "update_goal": ["update my plank goal: I held it for 90 seconds"],
+      "remove_goal": ["remove my plank goal"]
     }
   },
 

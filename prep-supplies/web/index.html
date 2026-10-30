@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<!-- Prep Supplies page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prep Supplies</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-chip:var(--chip,#eef2f6);--radius:12px;
+}
+html{font-size:14px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:18px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.5rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:18px 0 8px;text-transform:capitalize}
+.wrap{max-width:900px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:14px 16px}
+.top{display:flex;flex-wrap:wrap;gap:12px;align-items:stretch;margin:14px 0}
+.stat{flex:1 1 160px}
+.stat .big{font-family:var(--font-display);font-size:2rem;font-weight:700}
+.stat .lbl{color:var(--p-text2)}
+.people{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.note{color:var(--p-text2);font-size:.9rem;margin-top:6px}
+input,select{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:8px;padding:6px 8px}
+input[type=number]{width:90px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:8px;padding:6px 12px}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.small{padding:3px 9px;font-size:.9rem}
+form.add{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;align-items:end}
+form.add label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-text2)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:7px 6px;border-bottom:1px solid var(--p-line);vertical-align:middle}
+th{font-size:.8rem;color:var(--p-text2);font-weight:600}
+td.act{text-align:right;white-space:nowrap}
+.flag{display:inline-block;border-radius:20px;padding:1px 8px;font-size:.8rem;font-weight:600;margin-left:6px}
+.flag.soon{background:var(--p-warn);color:#1f2a36}
+.flag.gone{background:var(--p-bad);color:#fff}
+.empty{color:var(--p-text2);padding:10px 0}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M24 12a8 8 0 0 1 16 0" fill="none" stroke="currentColor" stroke-width="3"/><rect x="20" y="12" width="24" height="7" rx="2" fill="currentColor"/><rect x="22" y="19" width="20" height="30" rx="4" fill="#ffe08a" stroke="currentColor" stroke-width="3"/><rect x="18" y="49" width="28" height="6" rx="2" fill="currentColor"/></svg>Prep Supplies</h1>
+
+<div class="top">
+  <div class="card stat"><div class="big" id="waterDays">-</div><div class="lbl">days of water</div></div>
+  <div class="card stat"><div class="big" id="foodDays">-</div><div class="lbl">days of food</div></div>
+  <div class="card people"><label for="people">People in the household</label>
+    <input type="number" id="people" min="1" max="100" step="1" value="4"></div>
+</div>
+<div class="note" id="assume">Counts 1 gallon (3.8 liters) of water and 3 servings of food per person a day, unless an item says its own daily use. Expired items do not count.</div>
+<div class="note" id="skipped"></div>
+
+<h2 id="formTitle">Add a supply</h2>
+<div class="card">
+<form class="add" id="form">
+  <label>Name<input id="f_name" required maxlength="80" placeholder="Bottled water"></label>
+  <label>Category<select id="f_category">
+    <option value="food">Food</option><option value="water">Water</option><option value="medicine">Medicine</option>
+    <option value="first_aid">First aid</option><option value="batteries">Batteries</option><option value="fuel">Fuel</option>
+    <option value="light">Light</option><option value="sanitation">Sanitation</option><option value="tools">Tools</option>
+    <option value="other">Other</option></select></label>
+  <label>Quantity<input id="f_quantity" type="number" min="0" step="any" required value="1"></label>
+  <label>Unit<input id="f_unit" maxlength="20" placeholder="gallons, servings, cans"></label>
+  <label>Expires on<input id="f_expires_on" type="date"></label>
+  <label>Daily use per person<input id="f_ppd" type="number" min="0" step="any" placeholder="optional"></label>
+  <div><button class="primary" type="submit" id="saveBtn">Add</button> <button type="button" id="cancelBtn" hidden>Cancel</button></div>
+</form>
+<div id="msg"></div>
+</div>
+
+<div id="list"></div>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/prep-supplies/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+const CATS=['food','water','medicine','first_aid','batteries','fuel','light','sanitation','tools','other'];
+const SOON=30;
+let doc={supplies:[],people:4},_stamp='',_loaded=false,editing=null;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+function catName(c){return String(c||'other').replace('_',' ')}
+function daysLeft(s){if(!s.expires_on)return null;const d=new Date(s.expires_on+'T00:00:00'),t=new Date();t.setHours(0,0,0,0);return Math.round((d-t)/86400000)}
+function fmt(n){n=Number(n)||0;return n===Math.floor(n)?n.toLocaleString():n.toFixed(1)}
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Prep Supplies sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Prep Supplies could not save.');
+  return out}
+
+// Poll the stamp; read the whole document only when it changed (the brain may add things too).
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){if(!_loaded)say('Prep Supplies could not read its saved list.',true);return}
+    const {last_updated}=await chk.json();if(_loaded&&!force&&last_updated===_stamp)return;
+    const [d,s]=await Promise.all([fetch(BASE+'data'),fetch(BASE+'summary')]);if(!d.ok||!s.ok)return;
+    doc=await d.json();_stamp=doc.last_updated||'';_loaded=true;render(await s.json())}
+  catch(e){if(!_loaded)say('Prep Supplies is not answering. Is it running?',true)}}
+
+function render(sum){
+  $('waterDays').textContent=fmt(sum.water_days);$('foodDays').textContent=fmt(sum.food_days);
+  if(document.activeElement!==$('people'))$('people').value=sum.people;
+  const notes=[];
+  if(sum.not_counted&&sum.not_counted.length)notes.push('Not counted (no daily use for their unit): '+sum.not_counted.join('; '));
+  if(sum.expired&&sum.expired.length)notes.push('Expired: '+sum.expired.join('; '));
+  $('skipped').textContent=notes.join('. ');
+  const items=doc.supplies||[];
+  if(!items.length){$('list').innerHTML='<p class="empty">No supplies yet. Add the first one above.</p>';return}
+  let html='';
+  for(const c of CATS.concat(['?'])){
+    const group=items.filter(s=>c==='?'?!CATS.includes(s.category):s.category===c)
+      .sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+    if(!group.length)continue;
+    html+=`<h2>${esc(c==='?'?'other':catName(c))}</h2><div class="card"><table><tr><th>Item</th><th>Quantity</th><th>Expires</th><th></th></tr>`;
+    for(const s of group){
+      const d=daysLeft(s);
+      const flag=d===null?'':d<0?'<span class="flag gone">expired</span>':d<=SOON?`<span class="flag soon">in ${d} day${d===1?'':'s'}</span>`:'';
+      html+=`<tr><td>${esc(s.name)}</td><td>${esc(fmt(s.quantity))} ${esc(s.unit)}</td><td>${esc(s.expires_on||'')}${flag}</td>
+        <td class="act"><button class="small" data-edit="${esc(s.id)}">Edit</button> <button class="small" data-del="${esc(s.id)}">Delete</button></td></tr>`}
+    html+='</table></div>'}
+  $('list').innerHTML=html}
+
+function resetForm(){editing=null;$('form').reset();$('f_quantity').value=1;$('formTitle').textContent='Add a supply';
+  $('saveBtn').textContent='Add';$('cancelBtn').hidden=true}
+
+$('form').addEventListener('submit',async e=>{e.preventDefault();
+  const body={name:$('f_name').value,category:$('f_category').value,quantity:$('f_quantity').value,
+    unit:$('f_unit').value,expires_on:$('f_expires_on').value,per_person_per_day:$('f_ppd').value||0};
+  try{const out=editing?await post('api/update',{id:editing,...body}):await post('api/add',body);
+    say(out.text);resetForm();pull(true)}catch(err){say(err.message,true)}});
+$('cancelBtn').addEventListener('click',()=>{resetForm();say('')});
+
+$('list').addEventListener('click',async e=>{
+  const ed=e.target.dataset.edit,del=e.target.dataset.del;
+  if(ed){const s=(doc.supplies||[]).find(x=>x.id===ed);if(!s)return;editing=ed;
+    $('f_name').value=s.name||'';$('f_category').value=CATS.includes(s.category)?s.category:'other';
+    $('f_quantity').value=s.quantity??0;$('f_unit').value=s.unit||'';$('f_expires_on').value=s.expires_on||'';
+    $('f_ppd').value=s.per_person_per_day||'';$('formTitle').textContent='Edit '+s.name;$('saveBtn').textContent='Save';
+    $('cancelBtn').hidden=false;window.scrollTo({top:0,behavior:'smooth'})}
+  if(del){const s=(doc.supplies||[]).find(x=>x.id===del);if(!s||!confirm('Delete '+s.name+'?'))return;
+    try{say((await post('api/remove',{id:del})).text);if(editing===del)resetForm();pull(true)}catch(err){say(err.message,true)}}});
+
+$('people').addEventListener('change',async()=>{
+  try{await post('api/people',{people:$('people').value});pull(true)}catch(err){say(err.message,true)}});
+
+pull(true);
+setInterval(pull,4000);
+</script>
+</body>
+</html>

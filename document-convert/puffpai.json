@@ -1,0 +1,48 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "document-convert",
+  "kind": "tool",
+  "name": "Document convert",
+  "version": "1.0.0",
+  "description": "Turns Word, Excel, PowerPoint and OpenDocument files into PDFs with LibreOffice on this computer, and reads the plain text out of a .docx, .xlsx or .pptx without it. It does not edit documents, convert to any format but PDF, or read PDFs, and making a PDF needs LibreOffice installed.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/page-arrow.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["convert_to_pdf"],
+    "tools": {
+      "convert_to_pdf": "Turn a document (Word .docx, Excel .xlsx, PowerPoint .pptx, .odt, .ods, .odp, .txt or .md) into a PDF with LibreOffice on this computer, and say where the PDF is.",
+      "read_document_text": "Read the plain text out of a Word .docx, Excel .xlsx or PowerPoint .pptx (or a .txt or .md) without changing it.",
+      "list_converted": "List the PDFs this tool has made, newest first."
+    },
+    "examples": {
+      "convert_to_pdf": ["turn this Word document into a PDF", "make a PDF of my spreadsheet"],
+      "read_document_text": ["read me what is in this Word doc", "what does this PowerPoint say"],
+      "list_converted": ["which PDFs have you made"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "accepts": [ { "types": [".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".txt", ".md"], "tool": "convert_to_pdf" } ],
+  "setup_steps": [
+    { "id": "libreoffice", "kind": "confirm", "title": "Install LibreOffice",
+      "why": "Making a PDF uses LibreOffice, a free office suite, on this computer. Reading text out of a .docx, .xlsx or .pptx works without it.",
+      "get_it": "https://www.libreoffice.org/download/" }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Your files stay on this computer: LibreOffice on this computer converts them, and the PDFs are kept in this tool's own data folder (made). It does not use the internet."
+}

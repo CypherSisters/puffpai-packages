@@ -6,8 +6,16 @@ Add it from Apps, PuffPAI store, then pick it on Looks. Puff, the cloud, stays t
 
 ## PuffPAI
 
-**What it does.** Gives the bot a face: one flat SVG drawing, shown on Home and in the top bar. It runs nothing.
+**What it does.** A `kind: avatar` package: a face for the bot, one flat drawing. The Desktop shows it in the top bar, on Home and on Looks once you pick it.
 
-**What it needs.** Nothing: no process, no internet, no keys, no personal data.
+**What it needs.** Nothing. It runs nothing, opens no port and uses no internet. The drawing has no script and links to nothing.
 
-**Setup.** Add it from Apps, PuffPAI store, then pick it on Looks. Puff, the cloud, stays the default face until you pick another.
+**Setup steps.** None. Add it from Apps, PuffPAI store, say Yes, then pick it under Avatar on Looks. Adding it never changes your bot's face by itself.
+
+**Files.** `face.svg` (the drawing, under 1 KB), this README.
+
+**Rough edges.** Its colours are fixed; the soft shadow under it is Paper's day colour, so on a dark Desktop it shows as a light band.
+
+## Changes in 1.1.0
+
+- The README now has its PuffPAI section. The drawing is unchanged.

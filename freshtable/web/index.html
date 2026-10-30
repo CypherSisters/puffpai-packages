@@ -233,7 +233,7 @@ radial-gradient(circle 120px at 88% 6%,rgba(255,241,118,0.15) 0%,transparent 70%
 <button class="nav-btn" data-view="order" title="Grocery Order">🏪<span>Order</span></button>
 <div class="nav-divider"></div>
 <button class="nav-btn" data-view="agents" title="Agent Teams">🤖<span>Agents</span></button>
-<button class="nav-btn" data-view="chat" title="Ask LLM">💬<span>Chat</span></button>
+<button class="nav-btn" data-view="chat" title="Ask the brain">💬<span>Chat</span></button>
 <div style="flex:1"></div>
 <button class="nav-btn" data-view="settings" title="Settings">⚙️<span>Config</span></button>
 </nav>
@@ -368,7 +368,7 @@ radial-gradient(circle 120px at 88% 6%,rgba(255,241,118,0.15) 0%,transparent 70%
 <div class="llm-input-row"><input class="llm-input" id="chatInput" placeholder="Ask about recipes, nutrition, meal ideas..." onkeydown="if(event.key==='Enter')App.sendChat()">
 <button class="llm-send" onclick="App.sendChat()">➤</button></div></div>
 <div><div class="glass" style="padding:20px;margin-bottom:16px"><div style="font-family:var(--font-display);font-weight:700;margin-bottom:12px;font-size:1.05rem">💡 Quick Prompts</div><div id="quickPrompts"></div></div>
-<div class="glass" style="padding:20px"><div style="font-family:var(--font-display);font-weight:700;margin-bottom:10px;font-size:0.95rem">🔌 LLM Connection</div>
+<div class="glass" style="padding:20px"><div style="font-family:var(--font-display);font-weight:700;margin-bottom:10px;font-size:0.95rem">🔌 Brain connection</div>
 <div class="form-group"><label class="form-label">Where this runs</label><div class="form-input" style="opacity:.75">Puff on this computer. Nothing leaves your computer without your consent.</div></div>
 <button class="header-btn" onclick="App.testLLMConnection()" style="width:100%">🔍 Test Connection</button></div></div>
 </div>
@@ -433,7 +433,7 @@ function saveState(){syncPush()}
 // -- Data: one document in FreshTable's data folder, kept by its own server --
 // Paths are relative, so the page works at /pkg/freshtable/ through the Core.
 const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
-let _syncTimer=null,_stamp='',_loaded=false;
+let _syncTimer=null,_stamp='',_loaded=false,_push=Promise.resolve(),_busy=0;
 
 function adopt(doc){const ui={currentView:state.currentView,pantryFilter:state.pantryFilter,llmConnected:state.llmConnected};
 state={...defaultState(),...doc,...ui};_stamp=doc.last_updated||'';renderAll()}
@@ -441,17 +441,22 @@ state={...defaultState(),...doc,...ui};_stamp=doc.last_updated||'';renderAll()}
 // The push sends the whole document and the stamp it started from. If the saved
 // copy changed meanwhile (the brain added something), the server answers 409
 // with the saved copy and the page shows that instead of writing over it.
-function syncPush(){if(!_loaded)return;clearTimeout(_syncTimer);_syncTimer=setTimeout(async()=>{_syncTimer=null;
+// Pushes go one at a time, so each one carries the stamp the last one got back.
+function syncPush(){if(!_loaded)return;clearTimeout(_syncTimer);_syncTimer=setTimeout(()=>{_syncTimer=null;_busy++;
+_push=_push.then(doPush).finally(()=>{_busy--})},800)}
+async function doPush(){
 try{const r=await fetch(BASE+'data',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({...state,last_updated:_stamp})});
 const out=await r.json();if(r.ok){_stamp=out.last_updated}
-else if(r.status===409&&out.data){adopt(out.data);toast('FreshTable changed somewhere else, so this page reloaded it.','🔄')}
-else{toast(escHtml(out.error||'FreshTable could not save.'),'❌')}}catch(e){toast('FreshTable could not save. Is it running?','❌')}},800)}
+else if(r.status===409&&out.data){adopt(out.data);toast('FreshTable changed somewhere else (the bot may have added something), so this page reloaded it. Your last change here was not saved, please do it again.','🔄')}
+else{toast(escHtml(out.error||'FreshTable could not save.'),'❌')}}catch(e){toast('FreshTable could not save. Is it running?','❌')}}
 
 // If the saved copy cannot be read, the page never pushes over it (_loaded stays false).
-async function syncPull(){if(_syncTimer)return;try{const chk=await fetch(BASE+'updated');
+async function syncPull(){if(_syncTimer||_busy)return;try{const chk=await fetch(BASE+'updated');
 if(!chk.ok){if(!_loaded)toast('FreshTable could not read its saved lists.','❌');return}
 const{last_updated}=await chk.json();if(_loaded&&last_updated===_stamp)return;
-const r=await fetch(BASE+'data');if(!r.ok)return;adopt(await r.json());_loaded=true}catch(e){}}
+const r=await fetch(BASE+'data');if(!r.ok)return;const doc=await r.json();
+if(_loaded&&(_syncTimer||_busy))return; // an edit here started meanwhile: it goes first, and the stamp check decides
+adopt(doc);_loaded=true}catch(e){}}
 
 function $(id){return document.getElementById(id)}
 function uid(){return'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,8)}
@@ -539,7 +544,7 @@ if(!res.ok)throw new Error(res.status);return(await res.json()).text||''}catch(e
 
 function updateLLMStatus(){const d=$('llmDot'),t=$('llmStatusText');if(state.llmConnected){d.classList.add('connected');t.textContent='Brain on this computer ● connected'}else{d.classList.remove('connected');t.textContent='Brain on this computer ○ offline'}}
 
-async function testLLMConnection(){toast('Testing connection...','🔍');const r=await llmGenerate('Say "FreshTable connected!" in exactly those words.');if(r)toast('LLM connected successfully!','✅');else toast('The brain did not answer. Check the model is running on this computer.','❌')}
+async function testLLMConnection(){toast('Testing connection...','🔍');const r=await llmGenerate('Say "FreshTable connected!" in exactly those words.');if(r)toast('The brain answered.','✅');else toast('The brain did not answer. Check the model is running on this computer.','❌')}
 
 // ── AGENTS ───────────────────────
 function setAgentStatus(id,s){const a=state.agentTeam.find(x=>x.id===id);if(a)a.status=s;saveState();renderAgents()}
@@ -565,7 +570,7 @@ if(!items||!items.length){items=[
 {name:'Flour Tortillas',price:2.99,qty:1},{name:'Sour Cream',price:1.79,qty:1},{name:'Cheddar Cheese',price:4.29,qty:1},
 {name:'Lime',price:0.33,qty:4},{name:'Cilantro Bunch',price:0.79,qty:1},{name:'Black Beans (can)',price:1.09,qty:2},
 {name:'Salsa Verde',price:3.49,qty:1},{name:'Avocado',price:1.29,qty:3},{name:'Rice (2lb)',price:2.49,qty:1}];
-toast('LLM offline, using demo receipt data','⚠️')}
+toast('The brain did not answer, so these are demo items to review','⚠️')}
 state.scannedItems=items.map(i=>({id:uid(),name:i.name,price:i.price||0,qty:i.qty||1,checked:true}));
 state.receiptHistory.unshift({id:uid(),date:new Date().toISOString(),items:state.scannedItems.length,total:state.scannedItems.reduce((s,i)=>s+i.price*i.qty,0)});
 saveState();setAgentStatus('a1','idle');renderReceipts();toast(`Found ${state.scannedItems.length} items on receipt!`,'🧾')}
@@ -584,13 +589,13 @@ const pi=state.pantry.map(p=>p.name).join(', ');
 const prompt=`Generate a 5-day dinner plan for theme "${theme}".\nFamily prefs:\n${prefs}\nPantry: ${pi||'standard items'}\nReturn ONLY JSON: [{"day":"Monday","name":"Meal","time":"30 min","servings":4,"cal":400,"ingredients":["item1"],"instructions":["Step 1","Step 2","Step 3"]}]\nEach meal MUST include an "instructions" array with 4-6 step-by-step cooking instructions.`;
 let meals=null;const lr=await llmGenerate(prompt,'You are a family meal planner. Return only JSON.');
 if(lr){try{const m=lr.match(/\[[\s\S]*\]/);if(m)meals=JSON.parse(m[0])}catch(e){}}
-if(!meals||!meals.length){meals=getFallbackMeals(theme);if(!state.llmConnected)toast('LLM offline, using preset plan','⚠️')}
+if(!meals||!meals.length){meals=getFallbackMeals(theme);if(!state.llmConnected)toast('The brain did not answer, so this is a preset plan','⚠️')}
 state.mealPlan=meals.map(m=>({id:uid(),...m,theme,date:new Date().toISOString()}));
 saveState();setAgentStatus('a2','idle');renderDinners();renderDashboard();toast(`${theme} meal plan created!`,'🎉')}
 
 function addIngredientsToShoppingList(){const all=state.mealPlan.flatMap(m=>m.ingredients||[]);const uniq=[...new Set(all.map(i=>i.toLowerCase()))];let added=0;
 uniq.forEach(ing=>{const inP=state.pantry.find(p=>p.name.toLowerCase().includes(ing)&&p.quantity/p.maxQuantity>0.3);const inL=state.shoppingList.find(s=>s.name.toLowerCase()===ing);
-if(!inP&&!inL){state.shoppingList.push({id:uid(),name:ing.charAt(0).toUpperCase()+ing.slice(1),quantity:1,unit:'pcs',category:guessCat(ing),estimatedPrice:+(Math.random()*4+0.5).toFixed(2),checked:false,fromMealPlan:true});added++}});
+if(!inP&&!inL){state.shoppingList.push({id:uid(),name:ing.charAt(0).toUpperCase()+ing.slice(1),quantity:1,unit:'pcs',category:guessCat(ing),estimatedPrice:0,checked:false,fromMealPlan:true});added++}});
 saveState();renderAll();toast(`Added ${added} ingredients to shopping list!`,'🛒')}
 
 // ── SHOPPING ─────────────────────
@@ -623,9 +628,12 @@ saveState();renderChat()}
 // ── PANTRY MGMT ──────────────────
 function adjustPantryQty(id,d){const i=state.pantry.find(x=>x.id===id);if(!i)return;i.quantity=Math.max(0,Math.min(i.maxQuantity,i.quantity+d));
 if(i.quantity===0&&!state.shoppingList.find(s=>s.name.toLowerCase()===i.name.toLowerCase())){
-state.shoppingList.push({id:uid(),name:i.name,quantity:1,unit:i.unit,category:i.category,estimatedPrice:i.priceEach||2.99,checked:false,fromPantry:true});toast(i.name+' added to shopping list','🛒')}
+state.shoppingList.push({id:uid(),name:i.name,quantity:1,unit:i.unit,category:i.category,estimatedPrice:i.priceEach||0,checked:false,fromPantry:true});toast(i.name+' added to shopping list','🛒')}
 saveState();renderAll()}
 function removePantryItem(id){state.pantry=state.pantry.filter(i=>i.id!==id);saveState();renderAll()}
+function removeMeal(id){state.mealPlan=state.mealPlan.filter(m=>m.id!==id);saveState();closeModal();renderAll();toast('Taken off the plan','🗑️')}
+function removeRecipe(id){const r=(state.recipes||[]).find(x=>String(x.id)===id);if(!r)return;
+openConfirmModal('🗑️','Delete this recipe?',escHtml(r.name||'')+' will be deleted.',()=>{state.recipes=state.recipes.filter(x=>x!==r);saveState();renderAll();toast('Recipe deleted','🗑️')})}
 
 // ── DATA MGMT ────────────────────
 function exportAllData(){const b=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=`freshtable_backup_${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(u);toast('Data exported!','💾')}
@@ -648,7 +656,7 @@ if(type==='addPantry'||type==='addItem'){h=`<div class="modal-title">➕ Add Pan
 else if(type==='addShopping'){h=`<div class="modal-title">➕ Add Shopping Item</div>
 <div class="form-group"><label class="form-label">Item Name</label><input class="form-input" id="mSN" placeholder="e.g. Avocados"></div>
 <div class="form-row"><div class="form-group"><label class="form-label">Quantity</label><input class="form-input" id="mSQ" type="number" value="1" min="1"></div>
-<div class="form-group"><label class="form-label">Est. Price</label><input class="form-input" id="mSP" type="number" step="0.01" value="2.99" min="0"></div></div>
+<div class="form-group"><label class="form-label">Est. Price</label><input class="form-input" id="mSP" type="number" step="0.01" value="0" min="0"></div></div>
 <div class="form-group"><label class="form-label">Category</label><select class="form-select" id="mSC">${CATEGORIES.map(c=>`<option value="${c}">${c}</option>`).join('')}</select></div>
 <div class="modal-actions"><button class="modal-btn cancel" onclick="App.closeModal()">Cancel</button><button class="modal-btn save" onclick="App.saveShoppingItem()">Add Item</button></div>`}
 else if(type==='createRecipe'){h=`<div class="modal-title">📝 Create New Recipe</div>
@@ -684,7 +692,7 @@ const exp=$('mIX')&&$('mIX').value;if(exp)item.expires=exp;
 state.pantry.push(item);saveState();closeModal();renderAll();toast(n+' added!','✅')}
 
 function saveShoppingItem(){const n=$('mSN').value.trim();if(!n)return toast('Enter a name','⚠️');
-state.shoppingList.push({id:uid(),name:n,quantity:+$('mSQ').value||1,unit:'pcs',category:$('mSC').value,estimatedPrice:+$('mSP').value||2.99,checked:false});
+state.shoppingList.push({id:uid(),name:n,quantity:+$('mSQ').value||1,unit:'pcs',category:$('mSC').value,estimatedPrice:+$('mSP').value||0,checked:false});
 saveState();closeModal();renderShopping();toast(n+' added!','🛒')}
 
 function saveFamilyMember(){const n=$('mMN').value.trim();if(!n)return toast('Enter a name','⚠️');
@@ -716,7 +724,7 @@ return`<span class="recipe-ingredient-chip ${inP?'have':'need'}">${inP?'✓':'�
 const stepsHtml=(m.instructions||[]).map(s=>`<li class="recipe-step">${escHtml(s)}</li>`).join('');
 const missingIngs=(m.ingredients||[]).filter(ing=>!state.pantry.find(p=>p.name.toLowerCase().includes(ing.toLowerCase())));
 c.innerHTML=`<div class="recipe-detail-header"><div class="recipe-detail-title">${escHtml(m.name)}</div>
-<button class="modal-btn cancel" onclick="App.closeModal()" style="padding:6px 14px">✕ Close</button></div>
+<div style="display:flex;gap:8px"><button class="modal-btn cancel" onclick="App.removeMeal('${m.id}')" style="padding:6px 14px">🗑️ Take off the plan</button><button class="modal-btn cancel" onclick="App.closeModal()" style="padding:6px 14px">✕ Close</button></div></div>
 <div class="recipe-meta-row">
 <span class="recipe-meta-badge">📅 ${escHtml(m.day||'')}</span>
 <span class="recipe-meta-badge">⏱️ ${escHtml(m.time||'30 min')}</span>
@@ -733,7 +741,7 @@ ov.classList.add('open')}
 function addMissingToShoppingList(mealId){const m=state.mealPlan.find(x=>x.id===mealId);if(!m)return;
 const missing=(m.ingredients||[]).filter(ing=>!state.pantry.find(p=>p.name.toLowerCase().includes(ing.toLowerCase())));
 let added=0;missing.forEach(ing=>{const inL=state.shoppingList.find(s=>s.name.toLowerCase()===ing.toLowerCase());
-if(!inL){state.shoppingList.push({id:uid(),name:ing.charAt(0).toUpperCase()+ing.slice(1),quantity:1,unit:'pcs',category:guessCat(ing),estimatedPrice:+(Math.random()*4+0.5).toFixed(2),checked:false,fromMealPlan:true});added++}});
+if(!inL){state.shoppingList.push({id:uid(),name:ing.charAt(0).toUpperCase()+ing.slice(1),quantity:1,unit:'pcs',category:guessCat(ing),estimatedPrice:0,checked:false,fromMealPlan:true});added++}});
 saveState();renderAll();closeModal();toast(`Added ${added} item${added!==1?'s':''} to shopping list!`,'🛒')}
 
 // ── RENDERING ────────────────────
@@ -747,14 +755,14 @@ $('statMealsPlanned').textContent=state.mealPlan.length;
 $('statShopItems').textContent=state.shoppingList.filter(i=>!i.checked).length;
 
 $('dashLowStock').innerHTML=low.length?low.slice(0,5).map(i=>{const pct=Math.round(i.quantity/i.maxQuantity*100);
-return`<div class="pantry-item"><div class="pantry-item-left"><span class="pantry-emoji">${i.emoji}</span><div><div class="pantry-name">${i.name}</div><div class="pantry-qty">${i.quantity}/${i.maxQuantity} ${i.unit}</div></div></div>
+return`<div class="pantry-item"><div class="pantry-item-left"><span class="pantry-emoji">${i.emoji||getFoodEmoji(i.name)}</span><div><div class="pantry-name">${escHtml(i.name)}</div><div class="pantry-qty">${i.quantity}/${i.maxQuantity} ${escHtml(i.unit||'')}</div></div></div>
 <div class="pantry-bar-wrap"><div class="pantry-bar ${getBarClass(pct)}" style="width:${pct}%"></div></div></div>`}).join(''):'<div class="empty-state"><span class="empty-icon">✅</span><div class="empty-text">All stocked up!</div></div>';
 
-$('dashUpcomingMeals').innerHTML=state.mealPlan.length?state.mealPlan.slice(0,4).map(m=>`<div class="meal-card" onclick="App.openRecipeDetail('${m.id}')"><div class="meal-day">${m.day}</div><div class="meal-name">${m.name}</div>
+$('dashUpcomingMeals').innerHTML=state.mealPlan.length?state.mealPlan.slice(0,4).map(m=>`<div class="meal-card" onclick="App.openRecipeDetail('${m.id}')"><div class="meal-day">${escHtml(m.day||'')}</div><div class="meal-name">${escHtml(m.name||'')}</div>
 <div class="meal-meta"><span class="meal-meta-item">⏱️ ${m.time||'30 min'}</span><span class="meal-meta-item">🔥 ${m.cal||'400'} cal</span></div></div>`).join(''):'<div class="empty-state"><span class="empty-icon">🍽️</span><div class="empty-text">No meals planned yet. Go to Dinner Planner!</div></div>';
 
 const shopItems=state.shoppingList.filter(i=>!i.checked);
-$('dashShoppingQuick').innerHTML=shopItems.length?shopItems.slice(0,6).map(i=>`<div class="shopping-item"><span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${i.name}</span><span class="shopping-item-qty">x${i.quantity}</span></div>`).join('')+'<div style="text-align:center;margin-top:10px"><button class="header-btn" onclick="App.switchView(\'shopping\')">View Full List →</button></div>':'<div class="empty-state"><span class="empty-icon">🛒</span><div class="empty-text">Shopping list is empty</div></div>'}
+$('dashShoppingQuick').innerHTML=shopItems.length?shopItems.slice(0,6).map(i=>`<div class="shopping-item"><span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${escHtml(i.name)}</span><span class="shopping-item-qty">x${i.quantity}${i.unit&&i.unit!=='pcs'?' '+escHtml(i.unit):''}</span></div>`).join('')+'<div style="text-align:center;margin-top:10px"><button class="header-btn" onclick="App.switchView(\'shopping\')">View Full List →</button></div>':'<div class="empty-state"><span class="empty-icon">🛒</span><div class="empty-text">Shopping list is empty</div></div>'}
 
 function renderPantry(){
 // Category chips
@@ -768,7 +776,7 @@ if(i.expires){const d=new Date(i.expires),now=new Date(),diff=Math.ceil((d-now)/
 if(diff<0)expTag='<span style="color:var(--danger);font-weight:700;font-size:0.72rem"> · ⚠️ Expired</span>';
 else if(diff<=3)expTag=`<span style="color:#f59e0b;font-weight:700;font-size:0.72rem"> · Exp ${diff}d</span>`;
 else expTag=`<span style="font-size:0.72rem;opacity:0.7"> · Exp ${d.toLocaleDateString()}</span>`}
-return`<div class="pantry-item"><div class="pantry-item-left"><span class="pantry-emoji">${i.emoji}</span><div><div class="pantry-name">${i.name}</div><div class="pantry-qty">${i.quantity}/${i.maxQuantity} ${i.unit} · ${i.category}${expTag}</div></div></div>
+return`<div class="pantry-item"><div class="pantry-item-left"><span class="pantry-emoji">${i.emoji||getFoodEmoji(i.name)}</span><div><div class="pantry-name">${escHtml(i.name)}</div><div class="pantry-qty">${i.quantity}/${i.maxQuantity} ${escHtml(i.unit||'')} · ${escHtml(i.category||'')}${expTag}</div></div></div>
 <div style="display:flex;align-items:center;gap:10px"><div class="pantry-bar-wrap"><div class="pantry-bar ${getBarClass(pct)}" style="width:${pct}%"></div></div>
 <div class="pantry-actions"><button class="pantry-btn" onclick="App.adjustPantryQty('${i.id}',-1)">−</button><button class="pantry-btn" onclick="App.adjustPantryQty('${i.id}',1)">+</button>
 <button class="pantry-btn remove" onclick="App.removePantryItem('${i.id}')">✕</button></div></div></div>`}).join(''):'<div class="empty-state"><span class="empty-icon">🧊</span><div class="empty-text">Pantry is empty. Add items or scan a receipt!</div></div>'}
@@ -779,7 +787,7 @@ function renderReceipts(){
 if(state.scannedItems.length){
 $('scanResults').innerHTML=state.scannedItems.map(i=>`<div class="scan-item">
 <div class="scan-item-check ${i.checked?'checked':''}" onclick="App.toggleScanItem('${i.id}')">${i.checked?'✓':''}</div>
-<span class="scan-item-name">${i.name}${i.qty>1?' x'+i.qty:''}</span><span class="scan-item-price">${formatCurrency(i.price*i.qty)}</span></div>`).join('');
+<span class="scan-item-name">${escHtml(i.name)}${i.qty>1?' x'+i.qty:''}</span><span class="scan-item-price">${formatCurrency(i.price*i.qty)}</span></div>`).join('');
 $('scanActions').style.display='block'}else{
 $('scanResults').innerHTML='<div class="empty-state"><span class="empty-icon">🧾</span><div class="empty-text">Upload a receipt to see items here</div></div>';
 $('scanActions').style.display='none'}
@@ -794,17 +802,17 @@ function renderDinners(){
 $('dinnerThemes').innerHTML=DINNER_THEMES.map(t=>`<div class="theme-card glass ${state.selectedTheme===t.id?'active':''}" onclick="App.selectTheme('${t.id}')">
 <span class="theme-emoji">${t.emoji}</span><div class="theme-name">${t.name}</div><div class="theme-desc">${t.desc}</div></div>`).join('');
 
-$('mealPlanList').innerHTML=state.mealPlan.length?state.mealPlan.map(m=>`<div class="meal-card" onclick="App.openRecipeDetail('${m.id}')"><div class="meal-day">${m.day}</div><div class="meal-name">${m.name}</div>
+$('mealPlanList').innerHTML=state.mealPlan.length?state.mealPlan.map(m=>`<div class="meal-card" onclick="App.openRecipeDetail('${m.id}')"><div class="meal-day">${escHtml(m.day||'')}</div><div class="meal-name">${escHtml(m.name||'')}</div>
 <div class="meal-meta"><span class="meal-meta-item">⏱️ ${m.time||'30 min'}</span><span class="meal-meta-item">👥 ${m.servings||4}</span><span class="meal-meta-item">🔥 ${m.cal||400} cal</span><span class="meal-meta-item">📋 ${(m.instructions||[]).length} steps</span></div></div>`).join(''):'<div class="empty-state"><span class="empty-icon">📅</span><div class="empty-text">Select a theme and generate a plan</div></div>';
 
 const allIng=state.mealPlan.flatMap(m=>m.ingredients||[]);const uniq=[...new Set(allIng.map(i=>i.toLowerCase()))];
 if(uniq.length){$('neededIngredients').innerHTML=uniq.map(i=>{const inP=state.pantry.find(p=>p.name.toLowerCase().includes(i));
 return`<div style="display:inline-block;padding:4px 10px;margin:3px;border-radius:var(--radius-pill);font-size:0.8rem;font-weight:600;background:${inP?'rgba(74,186,94,0.2)':'rgba(232,93,117,0.15)'};color:${inP?'var(--grass-deep)':'var(--danger)'}">
-${inP?'✓':'✗'} ${i}</div>`}).join('');$('btnAddIngredients').style.display='inline-flex'}else{
+${inP?'✓':'✗'} ${escHtml(i)}</div>`}).join('');$('btnAddIngredients').style.display='inline-flex'}else{
 $('neededIngredients').innerHTML='<div class="empty-state" style="padding:10px"><div class="empty-text">Generate a meal plan to see ingredients</div></div>';$('btnAddIngredients').style.display='none'}
 
 $('familyPrefs').innerHTML=state.familyMembers.map(m=>`<div class="agent-row"><div class="agent-icon">${m.emoji}</div><div class="agent-info"><div class="agent-name">${m.name}</div><div class="agent-role">${m.prefs.join(', ')||'No preferences'}</div></div></div>`).join('');
-$('savedRecipes').innerHTML=(state.recipes||[]).length?state.recipes.map(r=>`<div class="agent-row"><div class="agent-icon">📖</div><div class="agent-info"><div class="agent-name">${escHtml(r.name||'')}</div><div class="agent-role">${escHtml(r.ingredients||'')}</div></div></div>`).join(''):'<div class="empty-state" style="padding:10px"><div class="empty-text">No saved recipes yet</div></div>'}
+$('savedRecipes').innerHTML=(state.recipes||[]).length?state.recipes.map(r=>`<div class="agent-row"><div class="agent-icon">📖</div><div class="agent-info"><div class="agent-name">${escHtml(r.name||'')}</div><div class="agent-role">${escHtml(r.ingredients||'')}</div></div><button class="pantry-btn remove" title="Delete this recipe" onclick="App.removeRecipe('${escHtml(String(r.id))}')">✕</button></div>`).join(''):'<div class="empty-state" style="padding:10px"><div class="empty-text">No saved recipes yet</div></div>'}
 
 // Recipes from a file: FreshTable's own import (the same one the brain's import_recipes tool uses)
 function importRecipeFile(e){const f=e.target.files[0];e.target.value='';if(!f)return;const rd=new FileReader();
@@ -818,8 +826,8 @@ function renderShopping(){
 const items=state.shoppingList;
 $('shoppingList').innerHTML=items.length?items.map(i=>`<div class="shopping-item ${i.checked?'done':''}">
 <div class="shopping-check ${i.checked?'checked':''}" onclick="App.toggleShoppingItem('${i.id}')">${i.checked?'✓':''}</div>
-<span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${i.name}</span>
-<span class="shopping-item-qty">x${i.quantity}</span><span class="shopping-item-cat">${(i.category||'').split(' ').pop()}</span>
+<span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${escHtml(i.name)}</span>
+<span class="shopping-item-qty">x${i.quantity}${i.unit&&i.unit!=='pcs'?' '+escHtml(i.unit):''}</span><span class="shopping-item-cat">${(i.category||'').split(' ').pop()}</span>
 <span style="font-family:var(--font-ui);font-weight:700;font-size:0.85rem">${formatCurrency((i.estimatedPrice||0)*i.quantity)}</span></div>`).join(''):'<div class="empty-state"><span class="empty-icon">🛒</span><div class="empty-text">No items in shopping list</div></div>';
 
 const total=items.filter(i=>!i.checked).reduce((s,i)=>s+(i.estimatedPrice||0)*i.quantity,0);
@@ -831,7 +839,7 @@ $('shoppingByCategory').innerHTML=Object.keys(cats).length?Object.entries(cats).
 
 function renderGroceryOrder(){
 const items=state.shoppingList.filter(i=>!i.checked);
-$('groceryOrderSummary').innerHTML=items.length?items.map(i=>`<div class="shopping-item"><span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${i.name}</span><span class="shopping-item-qty">x${i.quantity}</span><span style="font-family:var(--font-ui);font-weight:700">${formatCurrency((i.estimatedPrice||0)*i.quantity)}</span></div>`).join(''):'<div class="empty-state"><span class="empty-icon">📦</span><div class="empty-text">No items to order</div></div>';
+$('groceryOrderSummary').innerHTML=items.length?items.map(i=>`<div class="shopping-item"><span>${getFoodEmoji(i.name)}</span><span class="shopping-item-name">${escHtml(i.name)}</span><span class="shopping-item-qty">x${i.quantity}${i.unit&&i.unit!=='pcs'?' '+escHtml(i.unit):''}</span><span style="font-family:var(--font-ui);font-weight:700">${formatCurrency((i.estimatedPrice||0)*i.quantity)}</span></div>`).join(''):'<div class="empty-state"><span class="empty-icon">📦</span><div class="empty-text">No items to order</div></div>';
 $('groceryTotal').textContent=formatCurrency(items.reduce((s,i)=>s+(i.estimatedPrice||0)*i.quantity,0));
 
 $('orderHistory').innerHTML=state.orderHistory.length?state.orderHistory.slice(0,5).map(o=>`<div class="agent-row"><div class="agent-icon">📦</div><div class="agent-info"><div class="agent-name">${o.items.length} items · ${formatCurrency(o.total)}</div><div class="agent-role">${new Date(o.date).toLocaleDateString()} · ${o.status}</div></div><div class="agent-status ${o.status==='pending_approval'?'idle':'active'}">${o.status}</div></div>`).join(''):'<div class="empty-state" style="padding:10px"><div class="empty-text">No orders yet</div></div>'}
@@ -897,7 +905,7 @@ selectTheme,generateMealPlan,addIngredientsToShoppingList,
 toggleShoppingItem,clearCheckedShopping,
 initiateGroceryOrder,confirmGroceryOrder,
 sendChat,testLLMConnection,
-adjustPantryQty,removePantryItem,filterPantry,addManualScanItem,
+adjustPantryQty,removePantryItem,removeMeal,removeRecipe,filterPantry,addManualScanItem,
 runAgentTeam,exportAllData,importData,clearAllData,
 addRecipeIngRow,addRecipeStepRow,removeStepRow,saveCustomRecipe,
 openRecipeDetail,addMissingToShoppingList,importRecipeFile,

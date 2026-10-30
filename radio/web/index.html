@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<!-- World Radio page. Harvested in idea from HomeBotFounders@b77fc40:src/puffpai/media_hub.py (rewritten-from). Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Radio</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sky:#2196F3;--sky-light:#64B5F6;--sky-pale:#BBDEFB;
+  --rose:#EF5350;--purple:#7E57C2;--purple-pale:#D1C4E9;
+  --white-glass:rgba(255,255,255,0.55);--white-glass-h:rgba(255,255,255,0.72);
+  --border:rgba(255,255,255,0.5);
+  --text:#1a3a4a;--text-sub:#4a7a8a;--text-faint:#7aabb8;
+  --r:16px;--r-sm:10px;--r-pill:50px;--shadow:0 4px 24px rgba(0,60,120,0.12);
+}
+html{font-size:15px}
+body{
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text);min-height:100vh;
+  background:linear-gradient(170deg,#1565C0 0%,#42A5F5 25%,#81D4FA 50%,#C8E6C9 75%,#66BB6A 100%);
+  background-attachment:fixed;display:flex;flex-direction:column;align-items:center;padding:24px 16px 110px;
+}
+.app{max-width:620px;width:100%}
+.hdr{text-align:center;margin-bottom:18px}
+.hdr h1{font-size:1.8rem;font-weight:800;color:white;text-shadow:0 2px 12px rgba(0,60,120,0.25)}
+.hdr p{font-size:.82rem;color:rgba(255,255,255,.92);margin-top:2px}
+.card{background:var(--white-glass);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:.92rem;font-weight:700;margin-bottom:12px}
+.row{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.field{flex:1;min-width:110px;display:flex;flex-direction:column;gap:3px}
+.field label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-sub)}
+.field input{padding:8px 10px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.4);
+  font-family:inherit;font-size:.88rem;color:var(--text);outline:none}
+.field input:focus{border-color:var(--sky);background:rgba(255,255,255,.65)}
+.go-btn{width:100%;padding:10px;border-radius:var(--r-sm);border:none;color:white;font-family:inherit;font-size:.92rem;font-weight:700;cursor:pointer;
+  background:linear-gradient(135deg,var(--sky),var(--sky-light))}
+.st{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid rgba(255,255,255,.35)}
+.st:last-child{border-bottom:none}
+.st-main{flex:1;min-width:0}
+.st-name{font-weight:700;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-sub{font-size:.72rem;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st.on .st-name{color:var(--purple)}
+.ib{padding:4px 11px;border-radius:var(--r-pill);border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.3);
+  font-family:inherit;font-size:.75rem;font-weight:700;color:var(--text-sub);cursor:pointer;white-space:nowrap}
+.ib:hover{background:rgba(255,255,255,.55)}
+.ib.play{background:var(--sky-pale);color:var(--sky);border-color:var(--sky-light)}
+.empty{color:var(--text-sub);font-size:.82rem;padding:6px 2px}
+.note{background:#fff3e0;color:#8a4b00;border-radius:var(--r-sm);padding:10px 14px;margin-bottom:12px;font-size:.82rem;display:none}
+.note button{margin-left:8px}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--white-glass-h);border-top:1px solid var(--border);box-shadow:0 -4px 24px rgba(0,60,120,.12);
+  padding:10px 16px;display:flex;justify-content:center}
+.bar-in{max-width:620px;width:100%;display:flex;align-items:center;gap:12px}
+.bar-txt{flex:1;min-width:0}
+.bar-label{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-sub)}
+.bar-name{font-weight:800;font-size:.95rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-state{font-size:.72rem;color:var(--text-sub)}
+.bar audio{width:200px;max-width:40vw}
+.toast{position:fixed;top:16px;right:16px;z-index:999;padding:10px 18px;border-radius:var(--r-sm);background:var(--white-glass-h);
+  border:1px solid var(--border);box-shadow:var(--shadow);font-weight:700;font-size:.82rem;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>&#128251; World Radio</h1>
+    <p>Internet radio from radio-browser.info. Stations play here, on this page, straight from each station.</p>
+  </div>
+  <div class="note" id="note"></div>
+
+  <div class="card">
+    <h2>Find stations</h2>
+    <div class="row">
+      <div class="field"><label for="qName">Name</label><input id="qName" placeholder="kexp"></div>
+      <div class="field"><label for="qTag">Genre</label><input id="qTag" placeholder="jazz"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="qCountry">Country</label><input id="qCountry" placeholder="Ireland or IE"></div>
+      <div class="field"><label for="qLang">Language</label><input id="qLang" placeholder="spanish"></div>
+    </div>
+    <button class="go-btn" id="go">Search</button>
+  </div>
+
+  <div class="card"><h2>Results</h2><div id="results"><div class="empty">Search for a station, or ask the bot to play one.</div></div></div>
+  <div class="card"><h2>&#9733; Favorites</h2><div id="favs"><div class="empty">No favorites yet.</div></div></div>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="bar-txt">
+      <div class="bar-label">Now playing</div>
+      <div class="bar-name" id="npName">Nothing</div>
+      <div class="bar-state" id="npState">Pick a station. Browsers block sound until you click on the page once.</div>
+    </div>
+    <button class="ib" id="stopBtn">&#9632; Stop</button>
+    <audio id="player" controls preload="none"></audio>
+  </div>
+</div>
+
+<script>
+(() => {
+  // The Desktop opens this page through the Core at /pkg/radio/, which adds the package's token,
+  // so every call here is relative to the page's own folder.
+  const BASE = location.pathname.replace(/\/[^/]*\.[^/]*$/, '/').replace(/([^/])$/, '$1/');
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const player = $('player');
+  let doc = {favorites: [], now_playing: null, play_id: -1}, seenPlay = null, results = [];
+
+  function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+  function note(html) { const n = $('note'); n.style.display = html ? 'block' : 'none'; n.innerHTML = html || ''; }
+  const detail = s => [s.country, s.bitrate ? ((s.codec || 'stream') + ' ' + s.bitrate + 'k') : '', s.tags].filter(Boolean).join(' · ');
+
+  async function post(action, body) {
+    try {
+      const r = await fetch(BASE + 'api/' + action, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})});
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) { toast(out.error || 'World Radio could not do that.'); return null; }
+      return out;
+    } catch (e) { toast('World Radio is not answering. Is it running?'); return null; }
+  }
+
+  // -- Playback: the server holds "now playing"; this page plays it. --
+  function start(st) {
+    player.src = st.url;
+    $('npState').textContent = 'Connecting...';
+    const p = player.play();
+    if (p && p.catch) p.catch(err => {
+      if (err && err.name === 'NotAllowedError') {
+        note('Your browser blocks sound until you click on this page once. <button class="ib play" id="unblock">&#9654; Play</button>');
+        $('unblock').onclick = () => { note(''); player.play().catch(() => {}); };
+        $('npState').textContent = 'Waiting for one click on this page.';
+      }
+    });
+  }
+  function apply(d) {
+    doc = d;
+    const st = d.now_playing;
+    $('npName').textContent = st ? st.name : 'Nothing';
+    if (seenPlay !== d.play_id) {
+      seenPlay = d.play_id;
+      if (st) start(st); else { player.pause(); player.removeAttribute('src'); player.load(); note(''); $('npState').textContent = 'Stopped.'; }
+    }
+    renderFavs(); renderResults();
+  }
+  player.addEventListener('playing', () => { note(''); $('npState').textContent = 'Playing ' + detail(doc.now_playing || {}); });
+  player.addEventListener('error', () => {
+    if (!player.getAttribute('src')) return;
+    $('npState').textContent = 'This station did not play. It may be off the air, or use a format this browser cannot play.';
+  });
+
+  // -- Lists --
+  function row(s, inFavs) {
+    const fav = doc.favorites.some(f => f.url === s.url), on = doc.now_playing && doc.now_playing.url === s.url;
+    return '<div class="st' + (on ? ' on' : '') + '" data-url="' + esc(s.url) + '"><div class="st-main"><div class="st-name">' + esc(s.name)
+      + '</div><div class="st-sub">' + esc(detail(s)) + '</div></div>'
+      + '<button class="ib play" data-act="play">&#9654;</button>'
+      + (inFavs ? '<button class="ib" data-act="unfav">Remove</button>'
+        : '<button class="ib" data-act="fav"' + (fav ? ' disabled' : '') + '>' + (fav ? '&#9733;' : '&#9734; Save') + '</button>')
+      + '</div>';
+  }
+  function renderResults() {
+    if (!results.length) return;
+    $('results').innerHTML = results.map(s => row(s, false)).join('');
+  }
+  function renderFavs() {
+    $('favs').innerHTML = doc.favorites.length ? doc.favorites.map(s => row(s, true)).join('') : '<div class="empty">No favorites yet.</div>';
+  }
+  function find(url) { return results.find(s => s.url === url) || doc.favorites.find(s => s.url === url); }
+  async function onList(e) {
+    const b = e.target.closest('button[data-act]'), r = b && b.closest('.st');
+    if (!r) return;
+    const st = find(r.dataset.url); if (!st) return;
+    let out = null;
+    if (b.dataset.act === 'play') out = await post('play', {station: st});
+    else if (b.dataset.act === 'fav') { out = await post('add_favorite', {station: st}); if (out) toast('Saved ' + st.name); }
+    else if (b.dataset.act === 'unfav') { out = await post('remove_favorite', {url: st.url}); if (out) toast('Removed ' + st.name); }
+    if (out) apply(out);
+  }
+  async function search() {
+    const q = {name: $('qName').value, tag: $('qTag').value, country: $('qCountry').value, language: $('qLang').value};
+    $('results').innerHTML = '<div class="empty">Asking radio-browser.info...</div>';
+    const out = await post('search', q);
+    results = out ? out.stations || [] : [];
+    if (!results.length) { $('results').innerHTML = '<div class="empty">' + (out ? 'No working stations found. Try fewer words.' : 'The search did not work.') + '</div>'; return; }
+    renderResults();
+  }
+
+  async function pull() {
+    try {
+      const r = await fetch(BASE + 'data');
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { note(esc(d.error || 'World Radio cannot read its saved stations.')); return; }
+      apply(d);
+    } catch (e) {}
+  }
+
+  $('go').onclick = search;
+  document.querySelectorAll('.field input').forEach(i => i.addEventListener('keydown', e => { if (e.key === 'Enter') search(); }));
+  $('results').addEventListener('click', onList);
+  $('favs').addEventListener('click', onList);
+  $('stopBtn').onclick = async () => { const out = await post('stop'); if (out) apply(out); };
+  pull(); setInterval(pull, 2000);
+})();
+</script>
+</body>
+</html>

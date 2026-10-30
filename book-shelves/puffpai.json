@@ -1,0 +1,60 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "book-shelves",
+  "kind": "tool",
+  "name": "Book shelves",
+  "version": "1.0.0",
+  "description": "Find books in your Calibre library by title, author, series or tag, see one book's details, keep your own named shelves, and get a few plain suggestions of what to read next. It only reads the Calibre library; it does not open, convert or change books, does not change Calibre's own shelves or tags, and its suggestions follow plain rules, not the brain.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/book.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["set_library", "shelf_add", "shelf_remove"],
+    "tools": {
+      "set_library": "Set the Calibre library folder to read books from (the folder that holds metadata.db). It is only read, never changed.",
+      "find_books": "Search the Calibre book library by title words, author, series or tag. Shows up to 20 books with authors, series, year and formats.",
+      "book_details": "Everything the library knows about one book: authors, series, year, formats, tags, the description, and which of your shelves it is on.",
+      "shelves": "List your book shelves, or the books on one shelf.",
+      "shelf_add": "Put a book from the library on one of your shelves. Makes the shelf if it is new.",
+      "shelf_remove": "Take a book off one of your shelves.",
+      "recommend": "Suggest a few books to read from the library: the newest added, by a tag or an author, that are not on a Read shelf. Plain rules, not the brain.",
+      "library_stats": "How big the Calibre library is: books, authors, series, tags, formats and the newest book."
+    },
+    "examples": {
+      "set_library": ["my Calibre library is in D:\\Books\\Calibre Library"],
+      "find_books": ["do we have any books by Agatha Christie", "find books tagged cooking"],
+      "book_details": ["tell me about the book Dracula"],
+      "shelves": ["what is on my to-read shelf", "which book shelves do I have"],
+      "shelf_add": ["put Dracula on my to-read shelf"],
+      "shelf_remove": ["take Dracula off my to-read shelf"],
+      "recommend": ["recommend a mystery to read"],
+      "library_stats": ["how many books are in our library"]
+    }
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [
+    { "id": "library", "kind": "confirm",
+      "title": "Point it at your Calibre library",
+      "why": "Book shelves reads your books from the Calibre library on this computer. It only reads it, never changes it.",
+      "text": "Find the folder: open Calibre, click the Library button (the books icon) and choose Switch/create library; the folder shown there holds metadata.db. Then tell your bot: my Calibre library is in <that folder>.",
+      "get_it": "https://calibre-ebook.com/download" }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Book shelves reads the Calibre library on this computer, read-only, and never changes it. Your shelves and the library folder are kept in its own data folder on this computer. It does not use the internet."
+}
