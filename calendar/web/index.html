@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<!-- Harvested from PuffPAIBuildBot@774e27a4:dashboard/app/dashboard/apps/calendar/page.tsx (adapted): the same tabs, lists, forms and month view, rebuilt as one plain page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--paper:#f5efe3;--paper2:#ece4d3;--ink:#1f1c1a;--ink2:#5a534c;--rule:#d6ccb8;--coral:#e0684f;--pink:#f2b8ae;
+  --ok:#3f7a52;--warn:#b5651d;--sky:#3b82c4;--plum:#8a4fa3;--r:6px}
+body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--paper);color:var(--ink);padding:18px;font-size:14px}
+.app{max-width:980px;margin:0 auto}
+h1{font-family:'Iowan Old Style','Palatino Linotype',Georgia,serif;font-size:1.8rem;font-weight:600}
+.sub{color:var(--ink2);font-size:.85rem;margin:2px 0 14px}
+.bar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:12px}
+.chip{border:1px solid var(--rule);background:#fff8;border-radius:20px;padding:3px 11px;font-size:.8rem;cursor:pointer;font-family:inherit;color:var(--ink2)}
+.chip.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.tabs{display:flex;gap:2px;border-bottom:2px solid var(--rule);margin-bottom:14px}
+.tab{border:none;background:none;padding:8px 16px;font:inherit;font-weight:600;color:var(--ink2);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px}
+.tab.on{color:var(--ink);border-bottom-color:var(--coral)}
+.more{font-size:.78rem;color:var(--ink2);background:none;border:none;cursor:pointer;text-decoration:underline;margin-left:auto;font-family:inherit}
+.pane{display:none}.pane.on{display:block}
+.grid2{display:grid;grid-template-columns:1.6fr 1fr;gap:16px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.card{background:#fffaf2;border:1px solid var(--rule);border-radius:var(--r);padding:14px;margin-bottom:14px}
+.card h2{font-size:.95rem;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.month-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.month-head b{font-family:'Iowan Old Style',Georgia,serif;font-size:1.15rem}
+.nav{border:1px solid var(--rule);background:#fff;border-radius:var(--r);padding:2px 10px;cursor:pointer;font:inherit}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dow{font-size:.7rem;text-transform:uppercase;color:var(--ink2);text-align:center;padding:2px}
+.day{min-height:64px;background:#fff;border:1px solid var(--paper2);border-radius:4px;padding:3px;cursor:pointer;overflow:hidden}
+.day.blank{background:transparent;border:none;cursor:default}
+.day.today{border-color:var(--coral)}
+.day.sel{outline:2px solid var(--ink)}
+.day .n{font-size:.75rem;font-weight:700;color:var(--ink2)}
+.dot{display:block;font-size:.66rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--sky);padding-left:3px;margin-top:2px}
+.dot.task{border-color:var(--warn)}.dot.bill{border-color:var(--coral)}.dot.med{border-color:var(--plum)}.dot.done{opacity:.5;text-decoration:line-through}
+.row{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--paper2)}
+.row:last-child{border-bottom:none}
+.row .what{flex:1}
+.row .what b{font-weight:600}
+.row .meta{font-size:.76rem;color:var(--ink2)}
+.row.done .what b{text-decoration:line-through;color:var(--ink2)}
+.pill{font-size:.66rem;border-radius:10px;padding:1px 7px;background:var(--paper2);color:var(--ink2);margin-left:4px}
+.pill.high{background:#f6dcc2;color:var(--warn)}.pill.urgent{background:var(--pink);color:#8b2b1b}
+.btn{border:1px solid var(--rule);background:#fff;border-radius:var(--r);padding:3px 10px;cursor:pointer;font:inherit;font-size:.78rem}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.x{color:var(--coral)}
+form.add{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+form.add label{display:flex;flex-direction:column;gap:2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px;color:var(--ink2)}
+form.add input,form.add select{font:inherit;font-size:.86rem;padding:6px 8px;border:1px solid var(--rule);border-radius:var(--r);background:#fff;color:var(--ink);text-transform:none;letter-spacing:0}
+form.add .wide{grid-column:1/-1}
+.empty{color:var(--ink2);font-size:.85rem;padding:6px 0}
+.total{font-size:1.4rem;font-weight:700}
+.toast{position:fixed;top:14px;right:14px;background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:var(--r);font-size:.82rem;z-index:9}
+.problem{background:#fbe6d6;color:#7a3a10;border-radius:var(--r);padding:9px 12px;margin-bottom:10px;display:none}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>Calendar</h1>
+  <p class="sub">Events, tasks, medicines and bills for your household. Kept on this computer; never synced to an outside calendar.</p>
+  <div class="problem" id="problem"></div>
+  <div class="bar" id="people"></div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-tab="events">Events</button>
+    <button class="tab" data-tab="tasks">Tasks</button>
+    <button class="tab" data-tab="meds">Medicines</button>
+    <button class="tab" data-tab="bills">Bills</button>
+    <button class="more" id="more">Show medicines and bills</button>
+  </div>
+
+  <div class="pane on" id="pane-events">
+    <div class="grid2">
+      <div class="card">
+        <div class="month-head"><button class="nav" id="prev">&lsaquo;</button><b id="monthName"></b><button class="nav" id="next">&rsaquo;</button></div>
+        <div class="cal" id="cal"></div>
+      </div>
+      <div>
+        <div class="card"><h2 id="dayName">Today</h2><div id="dayList"></div></div>
+        <div class="card"><h2>Add an event</h2>
+          <form class="add" id="f-event">
+            <label class="wide">Title<input name="title" required placeholder="Dentist"></label>
+            <label>Start<input name="start" type="datetime-local" required></label>
+            <label>End<input name="end" type="datetime-local"></label>
+            <label>Category<select name="category" data-list="CATEGORIES"></select></label>
+            <label>For<select name="who" data-people></select></label>
+            <label>Priority<select name="priority" data-list="PRIORITIES"></select></label>
+            <label>Repeat<select name="repeat" data-list="REPEATS"></select></label>
+            <label class="wide">Place<input name="location" placeholder="Optional"></label>
+            <button class="btn primary wide">Add event</button>
+          </form></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-tasks">
+    <div class="grid2">
+      <div><div class="card"><h2>To do</h2><div id="tasksOpen"></div></div>
+        <div class="card"><h2>Done</h2><div id="tasksDone"></div></div></div>
+      <div class="card"><h2>Add a task</h2>
+        <form class="add" id="f-task">
+          <label class="wide">Task<input name="title" required placeholder="Take the bins out"></label>
+          <label>Due<input name="due" type="date" required></label>
+          <label>For<select name="who" data-people></select></label>
+          <label>Category<select name="category" data-list="CATEGORIES"></select></label>
+          <label>Priority<select name="priority" data-list="PRIORITIES"></select></label>
+          <button class="btn primary wide">Add task</button>
+        </form></div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-meds">
+    <div class="grid2">
+      <div class="card"><h2>Medicines</h2><div id="meds"></div></div>
+      <div class="card"><h2>Add a medicine</h2>
+        <form class="add" id="f-med">
+          <label class="wide">Name<input name="name" required></label>
+          <label>Dose<input name="dose" placeholder="10 mg"></label>
+          <label>For<select name="who" data-people></select></label>
+          <label>How often<select name="how_often" data-list="FREQ"></select></label>
+          <label>When<input name="next_time" placeholder="8:00 AM"></label>
+          <button class="btn primary wide">Add medicine</button>
+        </form></div>
+    </div>
+  </div>
+
+  <div class="pane" id="pane-bills">
+    <div class="grid2">
+      <div class="card"><h2>Unpaid <span class="total" id="billTotal"></span></h2><div id="billsOpen"></div>
+        <h2 style="margin-top:12px">Paid</h2><div id="billsPaid"></div></div>
+      <div class="card"><h2>Add a bill</h2>
+        <form class="add" id="f-bill">
+          <label class="wide">Name<input name="name" required placeholder="Electric"></label>
+          <label>Amount<input name="amount" type="number" step="0.01" min="0" required></label>
+          <label>Due<input name="due" type="date" required></label>
+          <label>Category<select name="category" data-list="BILLCATS"></select></label>
+          <label>Autopay<select name="autopay"><option value="">No</option><option value="1">Yes</option></select></label>
+          <button class="btn primary wide">Add bill</button>
+        </form></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // The Desktop opens this page through the Core at /pkg/calendar/, which adds the package's token,
+  // so every call here is relative to the page's own folder.
+  const BASE = location.pathname.replace(/\/[^/]*\.[^/]*$/, '/').replace(/([^/])$/, '$1/');
+  const LISTS = {
+    CATEGORIES: ['other', 'work', 'medical', 'sports', 'school', 'family', 'bills', 'appointment'],
+    PRIORITIES: ['medium', 'low', 'high', 'urgent'],
+    REPEATS: ['none', 'daily', 'weekdays', 'weekly', 'biweekly', 'monthly', 'yearly'],
+    FREQ: ['daily', 'twice-daily', 'weekly', 'as-needed'],
+    BILLCATS: ['utilities', 'insurance', 'subscription', 'housing', 'other'],
+  };
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const $ = id => document.getElementById(id);
+  // Escapes quotes too: its output also goes into attributes (data-id, data-who, option values).
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const pad = n => String(n).padStart(2, '0');
+  const iso = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  let doc = null, month = null, stamp = '', who = 'all', tab = 'events', showMore = false;
+  const today = new Date();
+  let y = today.getFullYear(), m = today.getMonth() + 1, sel = iso(today);
+
+  function toast(t) { const n = document.createElement('div'); n.className = 'toast'; n.textContent = t; document.body.appendChild(n); setTimeout(() => n.remove(), 3000); }
+  async function get(path) { const r = await fetch(BASE + path); const out = await r.json(); if (!r.ok) throw new Error(out.error || 'Calendar did not answer.'); return out; }
+  async function act(tool, args) {
+    try {
+      const r = await fetch(BASE + 'api/' + tool, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(args)});
+      const out = await r.json(); toast(out.message || out.error || 'Done');
+    } catch (e) { toast('Calendar is not answering. Is it running?'); }
+    load(true);
+  }
+  const mine = r => who === 'all' || !r.to || r.to === 'all' || r.to === who;
+  const nameOf = id => { if (!id || id === 'all') return 'everyone'; const p = (doc.people || []).find(p => p.id === id); return p ? p.name : id; };
+  const timeWords = t => { if (!t) return 'all day'; const [h, mi] = t.split(':').map(Number); return (h % 12 || 12) + ':' + pad(mi) + ' ' + (h < 12 ? 'AM' : 'PM'); };
+  const dayWords = s => { const d = new Date(s.slice(0, 10) + 'T00:00'); return d.toLocaleDateString('en-US', {weekday: 'long', month: 'short', day: 'numeric'}); };
+  const pill = p => p === 'high' || p === 'urgent' ? '<span class="pill ' + p + '">' + p + '</span>' : '';
+
+  async function load(force) {
+    try {
+      if (!force) { const u = await get('updated'); if (u.last_updated === stamp && doc) return; }
+      doc = await get('data'); stamp = doc.last_updated || '';
+      month = await get('month?y=' + y + '&m=' + m);
+      $('problem').style.display = 'none'; render();
+    } catch (e) { $('problem').style.display = 'block'; $('problem').textContent = e.message; }
+  }
+
+  function renderPeople() {
+    const people = doc.people || [];
+    $('people').innerHTML = people.length > 1 ? '<span class="sub" style="margin:0 4px 0 0">For:</span>' +
+      [{id: 'all', name: 'Everyone', emoji: ''}, ...people].map(p => '<button class="chip' + (who === p.id ? ' on' : '') + '" data-who="' + esc(p.id) + '">' + esc((p.emoji ? p.emoji + ' ' : '') + p.name) + '</button>').join('') : '';
+    document.querySelectorAll('select[data-people]').forEach(s => {
+      const keep = s.value; s.innerHTML = '<option value="all">Everyone</option>' + people.map(p => '<option value="' + esc(p.id) + '">' + esc(p.name) + '</option>').join(''); s.value = keep || 'all';
+    });
+  }
+
+  function renderMonth() {
+    $('monthName').textContent = MONTHS[m - 1] + ' ' + y;
+    const first = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate();
+    let html = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => '<div class="dow">' + d + '</div>').join('');
+    for (let i = 0; i < first; i++) html += '<div class="day blank"></div>';
+    for (let d = 1; d <= days; d++) {
+      const key = y + '-' + pad(m) + '-' + pad(d);
+      const rows = ((month.days || {})[key] || []).filter(mine);
+      html += '<div class="day' + (key === iso(today) ? ' today' : '') + (key === sel ? ' sel' : '') + '" data-day="' + key + '"><div class="n">' + d + '</div>'
+        + rows.slice(0, 3).map(r => '<span class="dot ' + esc(r.kind) + (r.done ? ' done' : '') + '">' + esc(r.title) + '</span>').join('')
+        + (rows.length > 3 ? '<span class="dot" style="border:none">+' + (rows.length - 3) + ' more</span>' : '') + '</div>';
+    }
+    $('cal').innerHTML = html;
+  }
+
+  function renderDay() {
+    $('dayName').textContent = dayWords(sel);
+    const rows = ((month.days || {})[sel] || []).filter(mine);
+    $('dayList').innerHTML = rows.length ? rows.map(r => {
+      const kind = {event: '', task: 'Task', bill: 'Bill', med: 'Medicine'}[r.kind];
+      const meta = [r.kind === 'event' ? timeWords(r.time) : kind, r.cat, r.loc, r.rec ? 'repeats ' + r.rec : '', r.amt != null ? '$' + Number(r.amt).toFixed(2) : '', r.to && r.to !== 'all' ? 'for ' + nameOf(r.to) : ''].filter(Boolean).join(' · ');
+      const btn = r.kind === 'event' ? '<button class="btn x" data-act="delete_event" data-arg="event" data-id="' + esc(r.id) + '">Delete</button>'
+        : r.kind === 'task' && !r.done ? '<button class="btn" data-act="complete_task" data-arg="task" data-id="' + esc(r.id) + '">Done</button>'
+        : r.kind === 'bill' && !r.done ? '<button class="btn" data-act="pay_bill" data-arg="bill" data-id="' + esc(r.id) + '">Paid</button>'
+        : r.kind === 'med' && !r.done ? '<button class="btn" data-act="take_med" data-arg="med" data-id="' + esc(r.id) + '">Taken</button>' : '';
+      return '<div class="row' + (r.done ? ' done' : '') + '"><div class="what"><b>' + esc(r.title) + '</b>' + pill(r.prio) + '<div class="meta">' + esc(meta) + '</div></div>' + btn + '</div>';
+    }).join('') : '<div class="empty">Nothing on this day.</div>';
+  }
+
+  function renderTasks() {
+    const tasks = (doc.tasks || []).filter(mine).sort((a, b) => String(a.due).localeCompare(String(b.due)));
+    const row = t => '<div class="row' + (t.status === 'completed' ? ' done' : '') + '"><div class="what"><b>' + esc(t.title) + '</b>' + pill(t.prio)
+      + '<div class="meta">due ' + esc(dayWords(String(t.due))) + (t.to && t.to !== 'all' ? ' · for ' + esc(nameOf(t.to)) : '') + '</div></div>'
+      + (t.status !== 'completed' ? '<button class="btn" data-act="complete_task" data-arg="task" data-id="' + esc(t.id) + '">Done</button>' : '')
+      + '<button class="btn x" data-act="delete_task" data-arg="task" data-id="' + esc(t.id) + '">Delete</button></div>';
+    const open = tasks.filter(t => t.status !== 'completed'), done = tasks.filter(t => t.status === 'completed');
+    $('tasksOpen').innerHTML = open.length ? open.map(row).join('') : '<div class="empty">Nothing to do.</div>';
+    $('tasksDone').innerHTML = done.length ? done.map(row).join('') : '<div class="empty">Nothing done yet.</div>';
+  }
+
+  function renderMeds() {
+    const meds = (doc.meds || []).filter(mine);
+    $('meds').innerHTML = meds.length ? meds.map(x => '<div class="row' + (x.takenToday ? ' done' : '') + '"><div class="what"><b>' + esc(x.name) + '</b>'
+      + '<div class="meta">' + esc([x.dose, x.freq, x.next, 'for ' + nameOf(x.to), x.takenToday ? 'taken today' : 'due'].filter(Boolean).join(' · ')) + '</div></div>'
+      + (x.takenToday ? '' : '<button class="btn" data-act="take_med" data-arg="med" data-id="' + esc(x.id) + '">Taken</button>') + '</div>').join('')
+      : '<div class="empty">No medicines are tracked.</div>';
+  }
+
+  function renderBills() {
+    const bills = (doc.bills || []).slice().sort((a, b) => String(a.due).localeCompare(String(b.due)));
+    const open = bills.filter(b => b.status !== 'paid'), paid = bills.filter(b => b.status === 'paid');
+    const row = b => '<div class="row' + (b.status === 'paid' ? ' done' : '') + '"><div class="what"><b>' + esc(b.name) + '</b> $' + Number(b.amt || 0).toFixed(2)
+      + '<div class="meta">due ' + esc(dayWords(String(b.due))) + ' · ' + esc(b.cat || '') + (b.auto ? ' · autopay' : '') + '</div></div>'
+      + (b.status !== 'paid' ? '<button class="btn" data-act="pay_bill" data-arg="bill" data-id="' + esc(b.id) + '">Paid</button>' : '')
+      + '<button class="btn x" data-act="delete_bill" data-arg="bill" data-id="' + esc(b.id) + '">Delete</button></div>';
+    $('billTotal').textContent = '$' + open.reduce((s, b) => s + Number(b.amt || 0), 0).toFixed(2);
+    $('billsOpen').innerHTML = open.length ? open.map(row).join('') : '<div class="empty">No unpaid bills.</div>';
+    $('billsPaid').innerHTML = paid.length ? paid.map(row).join('') : '<div class="empty">None yet.</div>';
+  }
+
+  function renderTabs() {
+    // Medicines and Bills show once they hold something (v1: most bots' calendars are not a medicine chart).
+    const has = k => showMore || tab === k || (doc[k] || []).length > 0;
+    document.querySelectorAll('.tab').forEach(b => { const k = b.dataset.tab; b.classList.toggle('on', k === tab); b.style.display = (k === 'meds' || k === 'bills') && !has(k) ? 'none' : ''; });
+    $('more').style.display = has('meds') && has('bills') ? 'none' : '';
+    document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + tab));
+  }
+
+  function render() { renderPeople(); renderTabs(); renderMonth(); renderDay(); renderTasks(); renderMeds(); renderBills(); }
+
+  function form(id, tool, shape) {
+    $(id).addEventListener('submit', e => {
+      e.preventDefault();
+      const args = shape(Object.fromEntries(new FormData(e.target).entries()));
+      act(tool, args); e.target.reset(); renderPeople();
+    });
+  }
+  form('f-event', 'add_event', a => ({...a, end: a.end || ''}));
+  form('f-task', 'add_task', a => a);
+  form('f-med', 'add_med', a => a);
+  form('f-bill', 'add_bill', a => ({...a, amount: parseFloat(a.amount || '0'), autopay: !!a.autopay}));
+
+  document.addEventListener('click', e => {
+    const t = e.target.closest('[data-act],[data-day],[data-who],.tab,#more,#prev,#next'); if (!t) return;
+    if (t.dataset.act) return act(t.dataset.act, {[t.dataset.arg]: t.dataset.id});
+    if (t.dataset.day) { sel = t.dataset.day; renderMonth(); renderDay(); return; }
+    if (t.dataset.who) { who = t.dataset.who; render(); return; }
+    if (t.classList.contains('tab')) { tab = t.dataset.tab; renderTabs(); return; }
+    if (t.id === 'more') { showMore = true; renderTabs(); return; }
+    if (t.id === 'prev' || t.id === 'next') {
+      m += t.id === 'prev' ? -1 : 1; if (m < 1) { m = 12; y--; } if (m > 12) { m = 1; y++; }
+      sel = y + '-' + pad(m) + '-01'; load(true);
+    }
+  });
+
+  document.querySelectorAll('select[data-list]').forEach(s => { s.innerHTML = LISTS[s.dataset.list].map(v => '<option value="' + v + '">' + v + '</option>').join(''); });
+  load(true); setInterval(load, 2000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<!-- Harvested from PuffPAIBuildBot@774e27a4:dashboard/public/alarm-app.html (adapted). Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlarmFlow</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sky:#2196F3;--sky-light:#64B5F6;--sky-pale:#BBDEFB;
+  --rose:#EF5350;--purple:#7E57C2;--purple-pale:#D1C4E9;
+  --white-glass:rgba(255,255,255,0.55);--white-glass-h:rgba(255,255,255,0.72);
+  --border:rgba(255,255,255,0.5);
+  --text:#1a3a4a;--text-sub:#4a7a8a;--text-faint:#7aabb8;
+  --r:16px;--r-sm:10px;--r-pill:50px;--shadow:0 4px 24px rgba(0,60,120,0.12);
+}
+html{font-size:15px}
+body{
+  font-family:system-ui,-apple-system,'Segoe UI',sans-serif;color:var(--text);min-height:100vh;
+  background:linear-gradient(170deg,#1565C0 0%,#42A5F5 25%,#81D4FA 50%,#C8E6C9 75%,#66BB6A 100%);
+  background-attachment:fixed;display:flex;flex-direction:column;align-items:center;padding:24px 16px;
+}
+.app{max-width:540px;width:100%}
+.hdr{text-align:center;margin-bottom:20px}
+.hdr h1{font-size:1.8rem;font-weight:800;color:white;text-shadow:0 2px 12px rgba(0,60,120,0.25)}
+.hdr p{font-size:.82rem;color:rgba(255,255,255,.9);margin-top:2px}
+.hdr-row{display:flex;justify-content:center;gap:10px;margin-top:12px}
+.hdr-btn{padding:7px 16px;border-radius:var(--r-pill);border:1px solid var(--border);background:var(--white-glass);
+  font-family:inherit;font-size:.82rem;font-weight:700;color:var(--text);cursor:pointer}
+.hdr-btn:hover{background:var(--white-glass-h)}
+.count{font-size:.6em;background:rgba(255,255,255,.35);padding:2px 10px;border-radius:20px;vertical-align:middle;display:none}
+.tabs{display:flex;margin-bottom:16px;background:var(--white-glass);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
+.tab{flex:1;padding:10px;text-align:center;font-weight:700;font-size:.9rem;cursor:pointer;border:none;background:none;color:var(--text-sub);font-family:inherit}
+.tab.active{background:rgba(255,255,255,.5);color:var(--text)}
+.tab.active.timer-tab{border-bottom:3px solid var(--sky)}
+.tab.active.alarm-tab{border-bottom:3px solid var(--purple)}
+.card{background:var(--white-glass);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card h2{font-size:.92rem;font-weight:700;margin-bottom:14px}
+.row{display:flex;gap:10px;margin-bottom:10px}
+.field{flex:1;display:flex;flex-direction:column;gap:3px}
+.field label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-sub)}
+.field input,.field select{padding:8px 10px;border-radius:var(--r-sm);border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.4);
+  font-family:inherit;font-size:.88rem;color:var(--text);outline:none}
+.field input:focus,.field select:focus{border-color:var(--sky);background:rgba(255,255,255,.65)}
+.desc-field{flex:2}
+.presets{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.preset{padding:4px 12px;border-radius:var(--r-pill);border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.2);
+  font-size:.78rem;font-weight:700;color:var(--text-sub);cursor:pointer}
+.preset:hover{background:rgba(255,255,255,.45);color:var(--sky)}
+.go-btn{width:100%;padding:10px;border-radius:var(--r-sm);border:none;color:white;font-family:inherit;font-size:.92rem;font-weight:700;cursor:pointer}
+.go-btn.timer-go{background:linear-gradient(135deg,var(--sky),var(--sky-light))}
+.go-btn.alarm-go{background:linear-gradient(135deg,var(--purple),#9575CD)}
+.pane{display:none}.pane.active{display:block}
+.item{background:var(--white-glass);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+.item.ringing{border-color:var(--rose);box-shadow:0 0 30px rgba(239,83,80,.25)}
+.item.paused{opacity:.6}
+.item-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.item-desc{font-weight:700;font-size:.9rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-right:8px}
+.badge{font-size:.6rem;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:var(--r-pill);letter-spacing:.3px}
+.b-timer{background:var(--sky-pale);color:var(--sky)}.b-alarm{background:var(--purple-pale);color:var(--purple)}
+.item-time{font-size:2.4rem;font-weight:800;text-align:center;letter-spacing:1px;line-height:1;padding:6px 0}
+.item.ringing .item-time,.item.ringing .item-sub{color:var(--rose)}
+.item-sub{text-align:center;font-size:.72rem;font-weight:600;color:var(--text-faint);margin-bottom:8px}
+.item-bar{height:4px;background:rgba(0,0,0,.06);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.item-bar-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--sky),var(--sky-light))}
+.item.is-alarm .item-bar-fill{background:linear-gradient(90deg,var(--purple),#9575CD)}
+.item.ringing .item-bar-fill{background:linear-gradient(90deg,var(--rose),#EF9A9A)}
+.item-btns{display:flex;gap:5px;justify-content:center;flex-wrap:wrap}
+.ib{padding:4px 11px;border-radius:var(--r-pill);border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.25);
+  font-family:inherit;font-size:.73rem;font-weight:700;color:var(--text-sub);cursor:pointer}
+.ib:hover{background:rgba(255,255,255,.5)}
+.ib.dismiss{background:rgba(239,83,80,.15);border-color:var(--rose);color:var(--rose)}
+.sound-tag{font-size:.62rem;color:var(--text-faint);text-align:center;margin-top:6px}
+.empty-msg{text-align:center;color:rgba(255,255,255,.85);padding:24px;font-weight:600;font-size:.9rem}
+.problem{background:#fff3e0;color:#8a4b00;border-radius:var(--r-sm);padding:10px 14px;margin-bottom:12px;font-size:.82rem;display:none}
+.toast{position:fixed;top:16px;right:16px;z-index:999;padding:10px 18px;border-radius:var(--r-sm);background:var(--white-glass-h);
+  border:1px solid var(--border);box-shadow:var(--shadow);font-weight:700;font-size:.82rem;pointer-events:none}
+@media(max-width:500px){.row{flex-wrap:wrap}.field{min-width:70px}.item-time{font-size:2rem}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hdr">
+    <h1>&#9200; AlarmFlow <span class="count" id="activeCount"></span></h1>
+    <p>Timers and alarms. They ring on this computer, even with this page closed.</p>
+    <div class="hdr-row"><button class="hdr-btn" id="testSound" onclick="A.testSound()">&#128264; Test sound</button></div>
+  </div>
+  <div class="problem" id="problem"></div>
+
+  <div class="tabs">
+    <button class="tab timer-tab active" onclick="A.showTab('timer')">&#9201; Timer</button>
+    <button class="tab alarm-tab" onclick="A.showTab('alarm')">&#128276; Alarm</button>
+  </div>
+
+  <div class="pane active" id="paneTimer">
+    <div class="card">
+      <h2>&#9201; New timer</h2>
+      <div class="row"><div class="field desc-field"><label for="tDesc">What it is for</label><input id="tDesc" placeholder="Pasta"></div></div>
+      <div class="row">
+        <div class="field"><label for="tH">Hours</label><input type="number" id="tH" min="0" max="99" value="0"></div>
+        <div class="field"><label for="tM">Min</label><input type="number" id="tM" min="0" max="59" value="5"></div>
+        <div class="field"><label for="tS">Sec</label><input type="number" id="tS" min="0" max="59" value="0"></div>
+      </div>
+      <div class="presets">
+        <span class="preset" onclick="A.tPre(0,1,0)">1m</span><span class="preset" onclick="A.tPre(0,5,0)">5m</span>
+        <span class="preset" onclick="A.tPre(0,10,0)">10m</span><span class="preset" onclick="A.tPre(0,15,0)">15m</span>
+        <span class="preset" onclick="A.tPre(0,30,0)">30m</span><span class="preset" onclick="A.tPre(1,0,0)">1h</span>
+      </div>
+      <div class="row"><div class="field"><label for="tSound">Sound</label><select id="tSound"></select></div></div>
+      <button class="go-btn timer-go" onclick="A.addTimer()">Start timer</button>
+    </div>
+  </div>
+
+  <div class="pane" id="paneAlarm">
+    <div class="card">
+      <h2>&#128276; New alarm</h2>
+      <div class="row"><div class="field desc-field"><label for="aDesc">What it is for</label><input id="aDesc" placeholder="Wake up"></div></div>
+      <div class="row">
+        <div class="field" style="flex:2"><label for="aTime">Time</label><input type="time" id="aTime"></div>
+        <div class="field"><label for="aSound">Sound</label><select id="aSound"></select></div>
+      </div>
+      <div class="row"><div class="field"><label for="aRepeat">Repeat</label>
+        <select id="aRepeat"><option value="none">Once</option><option value="daily">Daily</option>
+          <option value="weekdays">Weekdays</option><option value="weekends">Weekends</option></select></div></div>
+      <button class="go-btn alarm-go" onclick="A.addAlarm()">Set alarm</button>
+    </div>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+const A = (() => {
+  // The Desktop opens this page through the Core at /pkg/alarmflow/, which adds the package's token,
+  // so every call here is relative to the page's own folder.
+  const BASE = location.pathname.replace(/\/[^/]*\.[^/]*$/, '/').replace(/([^/])$/, '$1/');
+  const SOUNDS = {chime: 'Chime', alert: 'Alert', gentle: 'Gentle', bell: 'Bell', none: 'Silent'};
+  let items = [], offset = 0, stamp = '', actx = null, lastRing = 0, curTab = 'timer';
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const pad2 = n => String(n).padStart(2, '0');
+  const fmtSec = s => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sc = s % 60;
+    return h > 0 ? pad2(h) + ':' + pad2(m) + ':' + pad2(sc) : pad2(m) + ':' + pad2(sc); };
+  const fmtTime12 = ms => { const d = new Date(ms), h = d.getHours(); return (h % 12 || 12) + ':' + pad2(d.getMinutes()) + ' ' + (h >= 12 ? 'PM' : 'AM'); };
+  function toast(msg) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), 3000); }
+
+  // -- Sound (Web Audio, from the v1 page). Browsers stay silent until the page is tapped once. --
+  function getAC() { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); return actx; }
+  function tone(c, n, f, type, gain, start, len) {
+    const o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(gain, n + start); g.gain.exponentialRampToValueAtTime(.001, n + start + len);
+    o.connect(g).connect(c.destination); o.start(n + start); o.stop(n + start + len);
+  }
+  function playSound(type) {
+    if (type === 'none') return;
+    try {
+      const c = getAC(), n = c.currentTime;
+      if (type === 'alert') [880, 440, 880, 440].forEach((f, i) => tone(c, n, f, 'square', .12, i * .12, .1));
+      else if (type === 'gentle') tone(c, n, 392, 'triangle', .2, 0, 1.2);
+      else if (type === 'bell') { [440, 554, 659].forEach((f, i) => tone(c, n, f, 'sine', .2, i * .08, 1.5)); tone(c, n, 1760, 'square', .03, 0, .5); }
+      else [523, 659, 784].forEach((f, i) => tone(c, n, f, 'sine', .25, i * .15, .7));
+    } catch (e) {}
+  }
+
+  // -- Server --
+  async function call(tool, args) {
+    try {
+      const r = await fetch(BASE + 'api/' + tool, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(args || {})});
+      const out = await r.json().catch(() => ({}));
+      toast(out.message || out.error || (r.ok ? 'Done' : 'AlarmFlow could not do that.'));
+    } catch (e) { toast('AlarmFlow is not answering. Is it running?'); }
+    pull(true);
+  }
+  const UNREADABLE = 'AlarmFlow cannot read its timers, so nothing will ring.';
+  function problem(text) { const p = $('problem'); p.style.display = text ? 'block' : 'none'; p.textContent = text || ''; }
+  async function pull(force) {
+    try {
+      if (!force) {
+        const chk = await fetch(BASE + 'updated');
+        const u = await chk.json().catch(() => ({}));
+        if (!chk.ok) { problem(u.error || UNREADABLE); return; }
+        problem(u.problem || '');
+        if (u.last_updated === stamp) return;
+      }
+      const r = await fetch(BASE + 'data');
+      if (!r.ok) { const e = await r.json().catch(() => ({})); problem(e.error || UNREADABLE); return; }
+      const d = await r.json();
+      items = d.items || []; stamp = d.last_updated || ''; offset = (d.now || Date.now()) - Date.now();
+      render();
+    } catch (e) {}
+  }
+  const now = () => Date.now() + offset;
+  const secsLeft = a => a.status === 'paused' ? a.left : a.status === 'ringing' ? 0 : a.due ? Math.max(0, Math.ceil((a.due - now()) / 1000)) : a.left;
+
+  // -- Render --
+  function render() {
+    const el = $('list');
+    const run = items.filter(a => a.status === 'running' || a.status === 'ringing').length;
+    const c = $('activeCount'); c.style.display = run ? 'inline' : 'none'; c.textContent = run + ' active';
+    document.title = run ? '(' + run + ') AlarmFlow' : 'AlarmFlow';
+    if (!items.length) { el.innerHTML = '<div class="empty-msg">No timers or alarms are set</div>'; return; }
+    const order = {ringing: 0, running: 1, paused: 2};
+    const sorted = [...items].sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+    el.innerHTML = sorted.map(a => {
+      const left = secsLeft(a), isAlarm = a.mode === 'alarm', id = esc(a.id);
+      const tot = Number(a.tot) || 0, pct = tot > 0 ? Math.max(0, Math.min(100, (tot - left) / tot * 100)) : 100;
+      const sub = a.status === 'ringing' ? '⚠️ TIME\'S UP' : a.status === 'paused' ? 'Paused'
+        : isAlarm ? 'Rings at ' + fmtTime12(a.due) : 'of ' + fmtSec(a.tot);
+      // No ids inside inline script: each button carries its tool (and minutes); one click handler reads them.
+      const btn = (label, tool, minutes, cls) => '<button class="ib' + (cls ? ' ' + cls : '') + '" data-tool="' + tool + '"'
+        + (minutes == null ? '' : ' data-minutes="' + minutes + '"') + '>' + label + '</button>';
+      const btns = a.status === 'ringing'
+        ? btn('Stop', 'dismiss', null, 'dismiss') + btn('Snooze 5m', 'snooze', 5) + btn('Snooze 10m', 'snooze', 10)
+        : a.status === 'running'
+        ? btn('&minus;1m', 'add_time', -1) + (isAlarm ? '' : btn('Pause', 'pause')) + btn('+1m', 'add_time', 1)
+          + btn('+5m', 'add_time', 5) + btn('Cancel', 'dismiss')
+        : btn('\u25b6 Resume', 'resume') + btn('Cancel', 'dismiss');
+      const rep = a.repeat && a.repeat !== 'none' ? ' · 🔁 ' + esc(a.repeat) : '';
+      return '<div class="item' + (a.status === 'ringing' ? ' ringing' : '') + (a.status === 'paused' ? ' paused' : '') + (isAlarm ? ' is-alarm' : '') + '" data-id="' + id + '">'
+        + '<div class="item-top"><div class="item-desc">' + esc(a.desc) + '</div><span class="badge ' + (isAlarm ? 'b-alarm' : 'b-timer') + '">' + (isAlarm ? 'Alarm' : 'Timer') + '</span></div>'
+        + '<div class="item-time">' + fmtSec(left) + '</div><div class="item-sub">' + sub + '</div>'
+        + '<div class="item-bar"><div class="item-bar-fill" style="width:' + pct + '%"></div></div>'
+        + '<div class="item-btns">' + btns + '</div>'
+        + '<div class="sound-tag">🔊 ' + esc(SOUNDS[a.sound] || a.sound) + rep + '</div></div>';
+    }).join('');
+  }
+  function tick() {
+    document.querySelectorAll('.item').forEach(node => {
+      const a = items.find(x => x.id === node.dataset.id); if (!a) return;
+      const t = node.querySelector('.item-time'); if (t) t.textContent = fmtSec(secsLeft(a));
+    });
+    if (items.some(a => a.status === 'running' && a.due && a.due <= now())) pull(true);     // the server rings it; show it
+    const ringing = items.filter(a => a.status === 'ringing');
+    if (ringing.length && Date.now() - lastRing > 4000) { lastRing = Date.now(); playSound(ringing[0].sound); }
+  }
+
+  // -- Forms --
+  function addTimer() {
+    const h = parseInt($('tH').value) || 0, m = parseInt($('tM').value) || 0, s = parseInt($('tS').value) || 0;
+    if (h + m + s <= 0) { toast('Set a time first'); return; }
+    getAC();
+    call('create_timer', {desc: $('tDesc').value.trim() || 'Timer', hours: h, minutes: m, seconds: s, sound: $('tSound').value});
+    $('tDesc').value = ''; $('tH').value = 0; $('tM').value = 5; $('tS').value = 0;
+  }
+  function addAlarm() {
+    const v = $('aTime').value; if (!v) { toast('Pick a time'); return; }
+    const [hh, mm] = v.split(':').map(Number);
+    getAC();
+    call('create_alarm', {desc: $('aDesc').value.trim() || 'Alarm', hour: hh, minute: mm, sound: $('aSound').value, repeat: $('aRepeat').value});
+    $('aDesc').value = ''; $('aRepeat').value = 'none';
+  }
+  function tPre(h, m, s) { $('tH').value = h; $('tM').value = m; $('tS').value = s; }
+  function showTab(t) {
+    curTab = t;
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    document.querySelector('.tab.' + (t === 'timer' ? 'timer-tab' : 'alarm-tab')).classList.add('active');
+    $('paneTimer').classList.toggle('active', t === 'timer'); $('paneAlarm').classList.toggle('active', t === 'alarm');
+  }
+  function testSound() { playSound(($('tSound').value === 'none' ? 'chime' : $('tSound').value)); toast('This is how AlarmFlow sounds on this computer'); }
+
+  function init() {
+    ['tSound', 'aSound'].forEach(id => { $(id).innerHTML = Object.entries(SOUNDS).map(([k, v]) => '<option value="' + k + '">' + v + '</option>').join(''); });
+    const d = new Date(Date.now() + 3600000); $('aTime').value = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    document.addEventListener('pointerdown', () => getAC(), {once: true});
+    $('list').addEventListener('click', e => {
+      const b = e.target.closest('button[data-tool]'), card = b && b.closest('.item');
+      if (!card) return;
+      const args = {item: card.dataset.id};
+      if (b.dataset.minutes != null) args.minutes = Number(b.dataset.minutes);
+      call(b.dataset.tool, args);
+    });
+    document.addEventListener('keydown', e => { if (e.key !== 'Enter') return;
+      if (document.activeElement?.closest('#paneTimer')) addTimer(); else if (document.activeElement?.closest('#paneAlarm')) addAlarm(); });
+    pull(true); setInterval(pull, 2000); setInterval(tick, 1000);
+  }
+  return {init, call, addTimer, addAlarm, tPre, showTab, testSound};
+})();
+document.addEventListener('DOMContentLoaded', A.init);
+</script>
+</body>
+</html>

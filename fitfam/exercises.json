@@ -1,0 +1,686 @@
+{"provenance": "Harvested from PuffPAIBuildBot@774e27a4:dashboard/public/fitfam-app.jsx (adapted)",
+ "about": "FitFam's exercises and workout types, written by Cypher Sisters. Apache-2.0 License.",
+ "levels": {
+  "easy": "Easy",
+  "mid": "Moderate",
+  "challenging": "Challenging"
+ },
+ "durations": {
+  "15": 3,
+  "30": 5,
+  "45": 7,
+  "60": 9
+ },
+ "types": [
+  {
+   "id": "calisthenics",
+   "label": "Calisthenics",
+   "emoji": "🤸",
+   "pool": [
+    "calisthenics"
+   ]
+  },
+  {
+   "id": "kettlebell",
+   "label": "Kettlebell",
+   "emoji": "🏋️",
+   "pool": [
+    "kettlebell"
+   ]
+  },
+  {
+   "id": "rom",
+   "label": "Range of Motion",
+   "emoji": "🧘",
+   "pool": [
+    "rom"
+   ]
+  },
+  {
+   "id": "gym",
+   "label": "Gym Strength",
+   "emoji": "🏋️",
+   "pool": [
+    "gym"
+   ]
+  },
+  {
+   "id": "cali-kb",
+   "label": "Calisthenics + KB",
+   "emoji": "💪",
+   "pool": [
+    "calisthenics",
+    "kettlebell"
+   ]
+  },
+  {
+   "id": "gym-rom",
+   "label": "Gym + Flexibility",
+   "emoji": "⚡",
+   "pool": [
+    "rom",
+    "gym"
+   ]
+  },
+  {
+   "id": "full",
+   "label": "Full Session",
+   "emoji": "⚡",
+   "pool": [
+    "calisthenics",
+    "kettlebell",
+    "rom"
+   ]
+  }
+ ],
+ "exercises": {
+  "calisthenics": [
+   {
+    "id": "c1",
+    "name": "Push-Ups",
+    "muscle": "chest",
+    "levels": {
+     "easy": "3×10 (knees ok)",
+     "mid": "4×15 standard",
+     "challenging": "4×12 archer push-ups"
+    },
+    "time": 5,
+    "desc": "Fundamental upper push. Engage core, full ROM."
+   },
+   {
+    "id": "c2",
+    "name": "Diamond Push-Ups",
+    "muscle": "triceps",
+    "levels": {
+     "easy": "3×8",
+     "mid": "4×12",
+     "challenging": "4×15 tempo 3-1-3"
+    },
+    "time": 5,
+    "desc": "Hands close together targeting triceps. Elbows tight."
+   },
+   {
+    "id": "c3",
+    "name": "Pike Push-Ups",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×8",
+     "mid": "4×10",
+     "challenging": "4×12 elevated feet"
+    },
+    "time": 5,
+    "desc": "Handstand push-up progression. Hips high, head to floor."
+   },
+   {
+    "id": "c4",
+    "name": "Bodyweight Squats",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×15",
+     "mid": "4×20",
+     "challenging": "4×15 jump squats"
+    },
+    "time": 5,
+    "desc": "Full depth, knees tracking toes. Drive through heels."
+   },
+   {
+    "id": "c5",
+    "name": "Pistol Squat Progression",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×5/side assisted",
+     "mid": "3×8/side to box",
+     "challenging": "4×8/side full pistol"
+    },
+    "time": 6,
+    "desc": "Unilateral leg strength. Use support as needed."
+   },
+   {
+    "id": "c6",
+    "name": "Bulgarian Split Squats",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×8/side",
+     "mid": "3×12/side",
+     "challenging": "4×12/side tempo 4-0-1"
+    },
+    "time": 6,
+    "desc": "Rear foot elevated. Deep stretch on hip flexors."
+   },
+   {
+    "id": "c7",
+    "name": "Dips (Bench/Parallel)",
+    "muscle": "chest",
+    "levels": {
+     "easy": "3×8 bench",
+     "mid": "3×12 bench",
+     "challenging": "4×10 parallel bars"
+    },
+    "time": 5,
+    "desc": "Upper body push. Lean forward for chest emphasis."
+   },
+   {
+    "id": "c8",
+    "name": "Pull-Up / Inverted Rows",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×8 inverted rows",
+     "mid": "3×8 pull-ups",
+     "challenging": "4×10 pull-ups"
+    },
+    "time": 6,
+    "desc": "Scapular retraction, full hang to chin over bar."
+   },
+   {
+    "id": "c9",
+    "name": "Chin-Ups",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×5 negatives",
+     "mid": "3×8",
+     "challenging": "4×10 weighted"
+    },
+    "time": 6,
+    "desc": "Supinated grip. Bicep and lat emphasis."
+   },
+   {
+    "id": "c10",
+    "name": "Hollow Body Hold",
+    "muscle": "core",
+    "levels": {
+     "easy": "3×20s",
+     "mid": "3×30s",
+     "challenging": "3×45s"
+    },
+    "time": 4,
+    "desc": "Lower back pressed flat. Arms and legs extended."
+   },
+   {
+    "id": "c11",
+    "name": "L-Sit Progression",
+    "muscle": "core",
+    "levels": {
+     "easy": "3×10s tucked",
+     "mid": "3×15s one leg",
+     "challenging": "3×20s full L-sit"
+    },
+    "time": 5,
+    "desc": "Straight arms on parallettes or floor. Compress."
+   },
+   {
+    "id": "c12",
+    "name": "Plank Variations",
+    "muscle": "core",
+    "levels": {
+     "easy": "3×30s standard",
+     "mid": "3×45s side planks",
+     "challenging": "3×60s plank to push-up"
+    },
+    "time": 5,
+    "desc": "Rigid body line. Anti-extension core training."
+   },
+   {
+    "id": "c13",
+    "name": "Handstand Wall Hold",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×15s chest to wall",
+     "mid": "3×30s",
+     "challenging": "3×45s freestanding attempts"
+    },
+    "time": 6,
+    "desc": "Fingers spread, push through shoulders. Stack joints."
+   },
+   {
+    "id": "c14",
+    "name": "Muscle-Up Progression",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×5 explosive pull-ups",
+     "mid": "3×3 transition practice",
+     "challenging": "3×5 muscle-ups"
+    },
+    "time": 7,
+    "desc": "Pull high, aggressive kip to transition over bar."
+   },
+   {
+    "id": "c15",
+    "name": "Burpees",
+    "muscle": "full",
+    "levels": {
+     "easy": "3×8",
+     "mid": "4×12",
+     "challenging": "5×15"
+    },
+    "time": 5,
+    "desc": "Full body metabolic conditioning. Chest to floor."
+   }
+  ],
+  "kettlebell": [
+   {
+    "id": "k1",
+    "name": "Kettlebell Swings",
+    "muscle": "posterior",
+    "levels": {
+     "easy": "3×12 Russian",
+     "mid": "4×15 Russian",
+     "challenging": "5×15 American"
+    },
+    "time": 5,
+    "desc": "Hip hinge power. Snap hips, float the bell."
+   },
+   {
+    "id": "k2",
+    "name": "Turkish Get-Up",
+    "muscle": "full",
+    "levels": {
+     "easy": "2×3/side",
+     "mid": "3×3/side",
+     "challenging": "3×5/side"
+    },
+    "time": 8,
+    "desc": "7-step sequence from floor to standing."
+   },
+   {
+    "id": "k3",
+    "name": "Goblet Squat",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×10",
+     "mid": "4×12",
+     "challenging": "4×15 with 3s pause"
+    },
+    "time": 5,
+    "desc": "Hold KB at chest. Deep squat, elbows between knees."
+   },
+   {
+    "id": "k4",
+    "name": "Single-Arm Press",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×6/side",
+     "mid": "3×8/side",
+     "challenging": "4×10/side"
+    },
+    "time": 5,
+    "desc": "Strict press from rack. Core braced, no lean."
+   },
+   {
+    "id": "k5",
+    "name": "KB Clean",
+    "muscle": "full",
+    "levels": {
+     "easy": "3×6/side",
+     "mid": "3×8/side",
+     "challenging": "4×10/side"
+    },
+    "time": 5,
+    "desc": "Hip-driven pull to rack position. Absorb at chest."
+   },
+   {
+    "id": "k6",
+    "name": "KB Snatch",
+    "muscle": "full",
+    "levels": {
+     "easy": "3×5/side",
+     "mid": "3×8/side",
+     "challenging": "4×10/side"
+    },
+    "time": 6,
+    "desc": "One motion floor to overhead. High pull then punch through."
+   },
+   {
+    "id": "k7",
+    "name": "Windmill",
+    "muscle": "core",
+    "levels": {
+     "easy": "3×5/side bodyweight",
+     "mid": "3×5/side with KB",
+     "challenging": "3×8/side with KB"
+    },
+    "time": 6,
+    "desc": "Lateral hip hinge. KB locked overhead."
+   },
+   {
+    "id": "k8",
+    "name": "KB Halo",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×8 each way",
+     "mid": "3×12 each way",
+     "challenging": "4×12 each way"
+    },
+    "time": 4,
+    "desc": "Circle KB around head. Shoulder mobility and stability."
+   },
+   {
+    "id": "k9",
+    "name": "Farmer Carry (Single)",
+    "muscle": "core",
+    "levels": {
+     "easy": "3×30s/side",
+     "mid": "3×45s/side",
+     "challenging": "3×60s/side"
+    },
+    "time": 5,
+    "desc": "Anti-lateral flexion. Walk tall, engage obliques."
+   },
+   {
+    "id": "k10",
+    "name": "KB Deadlift",
+    "muscle": "posterior",
+    "levels": {
+     "easy": "3×10",
+     "mid": "4×12",
+     "challenging": "4×15 single-leg"
+    },
+    "time": 5,
+    "desc": "Hip hinge, flat back. Drive through heels to stand."
+   },
+   {
+    "id": "k11",
+    "name": "KB Thruster",
+    "muscle": "full",
+    "levels": {
+     "easy": "3×8",
+     "mid": "4×10",
+     "challenging": "4×12"
+    },
+    "time": 5,
+    "desc": "Goblet squat into overhead press. Full body power."
+   },
+   {
+    "id": "k12",
+    "name": "KB Row",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×8/side",
+     "mid": "4×10/side",
+     "challenging": "4×12/side tempo"
+    },
+    "time": 5,
+    "desc": "Bent over, pull to hip. Squeeze scapula."
+   }
+  ],
+  "rom": [
+   {
+    "id": "r1",
+    "name": "Sun Salutation A Flow",
+    "muscle": "full",
+    "levels": {
+     "easy": "3 rounds slow",
+     "mid": "5 rounds",
+     "challenging": "8 rounds with holds"
+    },
+    "time": 6,
+    "desc": "Classic vinyasa sequence. Breath-synchronized movement."
+   },
+   {
+    "id": "r2",
+    "name": "Pigeon Pose (Yin Hold)",
+    "muscle": "hips",
+    "levels": {
+     "easy": "60s/side",
+     "mid": "90s/side",
+     "challenging": "3min/side"
+    },
+    "time": 5,
+    "desc": "Deep hip external rotation. Relax into gravity, breathe."
+   },
+   {
+    "id": "r3",
+    "name": "90/90 Hip Switches",
+    "muscle": "hips",
+    "levels": {
+     "easy": "2×8 switches",
+     "mid": "3×10 with holds",
+     "challenging": "3×10 with lift-offs"
+    },
+    "time": 5,
+    "desc": "Internal and external rotation. Functional hip mobility."
+   },
+   {
+    "id": "r4",
+    "name": "Cat-Cow Spinal Waves",
+    "muscle": "spine",
+    "levels": {
+     "easy": "2×10",
+     "mid": "3×12 segmental",
+     "challenging": "3×15 with rotation"
+    },
+    "time": 4,
+    "desc": "Spinal flexion/extension. Breathe into each segment."
+   },
+   {
+    "id": "r5",
+    "name": "Thread the Needle",
+    "muscle": "spine",
+    "levels": {
+     "easy": "2×8/side",
+     "mid": "3×10/side",
+     "challenging": "3×10/side with hold"
+    },
+    "time": 4,
+    "desc": "Thoracic rotation from quadruped. Reach through and open."
+   },
+   {
+    "id": "r6",
+    "name": "Shoulder CARs",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "2×5/side",
+     "mid": "3×5/side",
+     "challenging": "3×8/side with tension"
+    },
+    "time": 4,
+    "desc": "Controlled Articular Rotations. Full circle, max intent."
+   },
+   {
+    "id": "r7",
+    "name": "Deep Squat Hold",
+    "muscle": "hips",
+    "levels": {
+     "easy": "3×30s",
+     "mid": "3×60s",
+     "challenging": "3×90s with reaches"
+    },
+    "time": 5,
+    "desc": "Full depth squat. Heels down, chest up."
+   },
+   {
+    "id": "r8",
+    "name": "Forward Fold + Ragdoll",
+    "muscle": "hamstrings",
+    "levels": {
+     "easy": "60s gentle",
+     "mid": "90s with PNF",
+     "challenging": "2min contract-relax"
+    },
+    "time": 4,
+    "desc": "Hamstring and spine release. Bend knees if needed."
+   },
+   {
+    "id": "r9",
+    "name": "Downward Dog to Cobra Flow",
+    "muscle": "full",
+    "levels": {
+     "easy": "3×5",
+     "mid": "3×8",
+     "challenging": "3×10 with holds"
+    },
+    "time": 5,
+    "desc": "Alternating inversion and extension. Full chain mobility."
+   },
+   {
+    "id": "r10",
+    "name": "Hip Flexor Lunge Stretch",
+    "muscle": "hips",
+    "levels": {
+     "easy": "60s/side",
+     "mid": "90s/side with reach",
+     "challenging": "2min/side with PAILs"
+    },
+    "time": 5,
+    "desc": "Half-kneeling. Drive hip forward, squeeze glute."
+   },
+   {
+    "id": "r11",
+    "name": "Ankle Dorsiflexion Mobilization",
+    "muscle": "ankles",
+    "levels": {
+     "easy": "2×10/side",
+     "mid": "3×12/side",
+     "challenging": "3×12/side loaded"
+    },
+    "time": 4,
+    "desc": "Knee over toe drive. Wall-supported ankle stretch."
+   },
+   {
+    "id": "r12",
+    "name": "Supine Spinal Twist",
+    "muscle": "spine",
+    "levels": {
+     "easy": "60s/side",
+     "mid": "90s/side",
+     "challenging": "2min/side"
+    },
+    "time": 5,
+    "desc": "Knees stacked, arms wide. Decompress and rotate."
+   },
+   {
+    "id": "r13",
+    "name": "Frog Stretch",
+    "muscle": "hips",
+    "levels": {
+     "easy": "60s",
+     "mid": "90s with rocks",
+     "challenging": "2min deep hold"
+    },
+    "time": 4,
+    "desc": "Wide knees, hips sinking. Adductor and hip opener."
+   },
+   {
+    "id": "r14",
+    "name": "Box Breathing + Body Scan",
+    "muscle": "recovery",
+    "levels": {
+     "easy": "3min",
+     "mid": "5min",
+     "challenging": "8min"
+    },
+    "time": 5,
+    "desc": "4-4-4-4 breath cycle. Parasympathetic activation."
+   },
+   {
+    "id": "r15",
+    "name": "Wrist Circles & Extensions",
+    "muscle": "wrists",
+    "levels": {
+     "easy": "2×10 each",
+     "mid": "3×10 each",
+     "challenging": "3×15 loaded"
+    },
+    "time": 3,
+    "desc": "Essential for calisthenics prehab. All directions."
+   }
+  ],
+  "gym": [
+   {
+    "id": "g1",
+    "name": "Barbell Back Squat",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×8 light",
+     "mid": "4×8 moderate",
+     "challenging": "5×5 heavy"
+    },
+    "time": 8,
+    "desc": "Foundational leg strength. Full depth, braced core."
+   },
+   {
+    "id": "g2",
+    "name": "Bench Press",
+    "muscle": "chest",
+    "levels": {
+     "easy": "3×8 light",
+     "mid": "4×8 moderate",
+     "challenging": "5×5 heavy"
+    },
+    "time": 7,
+    "desc": "Upper body horizontal push. Arch, retract scapulae."
+   },
+   {
+    "id": "g3",
+    "name": "Bent-Over Row",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×10",
+     "mid": "4×10",
+     "challenging": "4×8 heavy"
+    },
+    "time": 6,
+    "desc": "Pull to navel. Flat back, controlled eccentric."
+   },
+   {
+    "id": "g4",
+    "name": "Overhead Press",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×8",
+     "mid": "4×8",
+     "challenging": "4×6 heavy"
+    },
+    "time": 6,
+    "desc": "Strict press overhead. Core braced, full lockout."
+   },
+   {
+    "id": "g5",
+    "name": "Deadlift",
+    "muscle": "posterior",
+    "levels": {
+     "easy": "3×8 light",
+     "mid": "4×6 moderate",
+     "challenging": "5×3 heavy"
+    },
+    "time": 8,
+    "desc": "Hip hinge from floor. Full body posterior chain."
+   },
+   {
+    "id": "g6",
+    "name": "Leg Press",
+    "muscle": "legs",
+    "levels": {
+     "easy": "3×12",
+     "mid": "4×10",
+     "challenging": "4×8 heavy"
+    },
+    "time": 6,
+    "desc": "Quad/glute focus. Full ROM, don't lock knees."
+   },
+   {
+    "id": "g7",
+    "name": "Lat Pulldown",
+    "muscle": "back",
+    "levels": {
+     "easy": "3×10",
+     "mid": "4×10",
+     "challenging": "4×8 heavy"
+    },
+    "time": 5,
+    "desc": "Vertical pull. Wide grip, squeeze lats at bottom."
+   },
+   {
+    "id": "g8",
+    "name": "Dumbbell Shoulder Press",
+    "muscle": "shoulders",
+    "levels": {
+     "easy": "3×10",
+     "mid": "4×10",
+     "challenging": "4×8 heavy"
+    },
+    "time": 5,
+    "desc": "Shoulder stability and strength. Controlled path."
+   }
+  ]
+ }
+}

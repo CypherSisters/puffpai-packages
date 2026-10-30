@@ -1,0 +1,1810 @@
+{"provenance": "Harvested from PuffPAIBuildBot@774e27a4:dashboard/public/trivia-app.html (adapted)",
+ "about": "AeroTrivia's question bank, written by Cypher Sisters. Apache-2.0 License. The right answer is options[answer].",
+ "categories": [
+  {
+   "id": "random",
+   "icon": "🎲",
+   "name": "Random"
+  },
+  {
+   "id": "history",
+   "icon": "📜",
+   "name": "History"
+  },
+  {
+   "id": "science",
+   "icon": "🔬",
+   "name": "Science"
+  },
+  {
+   "id": "movies",
+   "icon": "🎬",
+   "name": "Movies"
+  },
+  {
+   "id": "music",
+   "icon": "🎵",
+   "name": "Music"
+  },
+  {
+   "id": "2000s",
+   "icon": "💿",
+   "name": "The 2000s"
+  },
+  {
+   "id": "action",
+   "icon": "💥",
+   "name": "Action Movies"
+  },
+  {
+   "id": "nature",
+   "icon": "🌿",
+   "name": "Nature"
+  },
+  {
+   "id": "sports",
+   "icon": "⚽",
+   "name": "Sports"
+  },
+  {
+   "id": "tech",
+   "icon": "💻",
+   "name": "Technology"
+  },
+  {
+   "id": "food",
+   "icon": "🍕",
+   "name": "Food & Drink"
+  },
+  {
+   "id": "geography",
+   "icon": "🗺️",
+   "name": "Geography"
+  }
+ ],
+ "difficulties": [
+  "beginner",
+  "mid",
+  "jeopardy"
+ ],
+ "questions": {
+  "history": {
+   "beginner": [
+    {
+     "q": "Which ancient civilization built the pyramids at Giza?",
+     "options": [
+      "Egyptians",
+      "Romans",
+      "Greeks",
+      "Persians"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who was the first President of the United States?",
+     "options": [
+      "George Washington",
+      "Abraham Lincoln",
+      "John Adams",
+      "Thomas Jefferson"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Titanic sank in which year?",
+     "options": [
+      "1912",
+      "1905",
+      "1920",
+      "1898"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What wall divided Berlin during the Cold War?",
+     "options": [
+      "Berlin Wall",
+      "Iron Curtain",
+      "Hadrian's Wall",
+      "Great Wall"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which country gifted the Statue of Liberty to the US?",
+     "options": [
+      "France",
+      "England",
+      "Germany",
+      "Spain"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "The Magna Carta was signed in which year?",
+     "options": [
+      "1215",
+      "1066",
+      "1492",
+      "1337"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who was known as the 'Maid of Orléans'?",
+     "options": [
+      "Joan of Arc",
+      "Marie Antoinette",
+      "Eleanor of Aquitaine",
+      "Catherine de Medici"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Battle of Hastings took place in which year?",
+     "options": [
+      "1066",
+      "1215",
+      "1099",
+      "1453"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which empire was ruled by Genghis Khan?",
+     "options": [
+      "Mongol Empire",
+      "Ottoman Empire",
+      "Roman Empire",
+      "Persian Empire"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Renaissance began in which country?",
+     "options": [
+      "Italy",
+      "France",
+      "England",
+      "Spain"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "The Treaty of Westphalia in 1648 ended which major conflict?",
+     "options": [
+      "Thirty Years' War",
+      "Seven Years' War",
+      "Hundred Years' War",
+      "War of the Roses"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who was the last Pharaoh of ancient Egypt?",
+     "options": [
+      "Cleopatra VII",
+      "Ramesses II",
+      "Tutankhamun",
+      "Nefertiti"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Defenestration of Prague helped trigger which war?",
+     "options": [
+      "Thirty Years' War",
+      "Napoleonic Wars",
+      "Seven Years' War",
+      "War of Austrian Succession"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which battle in 331 BC saw Alexander the Great defeat Darius III?",
+     "options": [
+      "Battle of Gaugamela",
+      "Battle of Thermopylae",
+      "Battle of Marathon",
+      "Battle of Issus"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Congress of Vienna took place in which year?",
+     "options": [
+      "1814-1815",
+      "1789",
+      "1848",
+      "1871"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "science": {
+   "beginner": [
+    {
+     "q": "What planet is known as the Red Planet?",
+     "options": [
+      "Mars",
+      "Venus",
+      "Jupiter",
+      "Saturn"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What gas do plants absorb from the atmosphere?",
+     "options": [
+      "Carbon dioxide",
+      "Oxygen",
+      "Nitrogen",
+      "Hydrogen"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How many bones are in the adult human body?",
+     "options": [
+      "206",
+      "186",
+      "256",
+      "312"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the chemical symbol for water?",
+     "options": [
+      "H₂O",
+      "CO₂",
+      "NaCl",
+      "O₂"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What force keeps us on the ground?",
+     "options": [
+      "Gravity",
+      "Magnetism",
+      "Friction",
+      "Inertia"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "What is the powerhouse of the cell?",
+     "options": [
+      "Mitochondria",
+      "Nucleus",
+      "Ribosome",
+      "Golgi apparatus"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which element has the atomic number 79?",
+     "options": [
+      "Gold",
+      "Silver",
+      "Platinum",
+      "Copper"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What type of bond involves sharing electrons?",
+     "options": [
+      "Covalent",
+      "Ionic",
+      "Metallic",
+      "Hydrogen"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Light travels at approximately what speed?",
+     "options": [
+      "300,000 km/s",
+      "150,000 km/s",
+      "500,000 km/s",
+      "1,000,000 km/s"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which planet has the most moons?",
+     "options": [
+      "Saturn",
+      "Jupiter",
+      "Uranus",
+      "Neptune"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "What is the Chandrasekhar limit for white dwarf stars?",
+     "options": [
+      "~1.4 solar masses",
+      "~2.0 solar masses",
+      "~0.8 solar masses",
+      "~3.0 solar masses"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Krebs cycle occurs in which part of the cell?",
+     "options": [
+      "Mitochondrial matrix",
+      "Cytoplasm",
+      "Nucleus",
+      "Cell membrane"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What does the Heisenberg Uncertainty Principle state?",
+     "options": [
+      "Position & momentum can't both be precisely known",
+      "Energy is always conserved",
+      "Light behaves as both wave and particle",
+      "Entropy always increases"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "CRISPR-Cas9 is a tool for editing what?",
+     "options": [
+      "DNA",
+      "RNA",
+      "Proteins",
+      "Lipids"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What particle is responsible for mass according to the Standard Model?",
+     "options": [
+      "Higgs boson",
+      "Photon",
+      "Gluon",
+      "W boson"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "movies": {
+   "beginner": [
+    {
+     "q": "Who directed Jurassic Park (1993)?",
+     "options": [
+      "Steven Spielberg",
+      "James Cameron",
+      "George Lucas",
+      "Ridley Scott"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In The Lion King, what is Simba's father's name?",
+     "options": [
+      "Mufasa",
+      "Scar",
+      "Rafiki",
+      "Zazu"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which movie features the quote 'I'll be back'?",
+     "options": [
+      "The Terminator",
+      "Die Hard",
+      "Predator",
+      "RoboCop"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What year was the first Toy Story released?",
+     "options": [
+      "1995",
+      "1993",
+      "1998",
+      "1991"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who played Jack in Titanic?",
+     "options": [
+      "Leonardo DiCaprio",
+      "Brad Pitt",
+      "Johnny Depp",
+      "Matt Damon"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "Which film won the first Academy Award for Best Picture?",
+     "options": [
+      "Wings",
+      "Sunrise",
+      "The Jazz Singer",
+      "Metropolis"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In Pulp Fiction, what is in the briefcase?",
+     "options": [
+      "Never revealed",
+      "Gold bars",
+      "Diamonds",
+      "A soul"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who composed the score for Inception?",
+     "options": [
+      "Hans Zimmer",
+      "John Williams",
+      "Howard Shore",
+      "James Horner"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which Coen Brothers film features 'The Dude'?",
+     "options": [
+      "The Big Lebowski",
+      "Fargo",
+      "No Country for Old Men",
+      "True Grit"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What was the first Pixar feature film?",
+     "options": [
+      "Toy Story",
+      "A Bug's Life",
+      "Monsters Inc",
+      "Finding Nemo"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "Which 1927 film is considered the first feature-length 'talkie'?",
+     "options": [
+      "The Jazz Singer",
+      "Sunrise",
+      "Metropolis",
+      "Wings"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In Kubrick's 2001, what is the AI computer's name?",
+     "options": [
+      "HAL 9000",
+      "WOPR",
+      "Skynet",
+      "MU-TH-UR"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who directed the 1972 film Solaris?",
+     "options": [
+      "Andrei Tarkovsky",
+      "Ingmar Bergman",
+      "Federico Fellini",
+      "Akira Kurosawa"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which film holds the record for most Oscar nominations without a win?",
+     "options": [
+      "The Turning Point",
+      "The Color Purple",
+      "Gangs of New York",
+      "Cry Freedom"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In what year was the Cannes Film Festival first held?",
+     "options": [
+      "1946",
+      "1939",
+      "1953",
+      "1960"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "music": {
+   "beginner": [
+    {
+     "q": "Which band released 'Bohemian Rhapsody'?",
+     "options": [
+      "Queen",
+      "The Beatles",
+      "Led Zeppelin",
+      "Pink Floyd"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What instrument has 88 keys?",
+     "options": [
+      "Piano",
+      "Guitar",
+      "Violin",
+      "Accordion"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who is known as the 'King of Pop'?",
+     "options": [
+      "Michael Jackson",
+      "Elvis Presley",
+      "Prince",
+      "Stevie Wonder"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How many strings does a standard guitar have?",
+     "options": [
+      "6",
+      "4",
+      "8",
+      "12"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which artist released the album 'Thriller'?",
+     "options": [
+      "Michael Jackson",
+      "Prince",
+      "Madonna",
+      "Whitney Houston"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "Which classical composer was deaf for much of his career?",
+     "options": [
+      "Beethoven",
+      "Mozart",
+      "Bach",
+      "Chopin"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What genre originated in the Bronx in the 1970s?",
+     "options": [
+      "Hip hop",
+      "Punk",
+      "Disco",
+      "Reggae"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who was the lead singer of Nirvana?",
+     "options": [
+      "Kurt Cobain",
+      "Eddie Vedder",
+      "Chris Cornell",
+      "Layne Staley"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What music key has no sharps or flats?",
+     "options": [
+      "C major",
+      "G major",
+      "D major",
+      "F major"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which band's debut album was 'Please Please Me'?",
+     "options": [
+      "The Beatles",
+      "The Rolling Stones",
+      "The Who",
+      "The Kinks"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "In which year did Woodstock music festival take place?",
+     "options": [
+      "1969",
+      "1967",
+      "1970",
+      "1972"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which composer wrote 'The Rite of Spring'?",
+     "options": [
+      "Stravinsky",
+      "Debussy",
+      "Ravel",
+      "Tchaikovsky"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The theremin is played by manipulating what?",
+     "options": [
+      "Electromagnetic fields",
+      "Strings",
+      "Air pressure",
+      "Keys"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What time signature is a waltz written in?",
+     "options": [
+      "3/4",
+      "4/4",
+      "6/8",
+      "2/4"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which jazz musician was known as 'Bird'?",
+     "options": [
+      "Charlie Parker",
+      "Miles Davis",
+      "John Coltrane",
+      "Dizzy Gillespie"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "2000s": {
+   "beginner": [
+    {
+     "q": "Which social media platform launched in 2004?",
+     "options": [
+      "Facebook",
+      "Twitter",
+      "Instagram",
+      "Snapchat"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What device did Apple release in 2007?",
+     "options": [
+      "iPhone",
+      "iPad",
+      "iPod Touch",
+      "MacBook Air"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which film franchise started with 'The Fellowship of the Ring'?",
+     "options": [
+      "Lord of the Rings",
+      "Harry Potter",
+      "Pirates of the Caribbean",
+      "The Matrix"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who won the 2008 US Presidential Election?",
+     "options": [
+      "Barack Obama",
+      "John McCain",
+      "George W. Bush",
+      "Al Gore"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What was the best-selling game console of the 2000s?",
+     "options": [
+      "PlayStation 2",
+      "Xbox 360",
+      "Nintendo Wii",
+      "GameCube"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "YouTube was founded in which year?",
+     "options": [
+      "2005",
+      "2004",
+      "2006",
+      "2007"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which reality show featured the phrase 'You're fired!'?",
+     "options": [
+      "The Apprentice",
+      "Survivor",
+      "Big Brother",
+      "American Idol"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What natural disaster devastated the Indian Ocean in December 2004?",
+     "options": [
+      "Tsunami",
+      "Hurricane",
+      "Earthquake",
+      "Volcanic eruption"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which social network was popular before Facebook, especially with teens?",
+     "options": [
+      "MySpace",
+      "Friendster",
+      "Orkut",
+      "Hi5"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What was the name of Apple's digital music store launched in 2003?",
+     "options": [
+      "iTunes Store",
+      "Apple Music",
+      "iPod Store",
+      "iStore"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "The Human Genome Project was completed in which year?",
+     "options": [
+      "2003",
+      "2001",
+      "2005",
+      "2000"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which spacecraft landed rovers Spirit and Opportunity on Mars?",
+     "options": [
+      "Mars Exploration Rover",
+      "Mars Pathfinder",
+      "Phoenix",
+      "Curiosity"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Large Hadron Collider first began operations in which year?",
+     "options": [
+      "2008",
+      "2006",
+      "2010",
+      "2012"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which company acquired YouTube in 2006?",
+     "options": [
+      "Google",
+      "Microsoft",
+      "Yahoo",
+      "Amazon"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What was the name of the first cloned pet (a cat) in 2001?",
+     "options": [
+      "CC (Copy Cat)",
+      "Dolly",
+      "Luna",
+      "Nyan"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "action": {
+   "beginner": [
+    {
+     "q": "Who plays Ethan Hunt in the Mission: Impossible series?",
+     "options": [
+      "Tom Cruise",
+      "Matt Damon",
+      "Daniel Craig",
+      "Bruce Willis"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In which movie does a shark terrorize a small beach town?",
+     "options": [
+      "Jaws",
+      "Deep Blue Sea",
+      "The Meg",
+      "Sharknado"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who portrayed Iron Man in the MCU?",
+     "options": [
+      "Robert Downey Jr.",
+      "Chris Evans",
+      "Chris Hemsworth",
+      "Mark Ruffalo"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What martial art is featured in 'The Karate Kid'?",
+     "options": [
+      "Karate",
+      "Kung Fu",
+      "Judo",
+      "Taekwondo"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which 1988 film stars Bruce Willis in Nakatomi Plaza?",
+     "options": [
+      "Die Hard",
+      "Lethal Weapon",
+      "Predator",
+      "Rambo"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "Who directed 'Mad Max: Fury Road'?",
+     "options": [
+      "George Miller",
+      "Ridley Scott",
+      "Michael Bay",
+      "Christopher Nolan"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In 'John Wick', what triggers John's quest for revenge?",
+     "options": [
+      "Killing his dog",
+      "Stealing his car",
+      "Burning his house",
+      "Kidnapping him"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which actor plays Dominic Toretto in Fast & Furious?",
+     "options": [
+      "Vin Diesel",
+      "Paul Walker",
+      "Dwayne Johnson",
+      "Jason Statham"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The movie 'Kill Bill' was directed by whom?",
+     "options": [
+      "Quentin Tarantino",
+      "Robert Rodriguez",
+      "Guy Ritchie",
+      "Tony Scott"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In 'The Matrix', what color pill does Neo take?",
+     "options": [
+      "Red",
+      "Blue",
+      "Green",
+      "White"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "Which 1981 film features an iconic boulder chase scene?",
+     "options": [
+      "Raiders of the Lost Ark",
+      "Romancing the Stone",
+      "The Goonies",
+      "Big Trouble in Little China"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "John Woo's 'Hard Boiled' stars which actor?",
+     "options": [
+      "Chow Yun-fat",
+      "Jet Li",
+      "Jackie Chan",
+      "Donnie Yen"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The 2011 film 'The Raid' is from which country?",
+     "options": [
+      "Indonesia",
+      "Thailand",
+      "South Korea",
+      "Japan"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who composed the iconic theme for 'Terminator 2'?",
+     "options": [
+      "Brad Fiedel",
+      "Hans Zimmer",
+      "Jerry Goldsmith",
+      "Basil Poledouris"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In 'Heat', De Niro and Pacino share a scene in what location?",
+     "options": [
+      "A diner",
+      "A bank",
+      "A rooftop",
+      "A warehouse"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "nature": {
+   "beginner": [
+    {
+     "q": "What is the largest mammal on Earth?",
+     "options": [
+      "Blue whale",
+      "African elephant",
+      "Giraffe",
+      "Hippopotamus"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How many legs does a spider have?",
+     "options": [
+      "8",
+      "6",
+      "10",
+      "12"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the tallest type of tree?",
+     "options": [
+      "Redwood",
+      "Oak",
+      "Pine",
+      "Maple"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which animal is known as 'man's best friend'?",
+     "options": [
+      "Dog",
+      "Cat",
+      "Horse",
+      "Dolphin"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What do caterpillars turn into?",
+     "options": [
+      "Butterflies/Moths",
+      "Beetles",
+      "Dragonflies",
+      "Ladybugs"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "What process do plants use to make food from sunlight?",
+     "options": [
+      "Photosynthesis",
+      "Respiration",
+      "Fermentation",
+      "Osmosis"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which biome has the most biodiversity?",
+     "options": [
+      "Tropical rainforest",
+      "Ocean",
+      "Temperate forest",
+      "Savanna"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What animal can regenerate its entire body from a small piece?",
+     "options": [
+      "Starfish",
+      "Lizard",
+      "Salamander",
+      "Crab"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the fastest land animal?",
+     "options": [
+      "Cheetah",
+      "Pronghorn",
+      "Lion",
+      "Greyhound"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Coral reefs are made of what type of organism?",
+     "options": [
+      "Animals (polyps)",
+      "Plants",
+      "Fungi",
+      "Bacteria"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "The axolotl is native to which body of water?",
+     "options": [
+      "Lake Xochimilco",
+      "Lake Titicaca",
+      "Lake Baikal",
+      "Lake Victoria"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What phenomenon causes salmon to return to their birthplace to spawn?",
+     "options": [
+      "Natal homing",
+      "Migration instinct",
+      "Magnetic navigation",
+      "Tidal pull"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which fungus is the largest living organism on Earth?",
+     "options": [
+      "Honey fungus (Armillaria)",
+      "Giant puffball",
+      "Mycelium web",
+      "Cordyceps"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How do tardigrades survive extreme environments?",
+     "options": [
+      "Cryptobiosis",
+      "Hibernation",
+      "Metamorphosis",
+      "Symbiosis"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Coelacanth was thought extinct until rediscovered in which year?",
+     "options": [
+      "1938",
+      "1952",
+      "1901",
+      "1977"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "sports": {
+   "beginner": [
+    {
+     "q": "How many players are on a soccer/football team?",
+     "options": [
+      "11",
+      "9",
+      "13",
+      "10"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In basketball, how many points is a free throw worth?",
+     "options": [
+      "1",
+      "2",
+      "3",
+      "4"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Olympics are held every how many years?",
+     "options": [
+      "4",
+      "2",
+      "3",
+      "5"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What sport uses a shuttlecock?",
+     "options": [
+      "Badminton",
+      "Tennis",
+      "Squash",
+      "Ping Pong"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How many bases are there in baseball?",
+     "options": [
+      "4",
+      "3",
+      "5",
+      "6"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "Which country has won the most FIFA World Cups?",
+     "options": [
+      "Brazil",
+      "Germany",
+      "Italy",
+      "Argentina"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In tennis, what is a score of 40-40 called?",
+     "options": [
+      "Deuce",
+      "Love",
+      "Advantage",
+      "Set point"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the diameter of a basketball hoop in inches?",
+     "options": [
+      "18",
+      "16",
+      "20",
+      "22"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which Grand Slam is played on clay courts?",
+     "options": [
+      "French Open",
+      "Wimbledon",
+      "US Open",
+      "Australian Open"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "How long is an Olympic swimming pool in meters?",
+     "options": [
+      "50",
+      "25",
+      "100",
+      "75"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "In cricket, what is a 'googly'?",
+     "options": [
+      "A deceptive leg-spin delivery",
+      "A type of bat",
+      "A fielding position",
+      "A scoring run"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The 'Fosbury Flop' revolutionized which track and field event?",
+     "options": [
+      "High jump",
+      "Long jump",
+      "Pole vault",
+      "Triple jump"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which martial art became an Olympic sport in 2020?",
+     "options": [
+      "Karate",
+      "Jiu-Jitsu",
+      "Muay Thai",
+      "Krav Maga"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the longest Grand Tour in professional cycling?",
+     "options": [
+      "Vuelta a España",
+      "Tour de France",
+      "Giro d'Italia",
+      "Tour of Britain"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "In which year were women first allowed to compete in the Olympic marathon?",
+     "options": [
+      "1984",
+      "1972",
+      "1988",
+      "1996"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "tech": {
+   "beginner": [
+    {
+     "q": "What does 'CPU' stand for?",
+     "options": [
+      "Central Processing Unit",
+      "Computer Personal Unit",
+      "Central Program Utility",
+      "Core Processing Unit"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Who co-founded Apple with Steve Jobs?",
+     "options": [
+      "Steve Wozniak",
+      "Bill Gates",
+      "Tim Cook",
+      "Larry Page"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What does 'Wi-Fi' allow you to connect to?",
+     "options": [
+      "The internet wirelessly",
+      "Bluetooth devices",
+      "Phone networks",
+      "Satellites"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What language is most used for websites?",
+     "options": [
+      "HTML/JavaScript",
+      "Python",
+      "Java",
+      "C++"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What does 'USB' stand for?",
+     "options": [
+      "Universal Serial Bus",
+      "Ultra Speed Bridge",
+      "Unified System Backup",
+      "Universal System Byte"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "In what year was the World Wide Web invented?",
+     "options": [
+      "1989",
+      "1993",
+      "1985",
+      "1991"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What programming language was created by Guido van Rossum?",
+     "options": [
+      "Python",
+      "Ruby",
+      "JavaScript",
+      "PHP"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What does 'SSD' stand for?",
+     "options": [
+      "Solid State Drive",
+      "Super Speed Disk",
+      "System Storage Device",
+      "Serial Signal Drive"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Moore's Law relates to the doubling of what?",
+     "options": [
+      "Transistors on a chip",
+      "Internet speed",
+      "Computer memory",
+      "Screen resolution"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which company created the Android operating system?",
+     "options": [
+      "Android Inc. (acquired by Google)",
+      "Apple",
+      "Microsoft",
+      "Samsung"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "What was the first message sent over ARPANET?",
+     "options": [
+      "'LO' (attempted 'LOGIN')",
+      "'HELLO WORLD'",
+      "'TEST'",
+      "'HI'"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which protocol does HTTPS add on top of HTTP?",
+     "options": [
+      "TLS/SSL",
+      "FTP",
+      "SSH",
+      "SMTP"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The concept of 'stored program' computers is attributed to which architecture?",
+     "options": [
+      "Von Neumann",
+      "Harvard",
+      "RISC",
+      "CISC"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What year was the first Bitcoin block mined?",
+     "options": [
+      "2009",
+      "2008",
+      "2010",
+      "2011"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What does the 'P' vs 'NP' problem in computer science ask?",
+     "options": [
+      "Whether problems verifiable in polynomial time are also solvable in polynomial time",
+      "Whether processors can exceed NP speed",
+      "Whether programs can be non-polynomial",
+      "Whether primes are naturally polynomial"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "food": {
+   "beginner": [
+    {
+     "q": "What Italian dish is made of layers of pasta, meat sauce, and cheese?",
+     "options": [
+      "Lasagna",
+      "Ravioli",
+      "Spaghetti",
+      "Fettuccine"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Sushi originated in which country?",
+     "options": [
+      "Japan",
+      "China",
+      "Korea",
+      "Thailand"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What fruit is known for having its seeds on the outside?",
+     "options": [
+      "Strawberry",
+      "Raspberry",
+      "Blueberry",
+      "Cherry"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the main ingredient in guacamole?",
+     "options": [
+      "Avocado",
+      "Tomato",
+      "Lime",
+      "Onion"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What type of pasta is shaped like little tubes?",
+     "options": [
+      "Penne",
+      "Spaghetti",
+      "Fettuccine",
+      "Linguine"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "What is the hottest chili pepper in the world (as of 2023)?",
+     "options": [
+      "Pepper X",
+      "Carolina Reaper",
+      "Trinidad Scorpion",
+      "Ghost Pepper"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the process of cooking food in a vacuum-sealed bag called?",
+     "options": [
+      "Sous vide",
+      "Braising",
+      "Poaching",
+      "Blanching"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Sake is a traditional alcoholic drink from Japan made from what?",
+     "options": [
+      "Rice",
+      "Wheat",
+      "Barley",
+      "Grapes"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What gives bread its holes and fluffy texture?",
+     "options": [
+      "Yeast (CO₂ gas)",
+      "Baking soda",
+      "Gluten",
+      "Water"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which spice is the most expensive by weight?",
+     "options": [
+      "Saffron",
+      "Vanilla",
+      "Cardamom",
+      "Cinnamon"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "The Maillard reaction is responsible for what in cooking?",
+     "options": [
+      "Browning and flavor development",
+      "Rising of dough",
+      "Caramelization of sugar",
+      "Emulsification"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What Japanese knife technique creates paper-thin slices?",
+     "options": [
+      "Katsuramuki",
+      "Brunoise",
+      "Chiffonade",
+      "Julienne"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Tempeh originates from which country?",
+     "options": [
+      "Indonesia",
+      "Japan",
+      "India",
+      "Thailand"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the 'mother sauce' that is a base for cheese sauce?",
+     "options": [
+      "Béchamel",
+      "Velouté",
+      "Espagnole",
+      "Hollandaise"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which amino acid is responsible for the 'umami' taste?",
+     "options": [
+      "Glutamate",
+      "Lysine",
+      "Tryptophan",
+      "Alanine"
+     ],
+     "answer": 0
+    }
+   ]
+  },
+  "geography": {
+   "beginner": [
+    {
+     "q": "What is the largest continent by area?",
+     "options": [
+      "Asia",
+      "Africa",
+      "North America",
+      "Europe"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which river is the longest in the world?",
+     "options": [
+      "Nile",
+      "Amazon",
+      "Mississippi",
+      "Yangtze"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the capital of France?",
+     "options": [
+      "Paris",
+      "Lyon",
+      "Marseille",
+      "Nice"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which ocean is the largest?",
+     "options": [
+      "Pacific",
+      "Atlantic",
+      "Indian",
+      "Arctic"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "On which continent is Egypt located?",
+     "options": [
+      "Africa",
+      "Asia",
+      "Europe",
+      "South America"
+     ],
+     "answer": 0
+    }
+   ],
+   "mid": [
+    {
+     "q": "Which country has the most time zones?",
+     "options": [
+      "France",
+      "Russia",
+      "USA",
+      "China"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the smallest country in the world?",
+     "options": [
+      "Vatican City",
+      "Monaco",
+      "San Marino",
+      "Liechtenstein"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Mariana Trench is in which ocean?",
+     "options": [
+      "Pacific",
+      "Atlantic",
+      "Indian",
+      "Arctic"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which African country was formerly known as Abyssinia?",
+     "options": [
+      "Ethiopia",
+      "Somalia",
+      "Eritrea",
+      "Sudan"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the driest desert on Earth?",
+     "options": [
+      "Atacama",
+      "Sahara",
+      "Gobi",
+      "Antarctic"
+     ],
+     "answer": 0
+    }
+   ],
+   "jeopardy": [
+    {
+     "q": "What is the only country that spans four hemispheres?",
+     "options": [
+      "Kiribati",
+      "Indonesia",
+      "Brazil",
+      "Russia"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Which strait separates Europe from Africa?",
+     "options": [
+      "Strait of Gibraltar",
+      "Bosphorus",
+      "Strait of Hormuz",
+      "Strait of Malacca"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "Lake Baikal, the world's deepest lake, is in which country?",
+     "options": [
+      "Russia",
+      "Mongolia",
+      "Kazakhstan",
+      "China"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "What is the largest landlocked country?",
+     "options": [
+      "Kazakhstan",
+      "Mongolia",
+      "Chad",
+      "Bolivia"
+     ],
+     "answer": 0
+    },
+    {
+     "q": "The Danakil Depression, one of the hottest places on Earth, is in which country?",
+     "options": [
+      "Ethiopia",
+      "Djibouti",
+      "Eritrea",
+      "Somalia"
+     ],
+     "answer": 0
+    }
+   ]
+  }
+ }
+}

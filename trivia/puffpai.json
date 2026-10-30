@@ -1,0 +1,50 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "trivia",
+  "kind": "app",
+  "name": "Trivia",
+  "version": "2.0.0",
+  "description": "Quiz rounds with scores: play AeroTrivia on its page, or ask the bot to quiz you in chat.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/question.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["record_result"],
+    "tools": {
+      "stats": "Trivia scores so far: games played, the average score, the best score and the last game.",
+      "list_categories": "List the trivia question categories and how many questions each has.",
+      "ask_question": "Get one multiple-choice trivia question to quiz people with. Read the question and the options A to D; the answer comes last, to say after they guess.",
+      "record_result": "Save the score of a trivia round played in chat: how many answers were right out of how many."
+    },
+    "examples": {
+      "stats": ["what are the trivia scores"],
+      "list_categories": ["which trivia categories are there"],
+      "ask_question": ["ask me a science trivia question"],
+      "record_result": ["save our trivia round: we got 7 out of 10 right in history"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "Trivia", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Trivia", "icon": "icons/question.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Trivia keeps your scores in its own data folder on this computer. Its questions come with it. It does not use the internet."
+}

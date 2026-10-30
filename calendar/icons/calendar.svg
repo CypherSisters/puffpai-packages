@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Calendar">
+  <rect x="8" y="12" width="48" height="44" rx="5" fill="#fffaf2" stroke="#3d1a55" stroke-width="4"/>
+  <path d="M8 24h48" stroke="#3d1a55" stroke-width="4"/>
+  <rect x="10" y="14" width="44" height="8" fill="#e0684f"/>
+  <path d="M20 8v10M44 8v10" stroke="#3d1a55" stroke-width="4" stroke-linecap="round"/>
+  <g fill="#3d1a55"><rect x="16" y="30" width="7" height="6" rx="1"/><rect x="28" y="30" width="7" height="6" rx="1"/><rect x="40" y="30" width="7" height="6" rx="1"/>
+  <rect x="16" y="42" width="7" height="6" rx="1"/><rect x="28" y="42" width="7" height="6" rx="1"/></g>
+  <rect x="40" y="42" width="7" height="6" rx="1" fill="#7cc58a"/>
+</svg>

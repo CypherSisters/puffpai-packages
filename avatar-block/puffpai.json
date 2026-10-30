@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "avatar-block",
+  "kind": "avatar",
+  "name": "Block",
+  "version": "1.0.0",
+  "description": "Block, a square terminal face with two square eyes and a cursor, as the bot's face. Flat colours that go with the Clean look.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "face.svg",
+  "avatar": { "preview": "face.svg", "voice": null },
+  "consent": "A face for your bot. It runs nothing and uses no internet."
+}

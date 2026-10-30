@@ -1,0 +1,67 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "freshtable",
+  "kind": "app",
+  "name": "FreshTable",
+  "version": "2.0.0",
+  "description": "Pantry, shopping list, meal plan and the recipes behind them.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/pot.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_pantry", "add_shopping", "check_off_shopping", "remove_shopping",
+                "add_meal", "add_recipe", "import_recipes"],
+    "tools": {
+      "add_pantry": "Add a food item to the pantry, or add to its count if it is already there.",
+      "list_pantry": "List what is in the pantry. Filter by a category, or use \"low\" for items running low.",
+      "add_shopping": "Put an item on the shopping list.",
+      "list_shopping": "List what is still on the shopping list.",
+      "check_off_shopping": "Tick an item off the shopping list (bought).",
+      "remove_shopping": "Take an item off the shopping list.",
+      "list_meal_plan": "List the meals planned for the week.",
+      "add_meal": "Plan a meal for a day of the week.",
+      "add_recipe": "Save a recipe: its name, ingredients and instructions.",
+      "list_recipes": "List the saved recipes with their ingredients.",
+      "import_recipes": "Read recipes from a file the owner sent (text or a photo of a recipe) and save them. A text file comes as file_name, mime and text; any other file as file_name, mime and content_b64."
+    },
+    "examples": {
+      "add_shopping": ["put milk on the shopping list"],
+      "list_shopping": ["what is on the shopping list"],
+      "add_pantry": ["add a bag of rice to the pantry"],
+      "list_pantry": ["what is running low in the pantry"],
+      "check_off_shopping": ["I bought the eggs, tick them off"],
+      "remove_shopping": ["take the bread off the shopping list"],
+      "list_meal_plan": ["what dinners are planned this week"],
+      "add_meal": ["plan chicken fajitas for Tuesday dinner"],
+      "add_recipe": ["save my pancake recipe: flour, milk, eggs; whisk and fry"],
+      "list_recipes": ["which recipes have I saved"],
+      "import_recipes": ["import the recipes in my file pancakes.txt: Pancakes. Flour, milk, eggs. Whisk and fry."]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "FreshTable", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "FreshTable", "icon": "icons/pot.svg", "opens": "main" } ],
+    "widgets": [ { "id": "list", "type": "list", "title": "Shopping list", "path": "/widget/list" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.3 },
+    "brain": { "text": true, "images": true }
+  },
+
+  "accepts": [ { "types": [".txt", ".md", "text/*", "image/*"], "tool": "import_recipes" } ],
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "FreshTable keeps your pantry, lists and recipes in its own data folder on this computer. Meal ideas and photo reading use the brain on this computer. It does not use the internet."
+}

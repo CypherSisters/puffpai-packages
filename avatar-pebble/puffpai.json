@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "avatar-pebble",
+  "kind": "avatar",
+  "name": "Pebble",
+  "version": "1.0.0",
+  "description": "Pebble, a round coral stone with a small smile, as the bot's face. Flat colours that go with the Paper look.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "face.svg",
+  "avatar": { "preview": "face.svg", "voice": null },
+  "consent": "A face for your bot. It runs nothing and uses no internet."
+}

@@ -1,0 +1,59 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "fitfam",
+  "kind": "app",
+  "name": "FitFam",
+  "version": "2.0.0",
+  "description": "Workouts for each person in the household, with streaks, goals and a history that stays on this computer.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/fire.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["log_workout", "log_set", "add_goal", "update_goal"],
+    "tools": {
+      "log_workout": "Log a workout someone did: what kind and how many minutes. Updates their streak.",
+      "log_set": "Log one strength set: the exercise, the reps, and the weight lifted.",
+      "status": "Workout streaks and totals: how many days in a row, workouts this week and in all, and the last one.",
+      "history": "List someone's recent workouts and strength sets, newest first.",
+      "suggest_workout": "Make a workout plan from the exercise library: a list of exercises with sets and reps. Nothing is logged.",
+      "list_goals": "List someone's fitness goals and how close they are.",
+      "add_goal": "Add a fitness goal with a target, like 20 push-ups in a row or a 2-minute plank.",
+      "update_goal": "Set the progress on a fitness goal: the number reached so far."
+    },
+    "examples": {
+      "log_workout": ["log a 30 minute run for me"],
+      "log_set": ["log a set of bench press: 135 pounds for 5 reps"],
+      "status": ["how long is my workout streak"],
+      "history": ["what workouts did I do lately"],
+      "suggest_workout": ["make me a 30 minute kettlebell workout"],
+      "list_goals": ["what are my fitness goals"],
+      "add_goal": ["add a fitness goal: 20 push-ups in a row"],
+      "update_goal": ["update my plank goal: I held it for 90 seconds"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "FitFam", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "FitFam", "icon": "icons/fire.svg", "opens": "main" } ],
+    "widgets": [ { "id": "streaks", "type": "list", "title": "Workout streaks", "path": "/widget/streaks" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "FitFam keeps each person's workouts and goals in its own data folder on this computer, and reads the names on the household people list. Workout history is health information. It does not use the internet."
+}

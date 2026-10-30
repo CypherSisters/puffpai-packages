@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="AlarmFlow">
+  <path d="M10 18l10-8M54 18l-10-8" fill="none" stroke="#3d1a55" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="32" cy="35" r="20" fill="#64b5f6" stroke="#3d1a55" stroke-width="4"/>
+  <path d="M32 23v12l8 6" fill="none" stroke="#3d1a55" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M18 54l-4 5M46 54l4 5" stroke="#3d1a55" stroke-width="4" stroke-linecap="round"/>
+</svg>

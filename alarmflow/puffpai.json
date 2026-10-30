@@ -1,0 +1,67 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "alarmflow",
+  "kind": "app",
+  "name": "AlarmFlow",
+  "version": "2.0.0",
+  "description": "Timers and alarms. They ring on this computer while BuildBot runs, even with no page open.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/alarm.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["create_timer", "create_alarm", "snooze", "add_time", "pause", "resume",
+                "dismiss", "dismiss_all", "delete"],
+    "tools": {
+      "create_timer": "Start a countdown timer for some hours, minutes and seconds, up to 7 days. It rings on this computer.",
+      "create_alarm": "Set an alarm for a clock time (24-hour), today or tomorrow, once or repeating.",
+      "list": "List the timers and alarms that are set, with the time left on each.",
+      "snooze": "Snooze a ringing timer or alarm for some minutes, up to 24 hours.",
+      "add_time": "Add minutes to a running timer or alarm, or take some off with a negative number, up to 24 hours either way.",
+      "pause": "Pause a running timer.",
+      "resume": "Start a paused timer again.",
+      "dismiss": "Stop a ringing timer or alarm, or cancel one that is set. A ringing repeating alarm moves to its next day.",
+      "dismiss_all": "Stop and cancel every timer and alarm.",
+      "delete": "Delete a timer or alarm for good, by its name."
+    },
+    "examples": {
+      "create_timer": ["set a timer for ten minutes for the pasta"],
+      "create_alarm": ["set an alarm for 6:30 in the morning to wake up"],
+      "list": ["what timers are running right now"],
+      "snooze": ["snooze the wake up alarm for ten minutes"],
+      "add_time": ["add five more minutes to the pasta timer"],
+      "pause": ["pause the pasta timer"],
+      "resume": ["resume the pasta timer"],
+      "dismiss": ["stop the pasta timer"],
+      "dismiss_all": ["cancel all my timers and alarms"],
+      "delete": ["delete the wake up alarm for good"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "AlarmFlow", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "AlarmFlow", "icon": "icons/alarm.svg", "opens": "main" } ],
+    "widgets": [ { "id": "running", "type": "list", "title": "Timers and alarms", "path": "/widget/running" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 },
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [
+    { "id": "sound", "kind": "confirm", "title": "Let AlarmFlow play sound",
+      "why": "Browsers stay silent until you tap a page once. Open AlarmFlow and tap Test sound." }
+  ],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "AlarmFlow keeps your timers and alarms in its own data folder on this computer and rings them here. It does not use the internet."
+}
