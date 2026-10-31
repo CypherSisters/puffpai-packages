@@ -128,7 +128,7 @@ def _station(raw) -> dict:
     return {
         "uuid": _short(raw.get("uuid") or raw.get("stationuuid"), 64),
         "name": _short(raw.get("name"), 120) or "Unnamed station",
-        "url": _web_address(raw.get("url") or raw.get("url_resolved"), "the stream address", 2000, True),
+        "url": _web_address(raw.get("url_resolved") or raw.get("url"), "the stream address", 2000, True),
         "country": _short(raw.get("country"), 80),
         "codec": _short(raw.get("codec"), 20),
         "bitrate": bitrate,

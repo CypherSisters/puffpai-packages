@@ -38,6 +38,7 @@ Internet radio on its own page: find stations from the radio-browser.info direct
 
 - No sound unless the World Radio page is open somewhere. Closing the page stops the sound; "now playing" stays set, and opening the page again starts it.
 - Some stations use formats a browser can't play, or are off the air. The page says so when a stream fails; the directory's "broken" filter catches most, not all.
+- The directory lists some stations at an address that no longer answers (a 404 from the station itself). The page says the station did not play; try the next result with the same name.
 - HLS stations (`.m3u8`) are left out of search results, because the page's player is a plain audio element.
 - An `https` Desktop may refuse to play `http` streams (mixed content). On the usual `http://127.0.0.1` Desktop they play.
 - HomeBot's genre and country word lists ("french jazz", "news from japan") and its "a different station each time" shuffle are not carried over. Search with the separate name, genre, country and language fields.

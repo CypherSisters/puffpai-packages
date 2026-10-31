@@ -3,7 +3,7 @@
   "id": "radio",
   "kind": "app",
   "name": "World Radio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Internet radio: find stations by name, country, genre or language and play them on the World Radio page, with favorites. Sound plays only while that page is open in the Desktop; it does not play on a speaker by itself, and it has no podcasts or recording.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

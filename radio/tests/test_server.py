@@ -171,3 +171,13 @@ def test_redirect_to_another_host_is_refused():
     req = urllib.request.Request("https://de1.api.radio-browser.info/json/stations/search")
     assert handler.redirect_request(req, None, 302, "Found", {}, "https://evil.example/") is None
     assert handler.redirect_request(req, None, 302, "Found", {}, "https://all.api.radio-browser.info/x") is not None
+
+
+def test_station_prefers_the_resolved_stream_over_a_playlist():
+    """radio-browser's url is often a .pls or .m3u playlist, which the page's audio element cannot play;
+    url_resolved is the stream behind it. The resolved address wins, and url is only the fallback."""
+    st = rd._station({"stationuuid": "u9", "name": "Soma", "url": "https://soma.example/groove.pls",
+                      "url_resolved": "https://ice.example/groove-128-mp3"})
+    assert st["url"] == "https://ice.example/groove-128-mp3"
+    only_url = rd._station({"stationuuid": "u8", "name": "Plain", "url": "https://plain.example/live", "url_resolved": ""})
+    assert only_url["url"] == "https://plain.example/live"
