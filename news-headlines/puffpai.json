@@ -3,7 +3,7 @@
   "id": "news-headlines",
   "kind": "tool",
   "name": "News headlines",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Reads the news feeds you add (RSS or Atom) and gives the latest headlines: title, source, time and link. It comes with no feeds, does not fetch or summarize articles, and each feed's site on the internet needs its own Yes before it loads.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

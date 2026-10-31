@@ -3,7 +3,7 @@
   "id": "adguard",
   "kind": "tool",
   "name": "AdGuard Home",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Read and change your own AdGuard Home: whether protection is on, how many lookups were blocked, the most blocked domains, the latest lookups per device, the devices it knows, and blocking or unblocking a domain, turning protection on or off, or pausing it. It only works with an AdGuard Home you already run on this computer or your home network. It does not install or set up AdGuard Home, edit filter lists, change per-device settings, or remove rules it did not add.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

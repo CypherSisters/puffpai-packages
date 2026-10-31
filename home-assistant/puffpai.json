@@ -3,7 +3,7 @@
   "id": "home-assistant",
   "kind": "tool",
   "name": "Home Assistant",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Reads and controls your own Home Assistant on your home network: list devices and their state, turn lights, switches, fans and media players on or off, open or close blinds, curtains and shades, set lights and thermostats, run scenes, list cameras and see which motion sensors changed lately. It does not lock or unlock doors, open garage doors or gates, arm or disarm alarms, run scripts or automations, or show camera pictures, and it never talks to anything on the internet.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

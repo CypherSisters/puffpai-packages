@@ -3,7 +3,7 @@
   "id": "jellyfin",
   "kind": "tool",
   "name": "Jellyfin media",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Search your own Jellyfin library and play music, movies and shows on one of its players (a TV app, a phone, a browser tab): pause, skip, stop, volume, what is playing, and music playlists. It needs your Jellyfin address on your home network and a Jellyfin API key. It does not play on this computer's own speakers, and it does not handle books, favorites, radio or library scans.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

@@ -3,7 +3,7 @@
   "id": "node-red-flows",
   "kind": "tool",
   "name": "Node-RED flows",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Lists, runs, and turns on or off the flows in the Node-RED you already run, on this computer or your home network, and ships 14 ready-made home flows (news, weather, a daily briefing, Home Assistant routines and more) for you to import by hand. It does not install or start Node-RED, does not import or change the flows' contents for you, and runs a flow only through a web path that flow itself defines. Several shipped flows were written for the HomeBot and need editing before they work elsewhere.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

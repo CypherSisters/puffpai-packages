@@ -3,7 +3,7 @@
   "id": "web-search",
   "kind": "tool",
   "name": "Web search",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Searches the web through a SearXNG you run yourself, on this computer or your home network: web results and news, the top 8 each, with the title, a one-line snippet, the address and the engine that found it. It does not use a public SearXNG or ask any search company directly, does not search images, does not open or read the pages it finds, and does not install or run SearXNG for you.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
