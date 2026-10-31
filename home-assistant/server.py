@@ -10,7 +10,7 @@ One small server, Python standard library only, bound to 127.0.0.1:
 Every route refuses a request without this package's PUFFPAI_TOKEN (D48d).
 
 It talks to one Home Assistant only: the address the owner sets with ``set_address``, which must be
-on the home network (loopback, 10/8, 172.16/12, 192.168/16, link-local, or a name ending in .local or
+on the home network (loopback, 10/8, 172.16/12, 192.168/16, fc00::/7, link-local, or a name ending in .local or
 .lan, which must also resolve to one of those). The Home Assistant token comes from the environment
 (HOME_ASSISTANT_TOKEN, injected from the vault). It is never written to disk, never logged and never
 put in an answer. Requests time out after 10 s, read at most 2 MB, and never follow a redirect to
@@ -35,6 +35,7 @@ import re
 import socket
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -74,7 +75,7 @@ LOCK_WORDS = ("Locks are read-only here: this package can tell you if a lock is 
               "or unlocks a door. Use Home Assistant itself for that.")
 
 _LOCAL_NETS = tuple(ipaddress.ip_network(n) for n in (
-    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "::1/128", "fe80::/10"))
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7", "169.254.0.0/16", "::1/128", "fe80::/10"))
 _LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _ENTITY = re.compile(r"^([a-z_][a-z0-9_]{0,63})\.([a-z0-9_]{1,200})$")
 _TOKEN_SHAPE = re.compile(r"^[A-Za-z0-9._~+/=-]{20,4096}$")
@@ -152,9 +153,17 @@ def _local_name(host: str) -> bool:
     return len(labels) >= 2 and labels[-1] in ("local", "lan") and all(_LABEL.match(x) for x in labels)
 
 
+def _mapped(host: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    return ip.version == 6 and ip.ipv4_mapped is not None
+
+
 def check_address(value) -> str:
     """The owner's Home Assistant base address, ``scheme://host:port``, or a plain ValueError.
-    Only http(s) on the home network: loopback, RFC1918, link-local, or a .local / .lan name."""
+    Only http(s) on the home network: loopback, RFC1918, fc00::/7, link-local, or a .local / .lan name."""
     text = _text(value, "address", 200)
     if not text:
         raise ValueError("give Home Assistant's address, like homeassistant.local:8123 or 192.168.1.20:8123")
@@ -177,7 +186,10 @@ def check_address(value) -> str:
         raise ValueError("the port is a number from 1 to 65535")
     if not host or not (_local_ip(host) or _local_name(host)):
         raise ValueError("this package only talks to a Home Assistant on your home network: an address like "
-                         "192.168.x.x, 10.x.x.x, 172.16 to 172.31, 127.0.0.1, or a name ending in .local or .lan")
+                         "192.168.x.x, 10.x.x.x, 172.16 to 172.31, fd00::1, 127.0.0.1, or a name ending in .local or .lan")
+    if _mapped(host):
+        raise ValueError("an address written with ::ffff: is not taken; write it plainly, like 127.0.0.1 or "
+                         "192.168.1.20")
     netloc = f"[{host}]" if ":" in host else host
     return f"{scheme}://{netloc}:{port}"
 
@@ -205,7 +217,7 @@ def _resolves_local(host: str, port: int) -> None:
 # ---------------------------------------------------------------- asking the Core for a Yes card (D110)
 
 ASK_PATH = "/v1/bridge/addresses/ask"
-ASK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 5                  # the whole ask: the connect and every read together
 ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
 LINE_MOST = 300                    # the most of the Core's line it says back
 ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
@@ -213,37 +225,50 @@ NO_CARD = "No Yes card could be raised right now. The owner can allow this addre
 ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
 
 
-class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
-    """This package's token goes to the Core and nowhere else."""
+class _DeadlineSocket(socket.socket):
+    """Each read gets only what is left of one deadline, so a slow drip can't hold the reply."""
+    deadline = 0.0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def recv_into(self, buffer, *args):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("the Core took too long")
+        self.settimeout(left)
+        return super().recv_into(buffer, *args)
 
 
-#: Direct, never through the Bridge proxy: the Core is on this computer.
-_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+class _AskConnection(http.client.HTTPConnection):
+    """One plain connection to the Core on this computer: never the Bridge proxy, and no redirect is followed."""
+
+    def connect(self):
+        deadline = time.monotonic() + ASK_TIMEOUT_S
+        plain = socket.create_connection((self.host, self.port), ASK_TIMEOUT_S)
+        self.sock = _DeadlineSocket(fileno=plain.detach())
+        self.sock.deadline = deadline
+        self.sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
 
 def _ask_core(place: str) -> tuple[str, str] | None:
     """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
     It grants nothing and never raises, so a failed ask never touches what was saved."""
-    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
     token = os.environ.get("PUFFPAI_TOKEN", "").strip()
-    if not api or not token:
-        return None
+    conn = None
     try:
-        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
-                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
-                                              "Accept": "application/json"})
-        try:
-            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
-                code, raw = r.status, r.read(ASK_MOST + 1)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        api = urlsplit(os.environ.get("PUFFPAI_API", "").strip())
+        if api.scheme != "http" or not api.hostname or not token:
+            return None
+        conn = _AskConnection(api.hostname, api.port or 80)
+        conn.request("POST", ASK_PATH, body=json.dumps({"address": place}).encode("utf-8"),
+                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                              "Accept": "application/json"})
+        resp = conn.getresponse()
+        code, raw = resp.status, resp.read(ASK_MOST + 1)
         said = json.loads(raw.decode("utf-8"))
     except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
         return None
+    finally:
+        if conn is not None:
+            conn.close()
     state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
     if not isinstance(state, str) or not isinstance(line, str):
         return None
@@ -261,7 +286,7 @@ def _card_words(host: str, port: int) -> str:
         return NO_CARD
     state, line = got
     if state == "allowed":
-        return f"{line} This package can reach {place} now, while the Bridge is open."
+        return f"{line} The owner allowed {place}, and it works while the Bridge is open and this package is on, unless a block list stops it."
     if state == "waiting":
         if line.lower().startswith("waiting"):
             return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
@@ -270,16 +295,30 @@ def _card_words(host: str, port: int) -> str:
 
 
 def _this_computer(host: str) -> bool:
-    """``localhost`` or a loopback address: no Bridge step, and no ask."""
+    """``localhost`` or a loopback address: reached directly, so no Bridge step and no ask."""
     if host == "localhost":
         return True
     try:
-        ip = ipaddress.ip_address(host.split("%", 1)[0])
+        return ipaddress.ip_address(host.split("%", 1)[0]).is_loopback
     except ValueError:
         return False
-    if ip.version == 6 and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
-    return ip.is_loopback
+
+
+def _only_this_computer(host: str, port: int) -> bool:
+    """Every answer for ``localhost`` is loopback, so the direct path never carries a home or public address."""
+    try:
+        return all(ipaddress.ip_address(str(i[4][0]).split("%", 1)[0]).is_loopback
+                   for i in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM))
+    except (OSError, ValueError):
+        return False
+
+
+PORT_PAIR = "Port 443 goes with https and port 80 with http, so the Bridge can't allow this pairing. Nothing was saved."
+
+
+def _pair_refused(scheme: str, port: int) -> bool:
+    """The Bridge takes only https on port 443 and only http on port 80, so a Yes for the other way round never works."""
+    return (scheme, port) in (("http", 443), ("https", 80))
 
 
 # ---------------------------------------------------------------- the store
@@ -392,6 +431,7 @@ class HomeAssistant:
     def __init__(self, store: Store, opener=None) -> None:
         self.store = store
         self.opener = opener or urllib.request.build_opener(_SameOrigin())
+        self.direct = urllib.request.build_opener(urllib.request.ProxyHandler({}), _SameOrigin())
 
     # plumbing
     def _base(self) -> str:
@@ -408,13 +448,17 @@ class HomeAssistant:
         base = self._base()
         token = _ha_token()
         parts = urlsplit(base)
-        _resolves_local(parts.hostname or "", parts.port or DEFAULT_HA_PORT)
+        host, port = parts.hostname or "", parts.port or DEFAULT_HA_PORT
+        _resolves_local(host, port)
+        direct = _this_computer(host)
+        if host == "localhost" and not _only_this_computer(host, port):
+            raise HAError("localhost does not point only at this computer here, so nothing was sent.")
         req = urllib.request.Request(
             base + path, method=method, data=json.dumps(body).encode("utf-8") if body is not None else None,
             headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
                      "Accept": "application/json"})
         try:
-            with self.opener.open(req, timeout=TIMEOUT_S) as resp:
+            with (self.direct if direct else self.opener).open(req, timeout=TIMEOUT_S) as resp:
                 raw = resp.read(MAX_REPLY + 1)
         except HAError:
             raise
@@ -489,6 +533,8 @@ class HomeAssistant:
         url = check_address(address)
         parts = urlsplit(url)
         found = _lookup(parts.hostname or "", parts.port or DEFAULT_HA_PORT)    # outside: refused, nothing saved
+        if not _this_computer(parts.hostname or "") and _pair_refused(parts.scheme, parts.port or DEFAULT_HA_PORT):
+            raise ValueError(PORT_PAIR)
         self.store.save(url)
         host = parts.hostname or ""
         said = (f"Saved. Home Assistant's address is {url}. "

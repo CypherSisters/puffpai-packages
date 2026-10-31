@@ -23,7 +23,7 @@ What it never does: lock or unlock a door (locks are read-only here), open or cl
 
 **What it needs.**
 
-- Your own Home Assistant on your home network, and its address. The address must be loopback, a private address (10.x, 172.16 to 172.31, 192.168.x), a link-local address, or a name ending in `.local` or `.lan` (like `homeassistant.local`). Anything else is refused.
+- Your own Home Assistant on your home network, and its address. The address must be loopback, a private address (10.x, 172.16 to 172.31, 192.168.x, or IPv6 fc00::/7 like fd00::1), a link-local address, or a name ending in `.local` or `.lan` (like `homeassistant.local`). Anything else is refused, and so is an address written with `::ffff:` (write it plainly). Off this computer, port 443 goes with `https://` and port 80 with `http://`: the other way round is refused, because the Bridge could never let it through.
 - `needs.addresses` is `lan`. When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page. Nothing reaches it until her Yes. An address on this computer needs no Bridge step. A link-local address can be saved, but it can't be allowed. The package declares no internet hosts (`needs.hosts` is empty).
 - A long-lived access token, `HOME_ASSISTANT_TOKEN` (`needs.keys`). Make it in Home Assistant: open your profile, Security, Long-lived access tokens. It goes into the vault and reaches this package only as an environment variable. It is never written to disk or logs and never said in an answer.
 
@@ -31,7 +31,7 @@ What it never does: lock or unlock a door (locks are read-only here), open or cl
 
 **Data.** One file, `ha.json`, in this package's data folder (`PUFFPAI_DATA`): the address you set and when. Never the token. Every save replaces the whole file at once. A file that will not read is never written over.
 
-**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA`, `PUFFPAI_TOKEN` and `HOME_ASSISTANT_TOKEN` set. It listens on 127.0.0.1 only. Every route (`/health` and `/mcp`) refuses a request without the package's `PUFFPAI_TOKEN` (as `Authorization: Bearer <token>` or `X-PuffPAI-Key`). It calls Home Assistant's REST API (`/api/states`, `/api/states/<entity>`, `/api/services/<domain>/<service>`) through the Bridge, with a 10 second timeout, reads at most 2 MB, and never follows a redirect to another address. A name like `homeassistant.local` must also resolve to a home-network address: `set_address` refuses a name that points outside and saves nothing, says so when the name cannot be found yet, and every call checks again before anything is sent.
+**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA`, `PUFFPAI_TOKEN` and `HOME_ASSISTANT_TOKEN` set. It listens on 127.0.0.1 only. Every route (`/health` and `/mcp`) refuses a request without the package's `PUFFPAI_TOKEN` (as `Authorization: Bearer <token>` or `X-PuffPAI-Key`). It calls Home Assistant's REST API (`/api/states`, `/api/states/<entity>`, `/api/services/<domain>/<service>`) directly on this computer (every loopback address) and through the Bridge anywhere else, with a 10 second timeout, reads at most 2 MB, and never follows a redirect to another address. A name like `homeassistant.local` must also resolve to a home-network address: `set_address` refuses a name that points outside and saves nothing, says so when the name cannot be found yet, and every call checks again before anything is sent.
 
 ## Changed from HomeBot
 
@@ -49,6 +49,5 @@ What it never does: lock or unlock a door (locks are read-only here), open or cl
 - Thermostats in heat_cool mode that need a low and a high target are not set yet.
 - Motion means `binary_sensor` devices whose class is motion or occupancy. Camera person or visitor sensors with another class are not counted.
 - A name like `homeassistant.local` is checked when it is used, and the Bridge looks it up again when it connects. A device on your network that answers for that name in between is not caught.
-- IPv6 home addresses other than loopback and link-local (like fd00:: addresses) are not taken yet. Use the IPv4 address or the name.
 
 Cypher Sisters. puff puff pass.
