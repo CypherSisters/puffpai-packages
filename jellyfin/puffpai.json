@@ -19,7 +19,7 @@
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
     "changes": ["set_address", "play", "control", "create_playlist", "add_to_playlist"],
     "tools": {
-      "set_address": "Save the address of your Jellyfin server on your home network, like http://192.168.1.20:8096.",
+      "set_address": "Save the address of your Jellyfin server on your home network, like http://192.168.1.20:8096. For an address off this computer, the bot raises a Yes card for that address and port.",
       "search_media": "Search your Jellyfin library for songs, albums, artists, movies or shows by words, with item ids.",
       "list_players": "List the Jellyfin players that can be controlled: client, device, user and what each is playing.",
       "play": "Play a song, album, playlist, movie or show from your Jellyfin library on one of its players.",
@@ -45,6 +45,7 @@
   "needs": {
     "packages": [],
     "hosts": [],
+    "addresses": "lan",
     "keys": [
       { "name": "JELLYFIN_API_KEY", "why": "to search your library and play on your players",
         "get_it": "In Jellyfin open Dashboard, API Keys, and add one" }
@@ -55,7 +56,7 @@
   "setup_steps": [
     { "id": "address", "kind": "confirm",
       "title": "Tell the bot where your Jellyfin is",
-      "why": "Jellyfin media talks only to the Jellyfin you name, on your home network. Jellyfin's usual address is http://<the computer running Jellyfin>:8096. In chat, say: set my Jellyfin address to http://192.168.1.20:8096 (with your own address). Then allow that address on the Bridge page.",
+      "why": "Jellyfin media talks only to the Jellyfin you name, on your home network. Jellyfin's usual address is http://<the computer running Jellyfin>:8096. In chat, say: set my Jellyfin address to http://192.168.1.20:8096 (with your own address). Then the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.",
       "text": "http://<your Jellyfin>:8096" }
   ],
   "data": { "keep_on_remove": "ask" },

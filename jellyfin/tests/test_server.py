@@ -7,7 +7,9 @@ a free port on 127.0.0.1 and is stopped by the test that started it; nothing tou
 import contextlib
 import importlib.util
 import json
+import socket
 import threading
+import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -337,3 +339,221 @@ def test_a_redirect_is_not_followed(base, fake):
     fake.redirect = True
     assert "redirect" in tool_error(base, "now_playing")
     assert len(fake.calls) == 1
+
+
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+CORE_TOKEN = "core-token-" + "c" * 20
+ASK = "/v1/bridge/addresses/ask"
+WAITING = (202, {"state": "waiting", "line": "Waiting for the owner's Yes. Nothing opens before that."})
+ALLOWED = (200, {"state": "allowed", "line": "Allowed. The owner said Yes to this address and port."})
+STALE = (202, {"state": "waiting", "line": "The owner's Yes for this address can't be used right now."})
+REFUSED = (429, {"state": "refused", "error": "Too many.", "line": "This package has asked for too many addresses this hour."})
+
+
+class FakeCore(BaseHTTPRequestHandler):
+    """The one Core route a package asks. It records each ask and answers what the test set."""
+    state: dict
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.state["asks"].append({"path": self.path, "auth": self.headers.get("Authorization"),
+                                   "type": self.headers.get("Content-Type"), "body": json.loads(raw)})
+        code, reply = self.state["reply"]
+        out = reply if isinstance(reply, bytes) else json.dumps(reply).encode()
+        self.send_response(code)
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+
+class FakeProxy(BaseHTTPRequestHandler):
+    """Stands in for the Bridge proxy: it records what it is asked for, reaches nothing, and answers what the test set."""
+    state: dict
+
+    def log_message(self, *a):
+        pass
+
+    def _seen(self):
+        self.state["seen"].append((self.command, self.path, self.headers.get("Host") if self.command != "CONNECT" else None))
+        code, out = self.state["reply"]
+        self.send_response(code)
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    do_GET = do_POST = do_CONNECT = _seen
+
+
+@pytest.fixture(autouse=True)
+def no_core(monkeypatch):
+    """No test reaches a running Core: a test that wants one starts its own fake."""
+    monkeypatch.delenv("PUFFPAI_API", raising=False)
+    monkeypatch.delenv("PUFFPAI_TOKEN", raising=False)
+
+
+@pytest.fixture
+def core(monkeypatch):
+    """A fake Core on a free loopback port, in this process's environment as the Core sets it: no /v1 in PUFFPAI_API."""
+    state = {"asks": [], "reply": WAITING}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), type("Core", (FakeCore,), {"state": state}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{server.server_address[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    yield state
+    server.shutdown()
+    server.server_close()
+    thread.join(5)
+
+
+@pytest.fixture
+def proxy(monkeypatch):
+    """A fake Bridge proxy in the environment. Nothing passes it, so no test dials a real address."""
+    state = {"seen": [], "reply": (403, b"")}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), type("Proxy", (FakeProxy,), {"state": state}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://pkg:secret@127.0.0.1:{server.server_address[1]}"
+    monkeypatch.setenv("HTTP_PROXY", url)
+    monkeypatch.setenv("HTTPS_PROXY", url)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    yield state
+    server.shutdown()
+    server.server_close()
+    thread.join(5)
+
+
+def a_closed_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def one_ask(core, place):
+    """Exactly one ask, with the package's token, the right path with no doubled /v1, and this one host:port."""
+    assert core["asks"] == [{"path": ASK, "auth": f"Bearer {CORE_TOKEN}", "type": "application/json",
+                             "body": {"address": place}}]
+
+
+@pytest.fixture
+def names(monkeypatch):
+    """The test's own home names answer with a home address. Every other name is looked up as usual."""
+    real = jf.socket.getaddrinfo
+
+    def lookup(host, port, *a, **k):
+        if str(host) == "gone.lan":
+            raise jf.socket.gaierror("no such name")
+        if str(host).endswith((".lan", ".local")):
+            return [(2, 1, 6, "", ("192.168.1.20", port))]
+        return real(host, port, *a, **k)
+    monkeypatch.setattr(jf.socket, "getaddrinfo", lookup)
+
+
+@pytest.mark.parametrize("given, url, place", [
+    ("192.168.1.20", "http://192.168.1.20:8096", "192.168.1.20:8096"),
+    ("http://Media.LAN:9000/jellyfin/", "http://media.lan:9000/jellyfin", "media.lan:9000"),
+    ("https://media.local", "https://media.local:8920", "media.local:8920"),
+    ("http://[fe80::1]:8096", "http://[fe80::1]:8096", "[fe80::1]:8096"),
+])
+def test_the_ask_carries_the_token_and_the_exact_saved_place(base, data, core, proxy, names, given, url, place):
+    text = tool(base, "set_address", address=given)
+    assert text.startswith(f"Saved {url}.")
+    one_ask(core, place)
+    assert json.loads((data / "jellyfin.json").read_text(encoding="utf-8"))["address"] == url
+
+
+def test_a_proxy_in_the_environment_is_not_used_for_the_ask(base, core, proxy):
+    tool(base, "set_address", address="192.168.1.20:8096")
+    one_ask(core, "192.168.1.20:8096")
+    # the one thing the proxy saw is the probe set_address always made
+    assert [s[1] for s in proxy["seen"]] == ["http://192.168.1.20:8096/System/Info/Public"]
+
+
+@pytest.mark.parametrize("reply, says", [
+    (ALLOWED, ["Allowed. The owner said Yes", "can reach 192.168.1.20:8096 now, while the Bridge is open"]),
+    (WAITING, ["Waiting for the owner's Yes", "A Yes card for 192.168.1.20:8096 is waiting", "until her Yes"]),
+    (STALE, ["can't be used right now", "Nothing reaches 192.168.1.20:8096 for now"]),
+    (REFUSED, ["too many addresses this hour", "No card was raised"]),
+])
+def test_each_reply_gives_true_words_and_the_address_stays_saved(base, data, core, proxy, reply, says):
+    core["reply"] = reply
+    text = tool(base, "set_address", address="192.168.1.20")
+    assert text.startswith("Saved http://192.168.1.20:8096.") and all(w in text for w in says), text
+    assert (reply is not STALE) or "Yes card" not in text        # no card is said where the Core raised none
+    assert (data / "jellyfin.json").exists()
+
+
+@pytest.mark.parametrize("reply", [
+    (200, b"not json"), (500, b"<html>oops</html>"), (401, {"error": "no"}), (200, {"state": "granted", "line": "yes"}),
+    (500, {"state": "allowed", "line": "yes"}), (200, {"state": ["allowed"], "line": "yes"}), (202, {"state": "waiting", "line": ""}),
+])
+def test_a_reply_that_does_not_parse_says_saved_and_no_card(base, data, core, proxy, reply):
+    core["reply"] = reply
+    text = tool(base, "set_address", address="192.168.1.20")
+    assert text.startswith("Saved") and "No Yes card could be raised" in text and "Bridge page" in text
+    assert (data / "jellyfin.json").exists()
+
+
+def test_the_cores_line_is_capped_and_never_says_the_token(base, core, proxy):
+    core["reply"] = (202, {"state": "waiting", "line": f"Waiting {CORE_TOKEN}\n" + "x" * 5000})
+    text = tool(base, "set_address", address="192.168.1.20")
+    assert CORE_TOKEN not in text and "\n" not in text and "x" * 300 not in text
+
+
+def test_no_api_no_token_or_the_core_down_says_saved_promptly(base, data, proxy, monkeypatch):
+    for api, token in ((None, CORE_TOKEN), ("http://127.0.0.1:9", None), (f"http://127.0.0.1:{a_closed_port()}", CORE_TOKEN)):
+        for name, value in (("PUFFPAI_API", api), ("PUFFPAI_TOKEN", token)):
+            monkeypatch.delenv(name, raising=False) if value is None else monkeypatch.setenv(name, value)
+        started = time.monotonic()
+        text = tool(base, "set_address", address="192.168.1.20")
+        assert time.monotonic() - started < 6 and text.startswith("Saved")
+        assert "No Yes card could be raised" in text and CORE_TOKEN not in text
+        assert (data / "jellyfin.json").exists()
+
+
+def test_a_core_that_never_answers_does_not_hold_the_reply(base, proxy, monkeypatch):
+    monkeypatch.setattr(jf, "ASK_TIMEOUT_S", 0.3)
+    with socket.socket() as quiet:
+        quiet.bind(("127.0.0.1", 0))
+        quiet.listen(1)
+        monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{quiet.getsockname()[1]}")
+        monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+        started = time.monotonic()
+        text = tool(base, "set_address", address="192.168.1.20")
+    assert time.monotonic() - started < 3 and "No Yes card could be raised" in text
+
+
+def test_a_name_that_does_not_resolve_yet_still_asks(base, core, proxy, names):
+    text = tool(base, "set_address", address="http://gone.lan:8096")
+    assert "does not resolve" in text and "A Yes card for gone.lan:8096 is waiting" in text
+    one_ask(core, "gone.lan:8096")
+    assert proxy["seen"] == []
+
+
+def test_an_address_on_this_computer_asks_nothing(base, core, fake):
+    text = tool(base, "set_address", address=fake.url)
+    assert "Test Jellyfin" in text and "needs no Bridge step" in text and core["asks"] == []
+
+
+def test_the_manifest_declares_lan():
+    manifest = json.loads((PKG / "puffpai.json").read_text(encoding="utf-8"))
+    assert manifest["needs"]["addresses"] == "lan" and manifest["needs"]["hosts"] == []
+
+
+@pytest.mark.parametrize("saved, sent", [
+    ("http://media.lan:8096", ("GET", "http://media.lan:8096/Sessions", "media.lan:8096")),
+    ("http://192.168.1.20:8096", ("GET", "http://192.168.1.20:8096/Sessions", "192.168.1.20:8096")),
+    ("https://media.lan:8920", ("CONNECT", "media.lan:8920", None)),
+])
+def test_the_proxy_is_asked_for_the_name_as_saved(data, proxy, names, saved, sent):
+    """A grant for a name matches the name only, so the proxy must see the name, unchanged, and never its answer."""
+    proxy["reply"] = (200, b"[]")
+    store = jf.Store(data)
+    store.save(saved)
+    with contextlib.suppress(jf.Plain):
+        jf.Jellyfin(store)._call("/Sessions")
+    assert proxy["seen"] and proxy["seen"][0] == sent

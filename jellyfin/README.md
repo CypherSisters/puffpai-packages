@@ -24,15 +24,15 @@ When only one player is on, you do not need to name it. When several are on, the
 
 - A Jellyfin server on this computer or your home network.
 - A Jellyfin API key, `JELLYFIN_API_KEY`: in Jellyfin open Dashboard, API Keys, and add one. PuffPAI keeps it in the vault and hands it to the package as an environment variable when it starts. The package never writes it to disk, never logs it and never puts it in an answer.
-- The Bridge must allow your Jellyfin address for this package. `needs.hosts` is empty because the address is yours, not one the package knows in advance.
+- `needs.addresses` is `lan`. When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page. Nothing reaches it until her Yes. An address on this computer needs no Bridge step. `needs.hosts` is empty because the address is yours, not one the package knows in advance.
 
 **Setup steps.**
 
 1. Add the key when PuffPAI asks for `JELLYFIN_API_KEY`.
 2. One `confirm` step: tell the bot your Jellyfin address in chat, for example "set my Jellyfin address to http://192.168.1.20:8096" with your own address. Jellyfin's usual port is 8096; when you leave the port off, 8096 is used for `http://` (8920, Jellyfin's own HTTPS port, for `https://`).
-3. Allow that address on the Bridge page.
+3. Off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.
 
-Addresses it takes: `http://` or `https://` only, with a host that is loopback (127.x, ::1), private (10.x, 172.16.x to 172.31.x, 192.168.x), link-local (169.254.x, fe80::), or a name ending in `.local` or `.lan`. It refuses public addresses, `localhost` (use 127.0.0.1), a name or password inside the address, and anything after `?` or `#`. A `.local` or `.lan` name is looked up when you set it (refused and not saved if it points outside those ranges; saved with a note if it does not resolve yet) and again before every call.
+Addresses it takes: `http://` or `https://` only, with a host that is loopback (127.x, ::1), private (10.x, 172.16.x to 172.31.x, 192.168.x), link-local (169.254.x, fe80::), or a name ending in `.local` or `.lan`. It refuses public addresses, `localhost` (use 127.0.0.1), a name or password inside the address, and anything after `?` or `#`. A `.local` or `.lan` name is looked up when you set it (refused and not saved if it points outside those ranges; saved with a note if it does not resolve yet) and again before every call. A link-local address can be saved, but it can't be allowed.
 
 **Data.** One file, `jellyfin.json`, in the package's data folder (`PUFFPAI_DATA`): `{address, last_updated}`. Nothing else is kept: no library, no history, no key. Every save replaces the whole file at once (temp file, then rename). A file that will not read is never written over.
 
