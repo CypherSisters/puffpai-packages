@@ -11,7 +11,7 @@ Every route refuses a request without this package's PUFFPAI_TOKEN.
 
 It talks to one place only: the AdGuard Home at the address the owner saves with ``set_address``.
 That address must be on this computer or the home network: an http(s) URL whose host is a loopback,
-RFC 1918 or link-local address, ``localhost``, or a name ending in ``.local`` or ``.lan``. The name
+RFC 1918, fc00::/7 or link-local address, ``localhost``, or a name ending in ``.local`` or ``.lan``. The name
 is looked up at every call and every answer must be such an address. An address on this computer
 is reached directly, at the address that was checked. Any other one goes through the Bridge proxy
 when the Core has set one, with the name as saved, so the Bridge decides and checks the answers when
@@ -45,6 +45,7 @@ import socket
 import ssl
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -65,7 +66,7 @@ KEY_USER, KEY_PASSWORD = "ADGUARD_USER", "ADGUARD_PASSWORD"
 USER_AGENT = "PuffPAI-AdGuard/1.0"
 LOCAL_SUFFIXES = (".local", ".lan")
 LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
-RFC1918 = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")]
+HOME_NETS = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7")]
 LINK_LOCAL = [ipaddress.ip_network(n) for n in ("169.254.0.0/16", "fe80::/10")]
 
 
@@ -133,10 +134,10 @@ def domain_of(value) -> str:
 
 
 def _ip_ok(ip: ipaddress._BaseAddress) -> bool:
-    """Loopback, RFC 1918 or link-local. Nothing else, not even other private ranges."""
+    """Loopback, the home networks (RFC 1918, fc00::/7) or link-local. Nothing else, not even other private ranges."""
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
         ip = ip.ipv4_mapped
-    return ip.is_loopback or any(ip in n for n in RFC1918 + LINK_LOCAL if n.version == ip.version)
+    return ip.is_loopback or any(ip in n for n in HOME_NETS + LINK_LOCAL if n.version == ip.version)
 
 
 def _name_ok(host: str) -> bool:
@@ -171,7 +172,7 @@ def check_address(value) -> tuple[str, str, int | None]:
         ip = None
     if not (_ip_ok(ip) if ip is not None else _name_ok(host)):
         raise ValueError(f"{host or 'that'} is not on this computer or the home network. AdGuard Home must be at "
-                         "a loopback, 192.168.x.x, 10.x.x.x, 172.16-31.x.x or 169.254.x.x address, localhost, "
+                         "a loopback, 192.168.x.x, 10.x.x.x, 172.16-31.x.x, fd00::1 or 169.254.x.x address, localhost, "
                          "or a name ending in .local or .lan")
     if port == 0:
         raise ValueError("port 0 is not a port")
@@ -316,7 +317,7 @@ def adguard_call(base: str, user: str, password: str, method: str, path: str, bo
 # ---------------------------------------------------------------- asking the Core for a Yes card (D110)
 
 ASK_PATH = "/v1/bridge/addresses/ask"
-ASK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 5                  # the whole ask: the connect and every read together
 ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
 LINE_MOST = 300                    # the most of the Core's line it says back
 ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
@@ -324,37 +325,50 @@ NO_CARD = "No Yes card could be raised right now. The owner can allow this addre
 ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
 
 
-class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
-    """This package's token goes to the Core and nowhere else."""
+class _DeadlineSocket(socket.socket):
+    """Each read gets only what is left of one deadline, so a slow drip can't hold the reply."""
+    deadline = 0.0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def recv_into(self, buffer, *args):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("the Core took too long")
+        self.settimeout(left)
+        return super().recv_into(buffer, *args)
 
 
-#: Direct, never through the Bridge proxy: the Core is on this computer.
-_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+class _AskConnection(http.client.HTTPConnection):
+    """One plain connection to the Core on this computer: never the Bridge proxy, and no redirect is followed."""
+
+    def connect(self):
+        deadline = time.monotonic() + ASK_TIMEOUT_S
+        plain = socket.create_connection((self.host, self.port), ASK_TIMEOUT_S)
+        self.sock = _DeadlineSocket(fileno=plain.detach())
+        self.sock.deadline = deadline
+        self.sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
 
 def _ask_core(place: str) -> tuple[str, str] | None:
     """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
     It grants nothing and never raises, so a failed ask never touches what was saved."""
-    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
     token = os.environ.get("PUFFPAI_TOKEN", "").strip()
-    if not api or not token:
-        return None
+    conn = None
     try:
-        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
-                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
-                                              "Accept": "application/json"})
-        try:
-            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
-                code, raw = r.status, r.read(ASK_MOST + 1)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        api = urllib.parse.urlsplit(os.environ.get("PUFFPAI_API", "").strip())
+        if api.scheme != "http" or not api.hostname or not token:
+            return None
+        conn = _AskConnection(api.hostname, api.port or 80)
+        conn.request("POST", ASK_PATH, body=json.dumps({"address": place}).encode("utf-8"),
+                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                              "Accept": "application/json"})
+        resp = conn.getresponse()
+        code, raw = resp.status, resp.read(ASK_MOST + 1)
         said = json.loads(raw.decode("utf-8"))
     except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
         return None
+    finally:
+        if conn is not None:
+            conn.close()
     state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
     if not isinstance(state, str) or not isinstance(line, str):
         return None
@@ -372,7 +386,7 @@ def _card_words(host: str, port: int) -> str:
         return NO_CARD
     state, line = got
     if state == "allowed":
-        return f"{line} This package can reach {place} now, while the Bridge is open."
+        return f"{line} The owner allowed {place}, and it works while the Bridge is open and this package is on, unless a block list stops it."
     if state == "waiting":
         if line.lower().startswith("waiting"):
             return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
@@ -390,6 +404,14 @@ def _this_computer(host: str, port: int) -> bool:
 
 def _after_saving(host: str, port: int) -> str:
     return ON_THIS_COMPUTER if _this_computer(host, port) else _card_words(host, port)
+
+
+PORT_PAIR = "Port 443 goes with https and port 80 with http, so the Bridge can't allow this pairing. Nothing was saved."
+
+
+def _pair_refused(scheme: str, port: int) -> bool:
+    """The Bridge takes only https on port 443 and only http on port 80, so a Yes for the other way round never works."""
+    return (scheme, port) in (("http", 443), ("https", 80))
 
 
 # ---------------------------------------------------------------- the store
@@ -502,6 +524,8 @@ class AdGuard:
     def set_address(self, address: str) -> str:
         scheme, host, port = check_address(address)
         refuse_named_outside(host)
+        if port and _pair_refused(scheme, port) and not _this_computer(host, port):
+            raise ValueError(PORT_PAIR)
         tries = [port] if port else ([443] if scheme == "https" else [3000, 80])
         heard = ""
         for p in tries:

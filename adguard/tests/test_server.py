@@ -396,7 +396,7 @@ def test_an_answer_at_the_second_port_asks_for_the_port_it_saved(base, tmp_path,
 
 
 @pytest.mark.parametrize("reply, says", [
-    (ALLOWED, ["Allowed. The owner said Yes", "can reach 192.168.1.2:3000 now, while the Bridge is open"]),
+    (ALLOWED, ["Allowed. The owner said Yes", "The owner allowed 192.168.1.2:3000", "works while the Bridge is open and this package is on", "unless a block list stops it"]),
     (WAITING, ["Waiting for the owner's Yes", "A Yes card for 192.168.1.2:3000 is waiting", "until her Yes"]),
     (STALE, ["can't be used right now", "Nothing reaches 192.168.1.2:3000 for now"]),
     (REFUSED, ["too many addresses this hour", "No card was raised"]),
@@ -479,3 +479,94 @@ def test_the_proxy_is_asked_for_the_name_as_saved(proxy, home_names, saved, sent
     with contextlib.suppress(ag.Problem):
         ag.adguard_call(saved, USER, PASSWORD, "GET", "/status")
     assert proxy["seen"] and proxy["seen"][0] == sent
+
+
+@contextlib.contextmanager
+def a_dripping_core(monkeypatch, head_first):
+    """A Core that sends one byte at a time, each in good time, for 4 seconds: of its head, or of a long body."""
+    stop = threading.Event()
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+
+    def serve():
+        with contextlib.suppress(OSError):
+            c, _ = listener.accept()
+            with c:
+                c.recv(65536)
+                head = b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n"
+                if head_first:
+                    c.sendall(head)
+                for byte in (b"x" * 40 if head_first else head + b"x" * 40):
+                    if stop.wait(0.1):
+                        return
+                    c.sendall(bytes([byte]))
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{listener.getsockname()[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    try:
+        yield
+    finally:
+        stop.set()
+        listener.close()
+        thread.join(5)
+
+
+@pytest.mark.parametrize("head_first", [False, True])
+def test_a_slow_drip_does_not_hold_the_reply(base, tmp_path, proxy, monkeypatch, head_first):
+    monkeypatch.setattr(ag, "ASK_TIMEOUT_S", 1)
+    with a_dripping_core(monkeypatch, head_first):
+        started = time.monotonic()
+        text, err = tool(base, "set_address", address="192.168.1.2:3000")
+    assert time.monotonic() - started < 2.5 and not err and "No Yes card could be raised" in text
+    assert (tmp_path / "adguard.json").exists()
+
+
+@pytest.mark.parametrize("given", ["http://192.168.1.2:443", "https://192.168.1.2:80", "http://adguard.lan:443",
+                                   "https://adguard.lan:80", "http://gone.lan:443"])
+def test_a_port_that_can_not_work_with_its_scheme_is_refused_before_saving(base, tmp_path, core, proxy, home_names, given):
+    text, err = tool(base, "set_address", address=given)
+    assert err and "Port 443 goes with https and port 80 with http" in text and "Nothing was saved" in text
+    assert not (tmp_path / "adguard.json").exists() and core["asks"] == [] and proxy["seen"] == []
+
+
+@pytest.mark.parametrize("given", ["http://127.0.0.1:443", "https://127.0.0.1:80", "http://localhost:443", "http://loop.lan:443"])
+def test_those_ports_on_this_computer_are_fine(base, tmp_path, core, home_names, monkeypatch, given):
+    monkeypatch.setattr(ag, "PROBE_TIMEOUT_S", 0.3)
+    text, err = tool(base, "set_address", address=given)
+    assert not err and "needs no Bridge step" in text and (tmp_path / "adguard.json").exists() and core["asks"] == []
+
+
+def test_the_two_pairings_that_do_work_still_ask(base, core, proxy, home_names):
+    assert not tool(base, "set_address", address="https://adguard.lan:443")[1]
+    assert not tool(base, "set_address", address="http://adguard.lan:80")[1]
+    assert [a["body"]["address"] for a in core["asks"]] == ["adguard.lan:443", "adguard.lan:80"]
+
+
+@pytest.mark.parametrize("given, place", [("http://[fd00::1]:3000", "[fd00::1]:3000"), ("http://[fc00::20]:3000", "[fc00::20]:3000")])
+def test_an_ipv6_home_address_is_taken_and_asked_for(base, core, proxy, given, place):
+    text, err = tool(base, "set_address", address=given)
+    assert not err and text.startswith("Saved")
+    one_ask(core, place)
+    assert proxy["seen"][0][1] == given + "/control/status"  # through the proxy, never direct
+
+
+@pytest.mark.parametrize("given", ["http://[fbff::1]:3000", "http://[fe00::1]:3000", "http://[fec0::1]:3000",
+                                   "http://[2001:db8::1]:3000", "http://100.64.0.1:3000", "http://8.8.8.8:3000"])
+def test_nothing_else_widens(base, tmp_path, core, given):
+    assert tool(base, "set_address", address=given)[1]
+    assert not (tmp_path / "adguard.json").exists() and core["asks"] == []
+
+
+@pytest.mark.parametrize("answers, ok", [
+    (["fd00::20", "192.168.1.2"], True), (["fd00::20"], True), (["fe80::1%12", "fd00::20", "192.168.1.2"], True),
+    (["fd00::20", "93.184.216.34"], False), (["2606:4700:4700::1111", "fd00::20"], False), (["fec0::1"], False),
+])
+def test_a_home_name_may_answer_with_ipv6_home_addresses_but_never_a_public_one(base, tmp_path, core, proxy, monkeypatch, answers, ok):
+    real = ag.socket.getaddrinfo
+    monkeypatch.setattr(ag.socket, "getaddrinfo", lambda host, *a, **k: [(2, 1, 6, "", (x, 0)) for x in answers]
+                        if host == "adguard.lan" else real(host, *a, **k))
+    text, err = tool(base, "set_address", address="http://adguard.lan:3000")
+    assert err is (not ok) and (tmp_path / "adguard.json").exists() is ok
+    assert ("outside this computer and the home network" in text) is (not ok)
