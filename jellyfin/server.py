@@ -14,7 +14,7 @@ Jellyfin's ``/Sessions`` API, with the owner's API key.
 
 The address is the one thing kept: ``jellyfin.json`` in PUFFPAI_DATA, written whole (temp
 file, then rename). Only http(s) addresses on this computer or the home network are taken
-(loopback, 10/8, 172.16/12, 192.168/16, 169.254/16, ::1, fe80::/10, or a name ending in
+(loopback, 10/8, 172.16/12, 192.168/16, fc00::/7, 169.254/16, ::1, fe80::/10, or a name ending in
 .local or .lan); a name is looked up before each call and refused if it points anywhere
 else. The key (JELLYFIN_API_KEY) comes from the environment only, goes only to the saved
 address as ``X-Emby-Token``, and is never written, logged or put in an answer. Calls time
@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import hmac
+import http.client
 import ipaddress
 import json
 import math
@@ -35,6 +36,7 @@ import re
 import socket
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime
@@ -54,7 +56,7 @@ HTTP_PORT, HTTPS_PORT = 8096, 8920    # Jellyfin's own defaults
 EXAMPLE = "http://192.168.1.20:8096"
 
 ALLOWED_NETS = tuple(ipaddress.ip_network(n) for n in (
-    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "::1/128", "fe80::/10"))
+    "127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7", "169.254.0.0/16", "::1/128", "fe80::/10"))
 NAME_RE = re.compile(r"\A(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:local|lan)\Z")
 NETLOC_RE = re.compile(r"\A[A-Za-z0-9.\-:\[\]%]+\Z")
 PATH_RE = re.compile(r"\A(?:/[A-Za-z0-9_-]+)+\Z")
@@ -151,11 +153,19 @@ def _ip_allowed(ip) -> bool:
 
 
 def host_allowed(host: str) -> bool:
-    """Loopback, RFC1918 or link-local, or a name ending in .local or .lan."""
+    """Loopback, RFC1918, fc00::/7 or link-local, or a name ending in .local or .lan."""
     try:
         return _ip_allowed(ipaddress.ip_address(host))
     except ValueError:
         return len(host) <= 253 and NAME_RE.match(host) is not None
+
+
+def _mapped(host: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.version == 6 and ip.ipv4_mapped is not None
 
 
 def check_address(value) -> str:
@@ -183,8 +193,10 @@ def check_address(value) -> str:
         raise ValueError("the port is a number from 1 to 65535")
     if not host or not host_allowed(host):
         raise ValueError(f"Jellyfin must be on this computer or your home network: 127.x, 10.x, 172.16.x to "
-                         f"172.31.x, 192.168.x, 169.254.x, or a name ending in .local or .lan. "
+                         f"172.31.x, 192.168.x, fd00::1, 169.254.x, or a name ending in .local or .lan. "
                          f"{_clean(host, 60) or 'That'} is not one of those.")
+    if _mapped(host):
+        raise ValueError("an address written with ::ffff: is not taken; write it plainly, like 127.0.0.1 or 192.168.1.20")
     port = port or (HTTP_PORT if u.scheme == "http" else HTTPS_PORT)
     netloc = f"[{host}]" if ":" in host else host
     return f"{u.scheme}://{netloc}:{port}{path}"
@@ -248,16 +260,16 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise urllib.error.HTTPError(req.full_url, code, "redirects are not followed", headers, fp)
 
 
-def _opener():
-    # Proxies from the environment only (the Core gives HTTP_PROXY / NO_PROXY for the Bridge),
-    # never the Windows registry.
-    return urllib.request.build_opener(urllib.request.ProxyHandler(urllib.request.getproxies_environment()),
-                                       NoRedirect())
+def _opener(direct: bool):
+    # Direct for every loopback address. Otherwise proxies from the environment only (the Core gives
+    # HTTP_PROXY / NO_PROXY for the Bridge), never the Windows registry.
+    proxies = {} if direct else urllib.request.getproxies_environment()
+    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies), NoRedirect())
 
 # ---------------------------------------------------------------- asking the Core for a Yes card (D110)
 
 ASK_PATH = "/v1/bridge/addresses/ask"
-ASK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 5                  # the whole ask: the connect and every read together
 ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
 LINE_MOST = 300                    # the most of the Core's line it says back
 ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
@@ -265,37 +277,50 @@ NO_CARD = "No Yes card could be raised right now. The owner can allow this addre
 ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
 
 
-class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
-    """This package's token goes to the Core and nowhere else."""
+class _DeadlineSocket(socket.socket):
+    """Each read gets only what is left of one deadline, so a slow drip can't hold the reply."""
+    deadline = 0.0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def recv_into(self, buffer, *args):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("the Core took too long")
+        self.settimeout(left)
+        return super().recv_into(buffer, *args)
 
 
-#: Direct, never through the Bridge proxy: the Core is on this computer.
-_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+class _AskConnection(http.client.HTTPConnection):
+    """One plain connection to the Core on this computer: never the Bridge proxy, and no redirect is followed."""
+
+    def connect(self):
+        deadline = time.monotonic() + ASK_TIMEOUT_S
+        plain = socket.create_connection((self.host, self.port), ASK_TIMEOUT_S)
+        self.sock = _DeadlineSocket(fileno=plain.detach())
+        self.sock.deadline = deadline
+        self.sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
 
 def _ask_core(place: str) -> tuple[str, str] | None:
     """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
     It grants nothing and never raises, so a failed ask never touches what was saved."""
-    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
     token = os.environ.get("PUFFPAI_TOKEN", "").strip()
-    if not api or not token:
-        return None
+    conn = None
     try:
-        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
-                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
-                                              "Accept": "application/json"})
-        try:
-            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
-                code, raw = r.status, r.read(ASK_MOST + 1)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        api = urlsplit(os.environ.get("PUFFPAI_API", "").strip())
+        if api.scheme != "http" or not api.hostname or not token:
+            return None
+        conn = _AskConnection(api.hostname, api.port or 80)
+        conn.request("POST", ASK_PATH, body=json.dumps({"address": place}).encode("utf-8"),
+                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                              "Accept": "application/json"})
+        resp = conn.getresponse()
+        code, raw = resp.status, resp.read(ASK_MOST + 1)
         said = json.loads(raw.decode("utf-8"))
     except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
         return None
+    finally:
+        if conn is not None:
+            conn.close()
     state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
     if not isinstance(state, str) or not isinstance(line, str):
         return None
@@ -313,7 +338,7 @@ def _card_words(host: str, port: int) -> str:
         return NO_CARD
     state, line = got
     if state == "allowed":
-        return f"{line} This package can reach {place} now, while the Bridge is open."
+        return f"{line} The owner allowed {place}, and it works while the Bridge is open and this package is on, unless a block list stops it."
     if state == "waiting":
         if line.lower().startswith("waiting"):
             return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
@@ -322,16 +347,19 @@ def _card_words(host: str, port: int) -> str:
 
 
 def _this_computer(host: str) -> bool:
-    """``localhost`` or a loopback address: no Bridge step, and no ask."""
-    if host == "localhost":
-        return True
+    """A loopback address, never a name: reached directly, so no Bridge step and no ask."""
     try:
-        ip = ipaddress.ip_address(host.split("%", 1)[0])
+        return ipaddress.ip_address(host).is_loopback
     except ValueError:
         return False
-    if ip.version == 6 and ip.ipv4_mapped:
-        ip = ip.ipv4_mapped
-    return ip.is_loopback
+
+
+PORT_PAIR = "Port 443 goes with https and port 80 with http, so the Bridge can't allow this pairing. Nothing was saved."
+
+
+def _pair_refused(scheme: str, port: int) -> bool:
+    """The Bridge takes only https on port 443 and only http on port 80, so a Yes for the other way round never works."""
+    return (scheme, port) in (("http", 443), ("https", 80))
 
 
 # ---------------------------------------------------------------- the store
@@ -440,7 +468,7 @@ class Jellyfin:
         url = base + path + (("?" + urlencode(params)) if params else "")
         req = urllib.request.Request(url, data=data, method=method, headers=headers)
         try:
-            with _opener().open(req, timeout=TIMEOUT) as r:
+            with _opener(_this_computer(urlsplit(base).hostname or "")).open(req, timeout=TIMEOUT) as r:
                 raw = r.read(MAX_ANSWER + 1)
         except urllib.error.HTTPError as exc:
             try:
@@ -542,6 +570,8 @@ class Jellyfin:
         if addrs and not _points_home(addrs):
             raise Plain(f"{host} points outside your home network, so it was not saved. "
                         "Use a name or address on your home network.")
+        if not _this_computer(host) and _pair_refused(urlsplit(base).scheme, urlsplit(base).port or HTTP_PORT):
+            raise ValueError(PORT_PAIR)
         self.store.save(base)
         words = ON_THIS_COMPUTER if _this_computer(host) else _card_words(host, urlsplit(base).port or HTTP_PORT)
         if addrs is None:

@@ -474,7 +474,7 @@ def test_a_proxy_in_the_environment_is_not_used_for_the_ask(base, core, proxy):
 
 
 @pytest.mark.parametrize("reply, says", [
-    (ALLOWED, ["Allowed. The owner said Yes", "can reach 192.168.1.20:8096 now, while the Bridge is open"]),
+    (ALLOWED, ["Allowed. The owner said Yes", "The owner allowed 192.168.1.20:8096", "works while the Bridge is open and this package is on", "unless a block list stops it"]),
     (WAITING, ["Waiting for the owner's Yes", "A Yes card for 192.168.1.20:8096 is waiting", "until her Yes"]),
     (STALE, ["can't be used right now", "Nothing reaches 192.168.1.20:8096 for now"]),
     (REFUSED, ["too many addresses this hour", "No card was raised"]),
@@ -557,3 +557,121 @@ def test_the_proxy_is_asked_for_the_name_as_saved(data, proxy, names, saved, sen
     with contextlib.suppress(jf.Plain):
         jf.Jellyfin(store)._call("/Sessions")
     assert proxy["seen"] and proxy["seen"][0] == sent
+
+
+@contextlib.contextmanager
+def a_dripping_core(monkeypatch, head_first):
+    """A Core that sends one byte at a time, each in good time, for 4 seconds: of its head, or of a long body."""
+    stop = threading.Event()
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+
+    def serve():
+        with contextlib.suppress(OSError):
+            c, _ = listener.accept()
+            with c:
+                c.recv(65536)
+                head = b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n"
+                if head_first:
+                    c.sendall(head)
+                for byte in (b"x" * 40 if head_first else head + b"x" * 40):
+                    if stop.wait(0.1):
+                        return
+                    c.sendall(bytes([byte]))
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{listener.getsockname()[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    try:
+        yield
+    finally:
+        stop.set()
+        listener.close()
+        thread.join(5)
+
+
+@pytest.mark.parametrize("head_first", [False, True])
+def test_a_slow_drip_does_not_hold_the_reply(base, data, proxy, monkeypatch, head_first):
+    monkeypatch.setattr(jf, "ASK_TIMEOUT_S", 1)
+    with a_dripping_core(monkeypatch, head_first):
+        started = time.monotonic()
+        text = tool(base, "set_address", address="192.168.1.20")
+    assert time.monotonic() - started < 2.5 and "No Yes card could be raised" in text
+    assert (data / "jellyfin.json").exists()
+
+
+@pytest.mark.parametrize("given", ["http://192.168.1.20:443", "https://192.168.1.20:80", "http://media.lan:443", "https://media.lan:80"])
+def test_a_port_that_can_not_work_with_its_scheme_is_refused_before_saving(base, data, core, proxy, names, given):
+    text = tool_error(base, "set_address", address=given)
+    assert "Port 443 goes with https and port 80 with http" in text and "Nothing was saved" in text
+    assert not (data / "jellyfin.json").exists() and core["asks"] == [] and proxy["seen"] == []
+
+
+@pytest.mark.parametrize("given", ["http://127.0.0.1:443", "https://127.0.0.1:80"])
+def test_those_ports_on_this_computer_are_fine(base, data, core, given):
+    text = tool(base, "set_address", address=given)
+    assert "needs no Bridge step" in text and (data / "jellyfin.json").exists() and core["asks"] == []
+
+
+def test_the_two_pairings_that_do_work_still_ask(base, core, proxy, names):
+    tool(base, "set_address", address="https://media.lan:443")
+    tool(base, "set_address", address="http://media.lan:80")
+    assert [a["body"]["address"] for a in core["asks"]] == ["media.lan:443", "media.lan:80"]
+
+
+class V6Server(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+@pytest.mark.parametrize("bind, where", [("127.0.0.2", "127.0.0.2"), ("::1", "[::1]"), ("127.0.0.1", "127.0.0.1")])
+def test_every_loopback_address_goes_direct_past_a_proxy(base, proxy, bind, where):
+    state = Fake()
+    with running((V6Server if ":" in bind else ThreadingHTTPServer)((bind, 0), fake_handler(state))) as url:
+        port = url.rsplit(":", 1)[1]
+        text = tool(base, "set_address", address=f"http://{where}:{port}")
+    assert "Test Jellyfin" in text and "needs no Bridge step" in text
+    assert proxy["seen"] == [] and state.calls
+
+
+@pytest.mark.parametrize("given", ["http://[::ffff:127.0.0.1]:7000", "http://[::ffff:192.168.1.20]:8096"])
+def test_an_address_written_as_mapped_is_refused_plainly(base, data, core, given):
+    assert "write it plainly" in tool_error(base, "set_address", address=given)
+    assert not (data / "jellyfin.json").exists() and core["asks"] == []
+
+
+def test_a_home_address_never_takes_the_direct_path(data, proxy, names):
+    proxy["reply"] = (200, b"[]")
+    store = jf.Store(data)
+    for saved in ("http://192.168.1.20:8096", "http://[fd00::1]:8096", "http://media.lan:8096"):
+        store.save(saved)
+        proxy["seen"].clear()
+        jf.Jellyfin(store)._call("/Sessions")
+        assert proxy["seen"][0][1] == saved + "/Sessions"
+
+
+@pytest.mark.parametrize("given, place", [("http://[fd00::1]:8096", "[fd00::1]:8096"), ("http://[fc00::20]:8096", "[fc00::20]:8096"),
+                                          ("[fdff:ffff::1]", "[fdff:ffff::1]:8096")])
+def test_an_ipv6_home_address_is_taken_and_asked_for(base, core, proxy, given, place):
+    assert tool(base, "set_address", address=given).startswith("Saved")
+    one_ask(core, place)
+
+
+@pytest.mark.parametrize("given", ["http://[fbff::1]:8096", "http://[fe00::1]:8096", "http://[fec0::1]:8096",
+                                   "http://[2001:db8::1]:8096", "http://100.64.0.1:8096", "http://8.8.8.8:8096"])
+def test_nothing_else_widens(base, data, core, given):
+    tool_error(base, "set_address", address=given)
+    assert not (data / "jellyfin.json").exists() and core["asks"] == []
+
+
+@pytest.mark.parametrize("answers, ok", [
+    (["fd00::20", "192.168.1.20"], True), (["fd00::20"], True), (["fe80::1%12", "fd00::20", "192.168.1.20"], True),
+    (["fd00::20", "93.184.216.34"], False), (["2606:4700:4700::1111", "fd00::20"], False), (["fec0::1"], False),
+])
+def test_a_home_name_may_answer_with_ipv6_home_addresses_but_never_a_public_one(base, data, core, proxy, monkeypatch, answers, ok):
+    real = jf.socket.getaddrinfo
+    monkeypatch.setattr(jf.socket, "getaddrinfo", lambda host, port, *a, **k: [(2, 1, 6, "", (x, port)) for x in answers]
+                        if host == "media.lan" else real(host, port, *a, **k))
+    err, text = run(base, "set_address", address="http://media.lan:8096")
+    assert err is (not ok) and (data / "jellyfin.json").exists() is ok
+    assert ("points outside your home network" in text) is (not ok)
