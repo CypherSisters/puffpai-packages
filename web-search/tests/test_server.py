@@ -146,6 +146,8 @@ def test_search_settings_checks_healthz(base, asked):
     ("ftp://192.168.1.2", "http:// or https://"),
     ("http://me:pw@192.168.1.2", "name or password"),
     ("http://192.168.1.2:99999", "port"),
+    ("http://[::ffff:127.0.0.1]:8888", "Write it plainly"),
+    ("http://[::ffff:192.168.1.20]:8888", "Write it plainly"),
 ])
 def test_set_address_refuses_what_is_not_the_owners(base, asked, tmp_path, address, why):
     assert why in tool(base, "set_address", error=True, address=address)

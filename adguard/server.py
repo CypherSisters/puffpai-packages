@@ -170,6 +170,8 @@ def check_address(value) -> tuple[str, str, int | None]:
         ip = ipaddress.ip_address(host.split("%", 1)[0])
     except ValueError:
         ip = None
+    if ip is not None and ip.version == 6 and ip.ipv4_mapped is not None:
+        raise ValueError("an address written with ::ffff: is not taken; write it plainly, like 127.0.0.1 or 192.168.1.2")
     if not (_ip_ok(ip) if ip is not None else _name_ok(host)):
         raise ValueError(f"{host or 'that'} is not on this computer or the home network. AdGuard Home must be at "
                          "a loopback, 192.168.x.x, 10.x.x.x, 172.16-31.x.x, fd00::1 or 169.254.x.x address, localhost, "

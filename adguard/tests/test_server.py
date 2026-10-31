@@ -205,6 +205,12 @@ def test_refuses_an_address_off_the_home_network(base, tmp_path, names, address)
         assert "outside this computer and the home network, so it was not saved" in text
 
 
+@pytest.mark.parametrize("address", ["http://[::ffff:127.0.0.1]:3000", "http://[::ffff:192.168.1.2]:3000"])
+def test_an_address_written_as_mapped_is_refused_plainly(base, tmp_path, address):
+    text, err = tool(base, "set_address", address=address)
+    assert err and "write it plainly" in text and not (tmp_path / "adguard.json").exists()
+
+
 def test_a_name_not_found_yet_is_saved_and_says_so(base, tmp_path, names):
     text, err = tool(base, "set_address", address="http://nothing.lan:3000")
     assert not err and "Not checked yet" in text and "could not be found" in text

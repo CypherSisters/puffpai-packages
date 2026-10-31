@@ -95,6 +95,13 @@ def _clean(value, most: int) -> str:
     text = " ".join(text.split())
     return text if len(text) <= most else text[: most - 3].rstrip() + "..."
 
+def _mapped(host: str) -> bool:
+    """An IPv4 address written the IPv6 way (``::ffff:127.0.0.1``), which a direct connect on Windows can't use."""
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    return ip.version == 6 and ip.ipv4_mapped is not None
 
 def address_kind(addr: str) -> str:
     """``loopback``, ``home`` (RFC1918, fc00::/7) or ``link-local`` for an address this package may ask; else ''."""
@@ -155,6 +162,9 @@ def check_base(value) -> tuple[str, bool]:
     if port is not None and not 1 <= port <= 65535:
         raise Refused("The port in that address is not a number from 1 to 65535.")
     port = port or (443 if scheme == "https" else 80)
+    if _mapped(host):
+        raise Refused("An address written with ::ffff: is not taken. Write it plainly, like 127.0.0.1 or 192.168.1.20. "
+                      "Nothing was saved.")
     if address_kind(host):
         kinds = {address_kind(host)}
     else:

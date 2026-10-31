@@ -191,6 +191,10 @@ def test_set_address_keeps_home_addresses_and_refuses_the_rest(base, monkeypatch
                 "http://0.0.0.0:1880", "http://[2001:db8::1]:1880", "http://192.168.1.2:99999", ""]:
         text = tool(url, "set_address", ok=False, address=bad)
         assert "Those arguments did not fit" in text, bad
+    for mapped in ["http://[::ffff:127.0.0.1]:1880", "http://[::ffff:192.168.1.20]:1880"]:
+        text = tool(url, "set_address", ok=False, address=mapped)
+        assert "Write it plainly" in text, mapped
+    assert json.loads((data / "nodered.json").read_text())["address"] == "http://192.168.1.20:1880"
     real = nr.socket.getaddrinfo
     monkeypatch.setattr(nr.socket, "getaddrinfo", lambda host, *a, **k: [(2, 1, 6, "", ("93.184.216.34", 1880))]
                         if host == "evil.lan" else real(host, *a, **k))

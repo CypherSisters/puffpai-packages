@@ -148,6 +148,13 @@ def host_kind(host: str) -> str | None:
         return "name"
     return None
 
+def _mapped(host: str) -> bool:
+    """An IPv4 address written the IPv6 way (``::ffff:127.0.0.1``), which a direct connect on Windows can't use."""
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    return ip.version == 6 and ip.ipv4_mapped is not None
 
 def check_address(text) -> str:
     """The owner's Node-RED address, checked and written one way: ``scheme://host:port[/admin-path]``."""
@@ -170,6 +177,8 @@ def check_address(text) -> str:
     host = (parts.hostname or "").rstrip(".")
     if not 1 <= port <= 65535:
         raise ValueError("The port is a number from 1 to 65535.")
+    if _mapped(host):
+        raise ValueError("An address written with ::ffff: is not taken. Write it plainly, like 127.0.0.1 or 192.168.1.20.")
     if host_kind(host) is None:
         raise ValueError("That address is not on this computer or your home network. Use 127.0.0.1, localhost, "
                          "a home address (10.x, 172.16-31.x, 192.168.x, fd00::1, 169.254.x), or a name ending in .local "
