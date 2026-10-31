@@ -11,7 +11,7 @@ Search the web through a SearXNG you run yourself: web results and news, the top
 | `web_search` | Searches through your SearXNG (category `general`, or `news`) and gives the top 8 results: title, a one-line snippet, the address and the engine that found it. Image results are left out. | no | search the web for how to store fresh basil |
 | `news_search` | The same, in SearXNG's news category | no | what's in the news about the Mars mission |
 | `search_settings` | Which SearXNG address is saved, and whether it answers right now (its `/healthz`, or its front page) | no | is web search set up |
-| `set_address` | Saves your SearXNG's address. Only an address on this computer (`127.0.0.1`, `localhost`) or your home network (`10.x`, `172.16.x` to `172.31.x`, `192.168.x`, link-local, or a name ending in `.local` or `.lan` that points only at those) is taken. A public SearXNG is refused, because it would see every question. | yes | set my SearXNG address to http://192.168.1.20:8888 |
+| `set_address` | Saves your SearXNG's address. Only an address on this computer (`127.0.0.1`, `localhost`) or your home network (`10.x`, `172.16.x` to `172.31.x`, `192.168.x`, IPv6 `fc00::/7` like `fd00::1`, link-local, or a name ending in `.local` or `.lan` that points only at those) is taken. A public SearXNG is refused, because it would see every question. | yes | set my SearXNG address to http://192.168.1.20:8888 |
 
 **What it needs.**
 
@@ -36,7 +36,7 @@ What a search sends: the words you asked, `format=json` and the category, to the
 ## Rough edges
 
 - A link-local address can be saved, but it can't be allowed on the Bridge, so searches to it are refused. Use a private address or a name like `searxng.lan`, or run SearXNG on this computer.
-- IPv6 home addresses (`fd00::/8` and the like) are not taken; only IPv4 home ranges, loopback and link-local.
+- Off this computer, port 443 goes with `https://` and port 80 with `http://`: the other way round is refused, because the Bridge could never let it through.
 - If SearXNG's limiter is on, it may turn this computer away (error 429). Let this computer's address through it in SearXNG's own settings.
 - No image search, no safe-search or language choice, no time range, and no paging past the top 8. SearXNG's own defaults apply.
 - The tool says SearXNG's engines were quiet only when nothing came back. Partial answers from a few engines are shown as they are.
