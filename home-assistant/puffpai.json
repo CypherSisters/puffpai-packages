@@ -19,7 +19,7 @@
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
     "changes": ["set_address", "turn_on", "turn_off", "set_light", "set_temperature", "run_scene"],
     "tools": {
-      "set_address": "Save the address of your Home Assistant on your home network, like homeassistant.local:8123.",
+      "set_address": "Save the address of your Home Assistant on your home network, like homeassistant.local:8123. For an address off this computer, the bot raises a Yes card for that address and port.",
       "list_devices": "List Home Assistant devices with their state, by kind (lights, switches, thermostats, sensors and more) or by name.",
       "device_state": "The state of one Home Assistant device, with a few details like brightness or temperature.",
       "turn_on": "Turn on a light, switch, fan or media player, or open a blind, curtain or shade. Never a lock, garage door or gate.",
@@ -47,6 +47,7 @@
   "needs": {
     "packages": [],
     "hosts": [],
+    "addresses": "lan",
     "keys": [
       { "name": "HOME_ASSISTANT_TOKEN", "why": "to read and control your Home Assistant", "get_it": "In Home Assistant open your profile, Security, Long-lived access tokens" }
     ],
@@ -55,7 +56,7 @@
 
   "setup_steps": [
     { "id": "address", "kind": "confirm", "title": "Find your Home Assistant address (usually http://homeassistant.local:8123)",
-      "why": "Then tell the bot, for example: my Home Assistant is at homeassistant.local:8123. The Bridge must allow that address for this package." }
+      "why": "Then tell the bot, for example: my Home Assistant is at homeassistant.local:8123. The bot then raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page." }
   ],
   "data": { "keep_on_remove": "ask" },
   "consent": "Home Assistant talks only to the Home Assistant at the address you set on your home network, using your own long-lived access token from the vault. It keeps nothing but that address in its own data folder, never the token, and it does not use the internet."

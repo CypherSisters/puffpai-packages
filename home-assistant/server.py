@@ -202,6 +202,85 @@ def _resolves_local(host: str, port: int) -> None:
         raise HAError(f"I could not find {host} on this network. Check the address, or set its number "
                       "address instead (like 192.168.1.20:8123).")
 
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+ASK_PATH = "/v1/bridge/addresses/ask"
+ASK_TIMEOUT_S = 5
+ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
+LINE_MOST = 300                    # the most of the Core's line it says back
+ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
+NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
+ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
+
+
+class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
+    """This package's token goes to the Core and nowhere else."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+#: Direct, never through the Bridge proxy: the Core is on this computer.
+_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+
+
+def _ask_core(place: str) -> tuple[str, str] | None:
+    """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
+    It grants nothing and never raises, so a failed ask never touches what was saved."""
+    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
+    token = os.environ.get("PUFFPAI_TOKEN", "").strip()
+    if not api or not token:
+        return None
+    try:
+        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                                              "Accept": "application/json"})
+        try:
+            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
+                code, raw = r.status, r.read(ASK_MOST + 1)
+        except urllib.error.HTTPError as exc:
+            with exc:
+                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        said = json.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
+        return None
+    state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
+    if not isinstance(state, str) or not isinstance(line, str):
+        return None
+    if code != ASK_STATUS.get(state) and not (state == "refused" and code >= 400):
+        return None
+    line = " ".join("".join(c if c.isprintable() else " " for c in line.replace(token, "[hidden]")).split())[:LINE_MOST]
+    return (state, line) if line else None
+
+
+def _card_words(host: str, port: int) -> str:
+    """What is true of this address now, after the save: the Core's line, and what it means."""
+    place = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    got = _ask_core(place)
+    if got is None:
+        return NO_CARD
+    state, line = got
+    if state == "allowed":
+        return f"{line} This package can reach {place} now, while the Bridge is open."
+    if state == "waiting":
+        if line.lower().startswith("waiting"):
+            return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
+        return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
+    return f"{line} No card was raised." if state == "refused" else line
+
+
+def _this_computer(host: str) -> bool:
+    """``localhost`` or a loopback address: no Bridge step, and no ask."""
+    if host == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return ip.is_loopback
+
 
 # ---------------------------------------------------------------- the store
 
@@ -346,8 +425,8 @@ class HomeAssistant:
                 raise HAError("Home Assistant refused the token. Make a new long-lived access token in your "
                               "Home Assistant profile and add it in this package's setup.") from None
             if code == 403:
-                raise HAError("The answer was 'not allowed'. If the Bridge does not allow this address for this "
-                              "package yet, nothing works until it does.") from None
+                raise HAError("The answer was 'not allowed'. If the Bridge does not allow this address and port for "
+                              "this package yet, nothing works until it does.") from None
             if code == 404:
                 raise NotFound("Home Assistant has no such thing.") from None
             if code == 400:
@@ -355,8 +434,8 @@ class HomeAssistant:
             raise HAError(f"Home Assistant answered with error {code}.") from None
         except (urllib.error.URLError, OSError, http.client.HTTPException, ValueError) as exc:
             reason = getattr(exc, "reason", None) or type(exc).__name__
-            raise HAError(f"I could not reach Home Assistant at {base} ({_shown(reason, 120)}). If the Bridge "
-                          "does not allow this address for this package yet, nothing works until it does.") from None
+            raise HAError(f"I could not reach Home Assistant at {base} ({_shown(reason, 120)}). If the Bridge does not "
+                          "allow this address and port for this package yet, nothing works until it does.") from None
         if len(raw) > MAX_REPLY:
             raise HAError("Home Assistant's answer was bigger than 2 MB, so I stopped reading it.")
         try:
@@ -411,8 +490,9 @@ class HomeAssistant:
         parts = urlsplit(url)
         found = _lookup(parts.hostname or "", parts.port or DEFAULT_HA_PORT)    # outside: refused, nothing saved
         self.store.save(url)
-        said = (f"Saved. Home Assistant's address is {url}. The Bridge must allow this address for this "
-                "package before anything works.")
+        host = parts.hostname or ""
+        said = (f"Saved. Home Assistant's address is {url}. "
+                + (ON_THIS_COMPUTER if _this_computer(host) else _card_words(host, parts.port or DEFAULT_HA_PORT)))
         if not found:
             said += (f" I could not find {parts.hostname} on this network right now, so nothing will work until "
                      "it can be found. Check the name, or set its number address instead (like 192.168.1.20:8123).")
@@ -592,7 +672,7 @@ def _p(kind: str, text: str) -> dict:
 _WHICH = _p("string", "The device: its entity id (like light.kitchen) or its name (like Kitchen light).")
 TOOLS = [
     ("set_address", "Save the address of your Home Assistant on your home network, like "
-     "homeassistant.local:8123 or 192.168.1.20:8123.",
+     "homeassistant.local:8123 or 192.168.1.20:8123. For an address off this computer, the bot raises a Yes card for that address and port.",
      {"address": _p("string", "Home Assistant's address. Port 8123 if none is given.")}, ["address"]),
     ("list_devices", "List Home Assistant devices with their state: lights, switches, fans, thermostats, covers, "
      "locks, media players, scenes, sensors, cameras. Up to 100.",

@@ -24,10 +24,10 @@ What it never does: lock or unlock a door (locks are read-only here), open or cl
 **What it needs.**
 
 - Your own Home Assistant on your home network, and its address. The address must be loopback, a private address (10.x, 172.16 to 172.31, 192.168.x), a link-local address, or a name ending in `.local` or `.lan` (like `homeassistant.local`). Anything else is refused.
-- **The Bridge must allow that address for this package. Nothing works until it does.** The package declares no internet hosts (`needs.hosts` is empty), because your Home Assistant is on your own network and its address is yours to set.
+- `needs.addresses` is `lan`. When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page. Nothing reaches it until her Yes. An address on this computer needs no Bridge step. A link-local address can be saved, but it can't be allowed. The package declares no internet hosts (`needs.hosts` is empty).
 - A long-lived access token, `HOME_ASSISTANT_TOKEN` (`needs.keys`). Make it in Home Assistant: open your profile, Security, Long-lived access tokens. It goes into the vault and reaches this package only as an environment variable. It is never written to disk or logs and never said in an answer.
 
-**Setup steps.** One step: find your Home Assistant address (usually `http://homeassistant.local:8123`), then tell the bot, for example "my Home Assistant is at homeassistant.local:8123". Add the token when the Yes card asks for it, and let the Bridge allow the address.
+**Setup steps.** One step: find your Home Assistant address (usually `http://homeassistant.local:8123`), then tell the bot, for example "my Home Assistant is at homeassistant.local:8123". Add the token when the Yes card asks for it. Then the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.
 
 **Data.** One file, `ha.json`, in this package's data folder (`PUFFPAI_DATA`): the address you set and when. Never the token. Every save replaces the whole file at once. A file that will not read is never written over.
 
