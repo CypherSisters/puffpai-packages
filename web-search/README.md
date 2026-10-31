@@ -1,6 +1,6 @@
 # Web search
 
-Search the web through a SearXNG you run yourself: web results and news, the top 8 each. No account, no key, no search company asked directly. By Cypher Sisters, Apache-2.0.
+Search with no setup: it asks Wikipedia, which is not the whole web and has no news. Save the address of a SearXNG you run yourself and it searches the web and news through that instead, the top 8 each. No account, no key, no search company asked directly. By Cypher Sisters, Apache-2.0.
 
 ## PuffPAI
 
@@ -8,33 +8,41 @@ Search the web through a SearXNG you run yourself: web results and news, the top
 
 | Tool | What it does | Changes | Sample ask |
 |---|---|---|---|
-| `web_search` | Searches through your SearXNG (category `general`, or `news`) and gives the top 8 results: title, a one-line snippet, the address and the engine that found it. Image results are left out. | no | search the web for how to store fresh basil |
-| `news_search` | The same, in SearXNG's news category | no | what's in the news about the Mars mission |
-| `search_settings` | Which SearXNG address is saved, and whether it answers right now (its `/healthz`, or its front page) | no | is web search set up |
+| `web_search` | With no SearXNG saved: searches Wikipedia and gives the top 5 articles (title, a one-line snippet, the address), and says it searched Wikipedia, not the whole web. With one saved: searches through it (category `general`, or `news`) and gives the top 8 results, with the engine that found each. Image results are left out. | no | search the web for how to store fresh basil |
+| `news_search` | With a SearXNG saved: its news category, the top 8. With none: says in one line that it needs your SearXNG, because Wikipedia has no news | no | what's in the news about the Mars mission |
+| `search_settings` | With none saved, says it searches Wikipedia. Otherwise which SearXNG address is saved, and whether it answers right now (its `/healthz`, or its front page) | no | is web search set up |
 | `set_address` | Saves your SearXNG's address. Only an address on this computer (`127.0.0.1`, `localhost`) or your home network (`10.x`, `172.16.x` to `172.31.x`, `192.168.x`, IPv6 `fc00::/7` like `fd00::1`, link-local, or a name ending in `.local` or `.lan` that points only at those) is taken. A public SearXNG is refused, because it would see every question. | yes | set my SearXNG address to http://192.168.1.20:8888 |
 
 **What it needs.**
 
-- **A SearXNG you run**, with its JSON format turned on. That is the one setup step. SearXNG itself needs its own internet access to ask search engines; that is outside this package and outside the Bridge's view of this package.
-- **The Bridge.** `needs.hosts` is empty: this package never talks to the internet itself. A SearXNG on this computer is asked directly. A SearXNG on another computer at home is asked through the Bridge, which must allow that exact address and port for Web search; until it does, searches are refused and the tool says so.
+- **Nothing to start.** With no SearXNG saved, it searches Wikipedia as soon as it is added. Adding it asks your one Yes, which covers `en.wikipedia.org`.
+- **For the whole web and news, a SearXNG you run**, with its JSON format turned on. This is your choice, not a setup step. SearXNG itself needs its own internet access to ask search engines; that is outside this package and outside the Bridge's view of this package.
+- **The Bridge.** `needs.hosts` is `en.wikipedia.org`, the one place on the internet this package talks to, and only with no SearXNG saved. A SearXNG on this computer is asked directly. A SearXNG on another computer at home is asked through the Bridge, which must allow that exact address and port for Web search; until it does, searches are refused and the tool says so.
 - **`needs.addresses` is `lan`.** When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.
 - No keys, no account, no brain.
 
-What a search sends: the words you asked, `format=json` and the category, to the address you set, with the User-Agent `PuffPAI web-search package`. Nothing else: no cookies, no language, nothing about who asked. Questions are never logged or stored by this package.
+What a search sends, with no SearXNG saved: the words you asked, after private details are taken out and cut to 200 characters, to `en.wikipedia.org`, with a User-Agent that names this package and no one else. Like any web request, Wikipedia also sees your internet address. A search with a high-risk detail in it (a street address, a card number, a health detail about you) is not sent at all; a lesser one (an email, a phone number, a full name) is left out, and the answer says so.
 
-**Setup steps.** One, a `confirm` step: "Run SearXNG and enable its JSON format" ([docs.searxng.org](https://docs.searxng.org/)). In SearXNG's settings, under `search:` `formats:`, add `json` next to `html`. Then tell the bot its address (off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page), and ask "is web search set up" to check it answers.
+What a search sends, with a SearXNG saved: the words you asked, as you asked them, `format=json` and the category, to the address you set, with the User-Agent `PuffPAI web-search package`. It never goes to Wikipedia, even when your SearXNG fails: the tool says it failed, because you chose your own box.
 
-**Data.** One file, `search.json`, in Web search's data folder (`PUFFPAI_DATA`): the SearXNG address and when it was saved. Search words and results are not stored. Every save replaces the whole file at once. A file that will not read is never written over. The address is checked again before every call, so a hand-edited file can't send searches somewhere else. On remove, the owner is asked whether to keep it.
+Either way nothing else is sent: no cookies, no language, nothing about who asked. Questions are never logged or stored by this package.
 
-**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA` and `PUFFPAI_TOKEN` set. It listens on 127.0.0.1 only. Every route (`/health` and `/mcp`) refuses a request without the package's `PUFFPAI_TOKEN` (as `Authorization: Bearer <token>` or `X-PuffPAI-Key`). Each call to SearXNG stops waiting after 15 seconds, reads at most 1 MB, sends no cookies, and follows a redirect only to the same scheme, host and port, three at most. The proxy comes from the environment the Core sets, never from Windows proxy settings.
+**Setup steps.** None. To use your own SearXNG ([docs.searxng.org](https://docs.searxng.org/)): in its settings, under `search:` `formats:`, add `json` next to `html`. Then tell the bot its address (off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page), and ask "is web search set up" to check it answers.
+
+**Data.** With no SearXNG, nothing. Otherwise one file, `search.json`, in Web search's data folder (`PUFFPAI_DATA`): the SearXNG address and when it was saved. Search words and results are not stored. Every save replaces the whole file at once. A file that will not read is never written over. The address is checked again before every call, so a hand-edited file can't send searches somewhere else. On remove, the owner is asked whether to keep it.
+
+**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA` and `PUFFPAI_TOKEN` set. It listens on 127.0.0.1 only. Every route (`/health` and `/mcp`) refuses a request without the package's `PUFFPAI_TOKEN` (as `Authorization: Bearer <token>` or `X-PuffPAI-Key`). Each call stops waiting after 15 seconds, reads at most 1 MB, sends no cookies, and follows a redirect only to the same scheme, host and port, three at most. The proxy comes from the environment the Core sets, never from Windows proxy settings.
 
 ## Changed from HomeBot
 
 - HomeBot's chat tool asked DuckDuckGo directly, and its Toolsmith asked a SearXNG on the box itself, at one fixed loopback address from the owner's config. This package asks only SearXNG, and the owner sets the address, on this computer or the home network.
+- Today's BuildBot's keyless search is the Wikipedia search here: the same request, the same 5 results and 200 characters, and the same private-detail check (`word_checks.py`, copied as it is). Its Brave and Marginalia searches need keys, so they are not in this package.
 - HomeBot also had a page reader (`web_fetch`) for any public address a result pointed to. That is not in this package: the brain gets the result addresses as words and opens nothing.
 
 ## Rough edges
 
+- Wikipedia finds articles, not the web: no prices, no opening hours, no news, English only.
+- The private-detail check catches and misses what today's BuildBot's does. First names alone, a town alone, a key or an id with no word naming it, and most other languages are not caught.
 - A link-local address can be saved, but it can't be allowed on the Bridge, so searches to it are refused. Use a private address or a name like `searxng.lan`, or run SearXNG on this computer.
 - Off this computer, port 443 goes with `https://` and port 80 with `http://`: the other way round is refused, because the Bridge could never let it through.
 - If SearXNG's limiter is on, it may turn this computer away (error 429). Let this computer's address through it in SearXNG's own settings.

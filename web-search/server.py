@@ -1,12 +1,23 @@
 # Harvested from HomeBotFounders@b77fc40:src/puffpai/rebot_tools.py (rewritten-from)
 # Harvested from HomeBotFounders@b77fc40:src/puffpai/agents/toolsmith.py (rewritten-from)
-"""Web search: ask a SearXNG the owner runs, as a PuffPAI package.
+# Harvested from PuffPAIBuildBot@774e27a4:src/puffpai/web_search.py (adapted: clean_words, _wikipedia, _clean_result)
+# Harvested from PuffPAIBuildBot@774e27a4:src/puffpai/catalogs/live.py (adapted: clean_text)
+"""Web search: Wikipedia with no setup, or a SearXNG the owner runs, as a PuffPAI package.
 
 One small server, Python standard library only, bound to 127.0.0.1:
 - ``/health``      "ok"
 - ``/mcp``         the MCP server (JSON-RPC over HTTP)
 
 Every route refuses a request without this package's PUFFPAI_TOKEN (D48d).
+
+With no SearXNG address saved, a search asks en.wikipedia.org through the Bridge
+(the Core's proxy, from the environment only). Private details come out of the
+words first (``word_checks``), at most 200 characters are sent, and a search with
+a high-risk detail in it is not sent at all. This searches Wikipedia, not the
+whole web, and the answer says so. It has no news.
+
+With an address saved, every search goes to that SearXNG and never to Wikipedia,
+even when it fails: the owner chose her own box.
 
 The one setting is the SearXNG address, one JSON document in PUFFPAI_DATA
 (``search.json``). Only an address on this computer (loopback) or on the home
@@ -15,7 +26,7 @@ or .lan that points only at such addresses) is taken. A public SearXNG is
 refused: it would see every question. The address is checked again before
 every call, so a hand-edited file can't point it somewhere else.
 
-A search sends ``q``, ``format=json`` and ``categories`` and nothing else: no
+A search of SearXNG sends ``q``, ``format=json`` and ``categories`` and nothing else: no
 cookies, no language, no other headers about the owner. Queries are never
 logged or stored. A SearXNG on this computer is asked directly; one on the
 home network is asked through the Bridge (the Core's proxy, from the
@@ -30,15 +41,18 @@ from __future__ import annotations
 
 import argparse
 import hmac
+import html
 import http.client
 import ipaddress
 import json
 import os
 import re
 import socket
+import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -46,8 +60,12 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.dont_write_bytecode = True     # nothing is written into this package's own folder
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import word_checks  # noqa: E402 - the file next to this one
+
 NAME = "web-search"
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 DOC = "search.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 64 * 1024
@@ -57,6 +75,11 @@ MAX_REDIRECTS = 3
 TOP = 8
 MAX_QUESTION = 300
 USER_AGENT = "PuffPAI web-search package"
+WIKI_HOST = "en.wikipedia.org"
+WIKI_API = f"https://{WIKI_HOST}/w/api.php"
+WIKI_AGENT = f"PuffPAI-web-search/{VERSION} (+https://github.com/CypherSisters/puffpai-packages)"   # Wikipedia asks for a named one
+MAX_QUERY = 200                    # the most words Wikipedia gets
+MAX_RESULTS = 5
 CATEGORIES = ("general", "news")
 HOME_NETS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"))
 LOCAL_SUFFIXES = (".local", ".lan")
@@ -64,8 +87,13 @@ _NAME_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\.[a-
 _PATH_RE = re.compile(r"^[A-Za-z0-9/._~-]*$")
 _CTRL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f​-‏ -‮⁦-⁩﻿]")
 
-NO_ADDRESS = ("Web search has no SearXNG address yet. Tell me the address of your own SearXNG, "
-              "like http://192.168.1.20:8888 or http://127.0.0.1:8888, and I will save it.")
+NO_ADDRESS = ("Web search has no SearXNG address saved, so it searches Wikipedia, not the whole web. For the whole "
+              "web, tell me the address of your own SearXNG, like http://192.168.1.20:8888 or "
+              "http://127.0.0.1:8888, and I will save it.")
+NO_NEWS = "News search needs your own SearXNG, because Wikipedia has no news; tell me its address and I will save it."
+ON_WIKIPEDIA = "This searched Wikipedia, not the whole web."
+LEFT_OUT = "I left a private detail out of the search words before searching."
+CUT_SHORT = f"Only the first {MAX_QUERY} characters of the search words were sent."
 PUBLIC = ("That looks like a SearXNG on the internet. This package is only for your own SearXNG, on this "
           "computer or your home network, because a public one would see every question you ask. "
           "Nothing was saved.")
@@ -203,16 +231,25 @@ class Offline(RuntimeError):
     """The SearXNG did not answer usefully. The words say what happened, never the question."""
 
 
+class SearchRefused(ValueError):
+    """Search words that were not sent. The words say why."""
+
+
 class _SameOrigin(urllib.request.HTTPRedirectHandler):
     """Follow a redirect only to the same scheme, host and port, and at most MAX_REDIRECTS times."""
     max_redirections = MAX_REDIRECTS
     max_repeats = MAX_REDIRECTS
+    moved = "Your SearXNG sent the request on to another place, so Web search stopped there."
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         old, new = urllib.parse.urlsplit(req.full_url), urllib.parse.urlsplit(newurl)
         if (new.scheme, new.netloc.lower()) != (old.scheme, old.netloc.lower()):
-            raise Offline("Your SearXNG sent the request on to another place, so Web search stopped there.")
+            raise Offline(self.moved)
         return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+class _SameWikipedia(_SameOrigin):
+    moved = "Wikipedia sent the request on to another place, so Web search stopped there."
 
 
 def _opener(direct: bool):
@@ -223,22 +260,38 @@ def _opener(direct: bool):
 
 
 def http_get(url: str, direct: bool) -> tuple[int, bytes]:
-    """GET *url*: ``(status, body)``. Errors are :class:`Offline` with plain words and never the URL's
-    query. Patched in tests, so they never touch the network."""
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    """GET *url* from the owner's SearXNG: ``(status, body)``. Patched in tests, so they never touch the network."""
+    return _fetch(url, _opener(direct), USER_AGENT, "Your SearXNG",
+                  "Could not reach your SearXNG ({why}). Is it running, and if it is on another computer, "
+                  "does the Bridge allow this address and port for Web search?")
+
+
+def wiki_get(url: str) -> tuple[int, bytes]:
+    """GET *url* from Wikipedia: ``(status, body)``, through the Bridge the environment names, never through the
+    Windows proxy settings. Patched in tests, so they never touch the network."""
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler(urllib.request.getproxies_environment()),
+                                         _SameWikipedia())
+    return _fetch(url, opener, WIKI_AGENT, "Wikipedia",
+                  "Could not reach Wikipedia ({why}). Is this computer online, is the Bridge open, and does it allow "
+                  f"{WIKI_HOST} for Web search?")
+
+
+def _fetch(url: str, opener, agent: str, who: str, cannot: str) -> tuple[int, bytes]:
+    """One GET: ``(status, body)``. Errors are :class:`Offline` with plain words and never the URL's query."""
+    req = urllib.request.Request(url, headers={"User-Agent": agent, "Accept": "application/json"})
     deadline = time.monotonic() + TIMEOUT_S
     try:
-        with _opener(direct).open(req, timeout=TIMEOUT_S) as r:
+        with opener.open(req, timeout=TIMEOUT_S) as r:
             status, chunks, size = r.status, [], 0
             while True:
                 if time.monotonic() > deadline:
-                    raise Offline(f"Your SearXNG took more than {TIMEOUT_S:g} seconds, so Web search stopped.")
+                    raise Offline(f"{who} took more than {TIMEOUT_S:g} seconds, so Web search stopped.")
                 chunk = r.read(64 * 1024)
                 if not chunk:
                     break
                 size += len(chunk)
                 if size > MAX_ANSWER:
-                    raise Offline("Your SearXNG sent more than 1 MB, so Web search did not read it.")
+                    raise Offline(f"{who} sent more than 1 MB, so Web search did not read it.")
                 chunks.append(chunk)
             return status, b"".join(chunks)
     except urllib.error.HTTPError as exc:
@@ -247,13 +300,12 @@ def http_get(url: str, direct: bool) -> tuple[int, bytes]:
     except Offline:
         raise
     except (TimeoutError, socket.timeout):
-        raise Offline(f"Your SearXNG did not answer within {TIMEOUT_S:g} seconds.") from None
+        raise Offline(f"{who} did not answer within {TIMEOUT_S:g} seconds.") from None
     except (urllib.error.URLError, OSError, ValueError) as exc:
         why = getattr(exc, "reason", None) or type(exc).__name__
         if isinstance(why, BaseException):
             why = type(why).__name__
-        raise Offline(f"Could not reach your SearXNG ({_clean(why, 80)}). Is it running, and if it is on "
-                      "another computer, does the Bridge allow this address and port for Web search?") from None
+        raise Offline(cannot.format(why=_clean(why, 80))) from None
 
 
 def _status_words(code: int) -> str:
@@ -411,8 +463,9 @@ def _engine(r: dict) -> str:
     return _clean(e, 40)
 
 
-def format_results(data, label: str) -> str:
-    """The top results from a SearXNG JSON answer, as plain lines. Image results are left out."""
+def format_results(data, label: str, source: str = "your SearXNG") -> str:
+    """The top results from a SearXNG JSON answer (or Wikipedia's, in the same shape), as plain lines. Image results
+    are left out."""
     if not isinstance(data, dict) or not isinstance(data.get("results", []), list):
         raise Offline("Your SearXNG sent something that is not search results.")
     rows, seen = [], set()
@@ -441,8 +494,82 @@ def format_results(data, label: str) -> str:
                  if isinstance(u, (list, tuple)) and u and isinstance(u[0], str)][:5]
         if quiet:
             return f"Your SearXNG found no {label} for that. These engines did not answer: {', '.join(quiet)}."
-        return f"Your SearXNG found no {label} for that."
-    return f"Top {len(rows)} {label} from your SearXNG:\n" + "\n".join(rows)
+        return f"{source[:1].upper()}{source[1:]} found no {label} for that."
+    return f"Top {len(rows)} {label} from {source}:\n" + "\n".join(rows)
+
+
+_KEPT_PRIVATE = re.compile(r"\[[^\[\]]{0,60}kept private\]", re.I)
+_classifier = word_checks.DataClassifier()
+
+
+def clean_words(words: str) -> tuple[str, list[str]]:
+    """``(words to send to Wikipedia, lines to tell the owner)``. Raises :class:`SearchRefused`."""
+    text = " ".join(str(words or "").split())
+    redacted, found = _classifier.redact_pii(text, include_health=True)
+    if found.severity in ("high", "critical"):
+        raise SearchRefused("That search had private details in it, so I did not send it.")
+    told = [LEFT_OUT] if redacted != text else []
+    clean = " ".join(_KEPT_PRIVATE.sub(" ", redacted).split())
+    if len(clean) > MAX_QUERY:
+        told.append(CUT_SHORT)
+    clean = clean[:MAX_QUERY].strip()
+    if not clean:
+        raise SearchRefused("There was nothing left to search for once private details were taken out, "
+                            "so I did not search.")
+    return clean, told
+
+
+_MD_LINK = re.compile(r"!?\[([^\]]{0,200})\]\([^)]{0,500}\)")
+_TAG = re.compile(r"<[^>]{0,400}>")
+_URL = re.compile(r"https?://\S+")
+
+
+def _wiki_text(value, most: int) -> str:
+    """Outside text, made safe to show: no markup, no links, no control characters. Wikipedia's snippets carry
+    ``<span>`` tags and ``&quot;``, so those go too."""
+    text = html.unescape("" if value is None else str(value))
+    text = _URL.sub("", _TAG.sub(" ", _MD_LINK.sub(r"\1", text)))
+    text = "".join(c if unicodedata.category(c)[0] != "C" else " " for c in text)
+    text = " ".join(text.replace("`", "").replace("*", "").replace("#", "").split())
+    if len(text) > most:
+        text = text[: max(1, most - 3)].rsplit(" ", 1)[0].rstrip(",;:.- ") + "..."
+    return text
+
+
+def _wiki_row(item) -> dict | None:
+    """One Wikipedia hit in SearXNG's shape. A title that reads like an order drops the hit; a snippet that does
+    drops the snippet, and the link stays."""
+    if not isinstance(item, dict):
+        return None
+    name = str(item.get("title") or "")
+    title, snippet = _wiki_text(name, 120), _wiki_text(item.get("snippet"), 200)
+    if not title or word_checks.reads_like_orders(title):
+        return None
+    if snippet and word_checks.reads_like_orders(snippet):
+        snippet = ""
+    link = f"https://{WIKI_HOST}/wiki/" + urllib.parse.quote(name.replace(" ", "_"))
+    return {"title": title, "content": snippet, "url": link, "engine": "Wikipedia"}
+
+
+def search_wikipedia(question: str) -> str:
+    """One search of Wikipedia: the cleaned words go out, and only they. Nothing is kept."""
+    sent, told = clean_words(question)
+    query = urllib.parse.urlencode({"action": "query", "list": "search", "srsearch": sent,
+                                    "srlimit": str(MAX_RESULTS), "srprop": "snippet", "format": "json",
+                                    "formatversion": "2", "utf8": "1", "maxlag": "5"})
+    status, raw = wiki_get(f"{WIKI_API}?{query}")
+    if status != 200:
+        raise Offline("Wikipedia did not answer the search. Try again later.")
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        data = None
+    found = data.get("query") if isinstance(data, dict) else None
+    found = found.get("search") if isinstance(found, dict) else None
+    if not isinstance(found, list):
+        raise Offline("Wikipedia sent an answer Web search could not read. Try again later.")
+    rows = [r for r in map(_wiki_row, found[:MAX_RESULTS]) if r]
+    return "\n".join([ON_WIKIPEDIA, format_results({"results": rows}, "results", "Wikipedia"), *told])
 
 
 class WebSearch:
@@ -464,7 +591,7 @@ class WebSearch:
             raise ValueError("question is the words to search for")
         base = self._base()
         if base is None:
-            return NO_ADDRESS
+            return NO_NEWS if category == "news" else search_wikipedia(question)
         url, direct = base
         query = urllib.parse.urlencode({"q": question, "format": "json", "categories": category})
         status, raw = http_get(f"{url}/search?{query}", direct)
@@ -527,15 +654,17 @@ def _p(kind: str, text: str, **more) -> dict:
 
 
 TOOLS = [
-    ("web_search", "Search the web through the owner's own SearXNG and get the top 8 results: the title, a one-line "
-     "snippet, the address and the engine that found it. Good for news, prices, opening hours and anything that "
-     "changes.",
+    ("web_search", "Search Wikipedia, or the owner's own SearXNG if one is saved, and get the top results. With none "
+     "saved: Wikipedia only, not the whole web, top 5, private details taken out of the words first. With one saved: "
+     "the web through that SearXNG, top 8, never Wikipedia. Only the search words are sent.",
      {"question": _p("string", "The words to search for, at most 300 characters."),
       "category": _p("string", "general or news. Default general.", enum=list(CATEGORIES))}, ["question"]),
     ("news_search", "Search recent news through the owner's own SearXNG and get the top 8 stories: the title, a "
-     "one-line snippet, the address and the engine that found it.",
+     "one-line snippet, the address and the engine that found it. With no SearXNG saved it says it needs one: "
+     "Wikipedia has no news.",
      {"question": _p("string", "The news topic to search for, at most 300 characters.")}, ["question"]),
-    ("search_settings", "Which SearXNG address web search uses, and whether it answers right now.", {}, []),
+    ("search_settings", "What web search asks: Wikipedia, or the saved SearXNG address and whether it answers right "
+     "now.", {}, []),
     ("set_address", "Save the address of the owner's own SearXNG, like http://192.168.1.20:8888 or "
      "http://127.0.0.1:8888. Only an address on this computer or the home network is taken; a public SearXNG is "
      "refused. For an address off this computer, the bot raises a Yes card for that address and port.",
@@ -585,7 +714,7 @@ def mcp_answer(app: WebSearch, msg: dict) -> dict | None:
             return text(f"Those arguments did not fit {name}: arguments is an object", True)
         try:
             return text(getattr(app, name)(**args), False)
-        except (Unreadable, Offline, Refused) as exc:
+        except (Unreadable, Offline, Refused, SearchRefused) as exc:
             return text(str(exc), True)
         except (TypeError, ValueError) as exc:
             return text(f"Those arguments did not fit {name}: {exc}", True)
