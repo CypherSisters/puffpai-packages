@@ -17,11 +17,12 @@ Search the web through a SearXNG you run yourself: web results and news, the top
 
 - **A SearXNG you run**, with its JSON format turned on. That is the one setup step. SearXNG itself needs its own internet access to ask search engines; that is outside this package and outside the Bridge's view of this package.
 - **The Bridge.** `needs.hosts` is empty: this package never talks to the internet itself. A SearXNG on this computer is asked directly. A SearXNG on another computer at home is asked through the Bridge, which must allow that exact address and port for Web search; until it does, searches are refused and the tool says so.
+- **`needs.addresses` is `lan`.** When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.
 - No keys, no account, no brain.
 
 What a search sends: the words you asked, `format=json` and the category, to the address you set, with the User-Agent `PuffPAI web-search package`. Nothing else: no cookies, no language, nothing about who asked. Questions are never logged or stored by this package.
 
-**Setup steps.** One, a `confirm` step: "Run SearXNG and enable its JSON format" ([docs.searxng.org](https://docs.searxng.org/)). In SearXNG's settings, under `search:` `formats:`, add `json` next to `html`. Then tell the bot its address, and ask "is web search set up" to check it answers.
+**Setup steps.** One, a `confirm` step: "Run SearXNG and enable its JSON format" ([docs.searxng.org](https://docs.searxng.org/)). In SearXNG's settings, under `search:` `formats:`, add `json` next to `html`. Then tell the bot its address (off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page), and ask "is web search set up" to check it answers.
 
 **Data.** One file, `search.json`, in Web search's data folder (`PUFFPAI_DATA`): the SearXNG address and when it was saved. Search words and results are not stored. Every save replaces the whole file at once. A file that will not read is never written over. The address is checked again before every call, so a hand-edited file can't send searches somewhere else. On remove, the owner is asked whether to keep it.
 
@@ -34,11 +35,11 @@ What a search sends: the words you asked, `format=json` and the category, to the
 
 ## Rough edges
 
-- The Bridge allows a home-network address only as numbers and a port (like `192.168.1.20:8888`). A name like `searxng.lan` or `searxng.local`, and a link-local address, can be saved but can't be allowed on the Bridge, so searches to them are refused when the Bridge is on. Use the numbers, or run SearXNG on this computer.
+- A link-local address can be saved, but it can't be allowed on the Bridge, so searches to it are refused. Use a private address or a name like `searxng.lan`, or run SearXNG on this computer.
 - IPv6 home addresses (`fd00::/8` and the like) are not taken; only IPv4 home ranges, loopback and link-local.
 - If SearXNG's limiter is on, it may turn this computer away (error 429). Let this computer's address through it in SearXNG's own settings.
 - No image search, no safe-search or language choice, no time range, and no paging past the top 8. SearXNG's own defaults apply.
 - The tool says SearXNG's engines were quiet only when nothing came back. Partial answers from a few engines are shown as they are.
-- A name ending in `.local` or `.lan` is looked up on this computer before each call and refused if any address it gives is outside the home network. Outside the Bridge, the request itself looks the name up again, so a home DNS server that changes its answer in between is not stopped by this package.
+- A name ending in `.local` or `.lan` is looked up on this computer before each call and refused if any address it gives is outside the home network. Through the Bridge, the request carries the name as saved, and the Bridge checks the answers when it connects. Outside the Bridge, the request itself looks the name up again, so a home DNS server that changes its answer in between is not stopped by this package.
 
 Cypher Sisters. puff puff pass.

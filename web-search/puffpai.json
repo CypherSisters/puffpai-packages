@@ -22,7 +22,7 @@
       "web_search": "Search the web through the owner's own SearXNG and get the top 8 results: the title, a one-line snippet, the address and the engine that found it. Good for news, prices, opening hours and anything that changes.",
       "news_search": "Search recent news through the owner's own SearXNG and get the top 8 stories: the title, a one-line snippet, the address and the engine that found it.",
       "search_settings": "Which SearXNG address web search uses, and whether it answers right now.",
-      "set_address": "Save the address of the owner's own SearXNG, like http://192.168.1.20:8888 or http://127.0.0.1:8888. Only an address on this computer or the home network is taken; a public SearXNG is refused."
+      "set_address": "Save the address of the owner's own SearXNG, like http://192.168.1.20:8888 or http://127.0.0.1:8888. Only an address on this computer or the home network is taken; a public SearXNG is refused. For an address off this computer, the bot raises a Yes card for that address and port."
     },
     "examples": {
       "web_search": ["search the web for how to store fresh basil", "look up what time the hardware store on Main Street closes"],
@@ -35,6 +35,7 @@
   "needs": {
     "packages": [],
     "hosts": [],
+    "addresses": "lan",
     "keys": [],
     "hardware": { "ram_gb": 0.2 }
   },
@@ -42,7 +43,7 @@
   "setup_steps": [
     { "id": "searxng", "kind": "confirm",
       "title": "Run SearXNG and enable its JSON format",
-      "why": "Web search asks your own SearXNG. It needs SearXNG running on this computer or your home network, with the json format turned on (in SearXNG's settings, under search, formats, add json next to html).",
+      "why": "Web search asks your own SearXNG. It needs SearXNG running on this computer or your home network, with the json format turned on (in SearXNG's settings, under search, formats, add json next to html). Then tell the bot its address. If it is on another computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.",
       "get_it": "https://docs.searxng.org/" }
   ],
   "data": { "keep_on_remove": "ask" },

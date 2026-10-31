@@ -242,18 +242,83 @@ def http_get(url: str, direct: bool) -> tuple[int, bytes]:
         if isinstance(why, BaseException):
             why = type(why).__name__
         raise Offline(f"Could not reach your SearXNG ({_clean(why, 80)}). Is it running, and if it is on "
-                      "another computer, does the Bridge allow its address for Web search?") from None
+                      "another computer, does the Bridge allow this address and port for Web search?") from None
 
 
 def _status_words(code: int) -> str:
     if code == 403:
         return ("Your SearXNG (or the Bridge) answered 403, refused. Check that SearXNG has the json format "
-                "turned on, and, for a SearXNG on another computer, that the Bridge allows its address.")
+                "turned on, and, for a SearXNG on another computer, that the Bridge allows this address and port.")
     if code == 429:
         return "Your SearXNG answered 429, too many searches. Its limiter is on; let this computer through it."
     if code in (407, 502):
-        return f"The Bridge did not pass the search on (error {code}). Allow your SearXNG's address for Web search."
+        return f"The Bridge did not pass the search on (error {code}). Allow this address and port for Web search."
     return f"Your SearXNG answered with error {code}."
+
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+ASK_PATH = "/v1/bridge/addresses/ask"
+ASK_TIMEOUT_S = 5
+ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
+LINE_MOST = 300                    # the most of the Core's line it says back
+ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
+NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
+
+
+class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
+    """This package's token goes to the Core and nowhere else."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+#: Direct, never through the Bridge proxy: the Core is on this computer.
+_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+
+
+def _ask_core(place: str) -> tuple[str, str] | None:
+    """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
+    It grants nothing and never raises, so a failed ask never touches what was saved."""
+    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
+    token = os.environ.get("PUFFPAI_TOKEN", "").strip()
+    if not api or not token:
+        return None
+    try:
+        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                                              "Accept": "application/json"})
+        try:
+            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
+                code, raw = r.status, r.read(ASK_MOST + 1)
+        except urllib.error.HTTPError as exc:
+            with exc:
+                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        said = json.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
+        return None
+    state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
+    if not isinstance(state, str) or not isinstance(line, str):
+        return None
+    if code != ASK_STATUS.get(state) and not (state == "refused" and code >= 400):
+        return None
+    line = " ".join("".join(c if c.isprintable() else " " for c in line.replace(token, "[hidden]")).split())[:LINE_MOST]
+    return (state, line) if line else None
+
+
+def _card_words(host: str, port: int) -> str:
+    """What is true of this address now, after the save: the Core's line, and what it means."""
+    place = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    got = _ask_core(place)
+    if got is None:
+        return NO_CARD
+    state, line = got
+    if state == "allowed":
+        return f"{line} This package can reach {place} now, while the Bridge is open."
+    if state == "waiting":
+        if line.lower().startswith("waiting"):
+            return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
+        return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
+    return f"{line} No card was raised." if state == "refused" else line
 
 
 # ---------------------------------------------------------------- the store
@@ -415,8 +480,9 @@ class WebSearch:
             self.store.save(doc)
         if direct:
             return f"Saved. Web search will ask the SearXNG at {url}, on this computer."
-        return (f"Saved. Web search will ask the SearXNG at {url}. It is on your home network, so the Bridge "
-                "must allow that exact address and port for Web search before a search can get through.")
+        parts = urllib.parse.urlsplit(url)
+        words = _card_words(parts.hostname or "", parts.port or (443 if parts.scheme == "https" else 80))
+        return f"Saved. Web search will ask the SearXNG at {url}, through the Bridge. {words}"
 
 
 # --------------------------------------------------------------- MCP tools
@@ -437,7 +503,7 @@ TOOLS = [
     ("search_settings", "Which SearXNG address web search uses, and whether it answers right now.", {}, []),
     ("set_address", "Save the address of the owner's own SearXNG, like http://192.168.1.20:8888 or "
      "http://127.0.0.1:8888. Only an address on this computer or the home network is taken; a public SearXNG is "
-     "refused.",
+     "refused. For an address off this computer, the bot raises a Yes card for that address and port.",
      {"address": _p("string", "The SearXNG address, http or https, on this computer or the home network.")},
      ["address"]),
 ]
