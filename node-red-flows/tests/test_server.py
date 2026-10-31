@@ -423,7 +423,7 @@ def test_a_proxy_in_the_environment_is_not_used_for_the_ask(base, core, proxy):
 
 
 @pytest.mark.parametrize("reply, says", [
-    (ALLOWED, ["Allowed. The owner said Yes", "can reach 192.168.1.20:1880 now, while the Bridge is open"]),
+    (ALLOWED, ["Allowed. The owner said Yes", "The owner allowed 192.168.1.20:1880", "works while the Bridge is open and this package is on", "unless a block list stops it"]),
     (WAITING, ["Waiting for the owner's Yes", "A Yes card for 192.168.1.20:1880 is waiting", "until her Yes"]),
     (STALE, ["can't be used right now", "Nothing reaches 192.168.1.20:1880 for now"]),
     (REFUSED, ["too many addresses this hour", "No card was raised"]),
@@ -511,3 +511,104 @@ def test_a_refused_tunnel_says_to_allow_this_address_and_port(proxy):
     with pytest.raises(nr.Refused, match="allow this address and port") as got:
         nr.fetch("https://nodered.lan:8443", "GET", "/settings")
     assert "IP address" not in str(got.value) and ".local" not in str(got.value)
+
+
+@contextlib.contextmanager
+def a_dripping_core(monkeypatch, head_first):
+    """A Core that sends one byte at a time, each in good time, for 4 seconds: of its head, or of a long body."""
+    stop = threading.Event()
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+
+    def serve():
+        with contextlib.suppress(OSError):
+            c, _ = listener.accept()
+            with c:
+                c.recv(65536)
+                head = b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n"
+                if head_first:
+                    c.sendall(head)
+                for byte in (b"x" * 40 if head_first else head + b"x" * 40):
+                    if stop.wait(0.1):
+                        return
+                    c.sendall(bytes([byte]))
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{listener.getsockname()[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    try:
+        yield
+    finally:
+        stop.set()
+        listener.close()
+        thread.join(5)
+
+
+@pytest.mark.parametrize("head_first", [False, True])
+def test_a_slow_drip_does_not_hold_the_reply(base, monkeypatch, head_first):
+    url, data = base
+    monkeypatch.setattr(nr, "ASK_TIMEOUT_S", 1)
+    with a_dripping_core(monkeypatch, head_first):
+        started = time.monotonic()
+        text = tool(url, "set_address", address="192.168.1.20")
+    assert time.monotonic() - started < 2.5 and "No Yes card could be raised" in text
+    assert (data / "nodered.json").exists()
+
+
+@pytest.mark.parametrize("given", ["http://192.168.1.20:443", "https://192.168.1.20:80", "http://nodered.lan:443", "https://nodered.lan:80"])
+def test_a_port_that_can_not_work_with_its_scheme_is_refused_before_saving(base, core, names, given):
+    url, data = base
+    text = tool(url, "set_address", ok=False, address=given)
+    assert "Port 443 goes with https and port 80 with http" in text and "Nothing was saved" in text
+    assert not (data / "nodered.json").exists() and core["asks"] == []
+
+
+@pytest.mark.parametrize("given", ["http://127.0.0.1:443", "https://127.0.0.1:80", "http://localhost:443"])
+def test_those_ports_on_this_computer_are_fine(base, core, given):
+    url, data = base
+    assert "needs no Bridge step" in tool(url, "set_address", address=given)
+    assert (data / "nodered.json").exists() and core["asks"] == []
+
+
+def test_the_two_pairings_that_do_work_still_ask(base, core, names):
+    url, _ = base
+    tool(url, "set_address", address="https://nodered.lan:443")
+    tool(url, "set_address", address="http://nodered.lan:80")
+    assert [a["body"]["address"] for a in core["asks"]] == ["nodered.lan:443", "nodered.lan:80"]
+
+
+@pytest.mark.parametrize("given, place", [("http://[fd00::1]:1880", "[fd00::1]:1880"), ("http://[fc00::20]:1880", "[fc00::20]:1880"),
+                                          ("[fdff:ffff::1]", "[fdff:ffff::1]:1880")])
+def test_an_ipv6_home_address_is_taken_and_asked_for(base, core, given, place):
+    url, _ = base
+    assert tool(url, "set_address", address=given).startswith("Saved.")
+    one_ask(core, place)
+
+
+def test_an_ipv6_home_address_goes_through_the_proxy(proxy):
+    proxy["reply"] = (200, b"{}")
+    nr.fetch("http://[fd00::1]:1880", "GET", "/settings")
+    assert proxy["seen"][0][1] == "http://[fd00::1]:1880/settings"
+
+
+@pytest.mark.parametrize("given", ["http://[fbff::1]:1880", "http://[fe00::1]:1880", "http://[fec0::1]:1880",
+                                   "http://[2001:db8::1]:1880", "http://100.64.0.1:1880", "http://8.8.8.8:1880"])
+def test_nothing_else_widens(base, core, given):
+    url, data = base
+    tool(url, "set_address", ok=False, address=given)
+    assert not (data / "nodered.json").exists() and core["asks"] == []
+
+
+@pytest.mark.parametrize("answers, ok", [
+    (["fd00::20", "192.168.1.20"], True), (["fd00::20"], True), (["fe80::1%12", "fd00::20", "192.168.1.20"], True),
+    (["fd00::20", "93.184.216.34"], False), (["2606:4700:4700::1111", "fd00::20"], False), (["fec0::1"], False),
+])
+def test_a_home_name_may_answer_with_ipv6_home_addresses_but_never_a_public_one(base, core, monkeypatch, answers, ok):
+    url, data = base
+    real = nr.socket.getaddrinfo
+    monkeypatch.setattr(nr.socket, "getaddrinfo", lambda host, *a, **k: [(2, 1, 6, "", (x, 1880)) for x in answers]
+                        if host == "nodered.lan" else real(host, *a, **k))
+    text = tool(url, "set_address", ok=ok, address="http://nodered.lan:1880")
+    assert (data / "nodered.json").exists() is ok
+    assert ("outside your home network" in text) is (not ok)

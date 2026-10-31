@@ -10,8 +10,8 @@ Every route refuses a request without this package's PUFFPAI_TOKEN (D48d).
 
 It talks to one Node-RED only: the address the owner sets with ``set_address``
 (default ``http://127.0.0.1:1880``, this computer). That address must be on
-this computer or the home network: a loopback, private (RFC 1918) or
-link-local address, or a name ending in ``.local`` or ``.lan``. A name is
+this computer or the home network: a loopback, private (RFC 1918, fc00::/7)
+or link-local address, or a name ending in ``.local`` or ``.lan``. A name is
 looked up when it is saved. Off this computer, the request goes through the
 Bridge proxy when PuffPAI gives one, never around it, with the name as saved,
 and the Bridge checks the name's answers when it connects. With no proxy, a
@@ -46,8 +46,6 @@ import ssl
 import tempfile
 import threading
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -70,6 +68,7 @@ KEY_ENV = "NODE_RED_TOKEN"
 _LOOP4 = ipaddress.ip_network("127.0.0.0/8")
 _LAN4 = [ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16")]
 _LINK6 = ipaddress.ip_network("fe80::/10")
+_HOME6 = ipaddress.ip_network("fc00::/7")
 _LABEL = r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
 _NAME_RE = re.compile(rf"^(?=.{{1,253}}$){_LABEL}(?:\.{_LABEL})*$")
 _PATH_RE = re.compile(r"^(?:/[A-Za-z0-9._~-]+)*/?$")
@@ -132,7 +131,7 @@ def _ip_kind(ip) -> str | None:
         return "lan" if any(ip in n for n in _LAN4) else None
     if ip == ipaddress.IPv6Address("::1"):
         return "loopback"
-    return "lan" if ip in _LINK6 else None
+    return "lan" if ip in _LINK6 or ip in _HOME6 else None
 
 
 def host_kind(host: str) -> str | None:
@@ -173,7 +172,7 @@ def check_address(text) -> str:
         raise ValueError("The port is a number from 1 to 65535.")
     if host_kind(host) is None:
         raise ValueError("That address is not on this computer or your home network. Use 127.0.0.1, localhost, "
-                         "a home address (10.x, 172.16-31.x, 192.168.x, 169.254.x), or a name ending in .local "
+                         "a home address (10.x, 172.16-31.x, 192.168.x, fd00::1, 169.254.x), or a name ending in .local "
                          "or .lan.")
     shown = f"[{host}]" if ":" in host else host
     return f"{parts.scheme}://{shown}:{port}{(parts.path or '').rstrip('/')}"
@@ -301,7 +300,7 @@ def fetch(base: str, method: str, path: str, body: bytes | None = None,
 # ---------------------------------------------------------------- asking the Core for a Yes card (D110)
 
 ASK_PATH = "/v1/bridge/addresses/ask"
-ASK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 5                  # the whole ask: the connect and every read together
 ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
 LINE_MOST = 300                    # the most of the Core's line it says back
 ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
@@ -309,37 +308,50 @@ NO_CARD = "No Yes card could be raised right now. The owner can allow this addre
 ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
 
 
-class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
-    """This package's token goes to the Core and nowhere else."""
+class _DeadlineSocket(socket.socket):
+    """Each read gets only what is left of one deadline, so a slow drip can't hold the reply."""
+    deadline = 0.0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def recv_into(self, buffer, *args):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("the Core took too long")
+        self.settimeout(left)
+        return super().recv_into(buffer, *args)
 
 
-#: Direct, never through the Bridge proxy: the Core is on this computer.
-_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+class _AskConnection(http.client.HTTPConnection):
+    """One plain connection to the Core on this computer: never the Bridge proxy, and no redirect is followed."""
+
+    def connect(self):
+        deadline = time.monotonic() + ASK_TIMEOUT_S
+        plain = socket.create_connection((self.host, self.port), ASK_TIMEOUT_S)
+        self.sock = _DeadlineSocket(fileno=plain.detach())
+        self.sock.deadline = deadline
+        self.sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
 
 def _ask_core(place: str) -> tuple[str, str] | None:
     """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
     It grants nothing and never raises, so a failed ask never touches what was saved."""
-    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
     token = os.environ.get("PUFFPAI_TOKEN", "").strip()
-    if not api or not token:
-        return None
+    conn = None
     try:
-        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
-                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
-                                              "Accept": "application/json"})
-        try:
-            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
-                code, raw = r.status, r.read(ASK_MOST + 1)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        api = urlsplit(os.environ.get("PUFFPAI_API", "").strip())
+        if api.scheme != "http" or not api.hostname or not token:
+            return None
+        conn = _AskConnection(api.hostname, api.port or 80)
+        conn.request("POST", ASK_PATH, body=json.dumps({"address": place}).encode("utf-8"),
+                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                              "Accept": "application/json"})
+        resp = conn.getresponse()
+        code, raw = resp.status, resp.read(ASK_MOST + 1)
         said = json.loads(raw.decode("utf-8"))
     except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
         return None
+    finally:
+        if conn is not None:
+            conn.close()
     state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
     if not isinstance(state, str) or not isinstance(line, str):
         return None
@@ -357,12 +369,20 @@ def _card_words(host: str, port: int) -> str:
         return NO_CARD
     state, line = got
     if state == "allowed":
-        return f"{line} This package can reach {place} now, while the Bridge is open."
+        return f"{line} The owner allowed {place}, and it works while the Bridge is open and this package is on, unless a block list stops it."
     if state == "waiting":
         if line.lower().startswith("waiting"):
             return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
         return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
     return f"{line} No card was raised." if state == "refused" else line
+
+
+PORT_PAIR = "Port 443 goes with https and port 80 with http, so the Bridge can't allow this pairing. Nothing was saved."
+
+
+def _pair_refused(scheme: str, port: int) -> bool:
+    """The Bridge takes only https on port 443 and only http on port 80, so a Yes for the other way round never works."""
+    return (scheme, port) in (("http", 443), ("https", 80))
 
 
 # ---------------------------------------------------------------- the store
@@ -496,6 +516,8 @@ class NodeRed:
                 _vetted_ip(parts.hostname, parts.port or DEFAULT_PORT)   # the same check every call makes
             except Refused as exc:
                 raise Refused(f"{exc} Nothing was saved.") from None
+        if host_kind(parts.hostname or "") != "loopback" and _pair_refused(parts.scheme, parts.port or DEFAULT_PORT):
+            raise ValueError(PORT_PAIR)
         self.store.save(address)
         host, port = parts.hostname or "", parts.port or DEFAULT_PORT
         words = ON_THIS_COMPUTER if host_kind(host) == "loopback" else _card_words(host, port)

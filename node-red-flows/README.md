@@ -19,7 +19,7 @@ Ask the bot about the flows in your Node-RED: which ones you have, run one, turn
 
 **What it needs.** A Node-RED you run yourself, on this computer or your home network. Nothing from the internet, and no brain.
 
-- The address: `http://127.0.0.1:1880` (this computer) until you set another with `set_address`. It must be a loopback address, a home address (10.x, 172.16 to 172.31.x, 192.168.x), a link-local address (169.254.x, fe80::), `localhost`, or a name ending in `.local` or `.lan`. Port 1880 if none is given. Anything else is refused.
+- The address: `http://127.0.0.1:1880` (this computer) until you set another with `set_address`. It must be a loopback address, a home address (10.x, 172.16 to 172.31.x, 192.168.x, or IPv6 fc00::/7 like fd00::1), a link-local address (169.254.x, fe80::), `localhost`, or a name ending in `.local` or `.lan`. Port 1880 if none is given. Anything else is refused. Off this computer, port 443 goes with `https://` and port 80 with `http://`: the other way round is refused, because the Bridge could never let it through.
 - `needs.addresses` is `lan`. When you set an address off this computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page. An address on this computer needs no Bridge step. A link-local address can be saved, but it can't be allowed.
 - `NODE_RED_TOKEN`, only if your Node-RED admin API asks for a login (`adminAuth` in Node-RED's `settings.js`). PuffPAI keeps it in the vault and hands it over as an environment value at start. It is sent to the Node-RED admin API only, and never saved, logged or shown.
 
