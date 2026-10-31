@@ -19,7 +19,7 @@
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
     "changes": ["set_address", "block_domain", "unblock_domain", "protection", "pause_protection"],
     "tools": {
-      "set_address": "Save where the owner's AdGuard Home is, like http://192.168.1.2:3000. Only an address on this computer or the home network is taken. Without a port it tries 3000, then 80.",
+      "set_address": "Save where the owner's AdGuard Home is, like http://192.168.1.2:3000. Only an address on this computer or the home network is taken. Without a port it tries 3000, then 80. For an address off this computer, the bot raises a Yes card for that address and port.",
       "status": "AdGuard Home's state: protection on or off, DNS lookups and blocked lookups in its stats period, and how many filter lists and rules it has.",
       "top_blocked": "The most blocked domains and the busiest devices, from AdGuard Home's stats.",
       "query_log": "The latest DNS lookups from AdGuard Home's log: which device asked for which domain, and whether it was blocked. Optional filter by device address or name.",
@@ -45,6 +45,7 @@
   "needs": {
     "packages": [],
     "hosts": [],
+    "addresses": "lan",
     "keys": [
       { "name": "ADGUARD_USER", "why": "To read and change your AdGuard Home.", "get_it": "The login you set up in AdGuard Home." },
       { "name": "ADGUARD_PASSWORD", "why": "To read and change your AdGuard Home.", "get_it": "The login you set up in AdGuard Home." }
@@ -61,7 +62,7 @@
       "get_it": "The login you set up in AdGuard Home.", "key": "ADGUARD_PASSWORD" },
     { "id": "adguard-address", "kind": "confirm", "title": "Tell the bot where AdGuard Home is",
       "why": "The package talks only to the address you give it, on this computer or your home network.",
-      "text": "Say: set my AdGuard address to http://<its address>:<its port>. If AdGuard Home is on another computer, the Bridge must also allow that exact address and port for this package." }
+      "text": "Say: set my AdGuard address to http://<its address>:<its port>. If AdGuard Home is on another computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page." }
   ],
   "data": { "keep_on_remove": "ask" },
   "consent": "AdGuard Home talks only to the AdGuard Home at the address you set, on this computer or your home network, never the internet, signing in with your own AdGuard login from the vault, and keeps nothing but that address in its own data folder. Its answers, including which sites your household's devices looked up, go only to the brain on this computer."

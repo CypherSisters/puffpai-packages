@@ -24,16 +24,16 @@ It uses AdGuard Home's own API: `/control/status`, `/control/stats`, `/control/q
 
 **What it needs.**
 - Your AdGuard Home login, as two keys: `ADGUARD_USER` and `ADGUARD_PASSWORD` (`needs.keys`). They go into the vault and reach the package only as environment variables when it starts. The package sends them as HTTP Basic only to the saved address, and never writes them to disk or puts them in an answer.
-- No outside hosts (`needs.hosts` is empty) and no brain.
+- `needs.addresses` is `lan`: it may ask for a Yes card for an address on the home network. No internet hosts (`needs.hosts` is empty) and no brain.
 
 **Setup steps.**
 1. Enter your AdGuard Home user name (`enter_secret`, key `ADGUARD_USER`).
 2. Enter your AdGuard Home password (`enter_secret`, key `ADGUARD_PASSWORD`).
-3. Tell the bot where AdGuard Home is (`confirm`): say "set my AdGuard address to http://<its address>:<its port>". Only an `http` or `https` address on this computer or the home network is taken: a loopback, `10.x.x.x`, `172.16-31.x.x`, `192.168.x.x` or `169.254.x.x` address, `localhost`, or a name ending in `.local` or `.lan`. A name is looked up at every call, and every answer must be one of those addresses; the connection then goes to the address that was checked. If AdGuard Home is on another computer, the Bridge must also allow that exact address and port for this package.
+3. Tell the bot where AdGuard Home is (`confirm`): say "set my AdGuard address to http://<its address>:<its port>". Only an `http` or `https` address on this computer or the home network is taken: a loopback, `10.x.x.x`, `172.16-31.x.x`, `192.168.x.x` or `169.254.x.x` address, `localhost`, or a name ending in `.local` or `.lan`. A name is looked up at every call, and every answer must be one of those addresses. If AdGuard Home is on another computer, the bot raises a Yes card for that address and port, and the owner can also allow one herself on the Bridge page.
 
 **Data.** One file, `adguard.json`, in the package's data folder (`PUFFPAI_DATA`), holding only the address and when it was saved. Saves replace the whole file at once. A file that will not read is never written over. On remove, the Core asks whether to keep it.
 
-**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA`, `PUFFPAI_TOKEN` and the two keys set. It listens on 127.0.0.1 only, and every route (`/health`, `/mcp`) refuses a request without the package's token. Calls to AdGuard Home on this computer go straight to it; calls to one elsewhere on the home network go through the Bridge proxy whenever the Core has set one. It never follows a redirect, waits at most 8 seconds, and reads at most 2 MB of any answer.
+**How it runs.** The Core starts `{python} server.py --port {port}` with `PUFFPAI_PORT`, `PUFFPAI_DATA`, `PUFFPAI_TOKEN` and the two keys set. It listens on 127.0.0.1 only, and every route (`/health`, `/mcp`) refuses a request without the package's token. Calls to AdGuard Home on this computer go straight to it; calls to one elsewhere on the home network go through the Bridge proxy whenever the Core has set one, with the name as saved, and the Bridge checks the name's answers when it connects. It never follows a redirect, waits at most 8 seconds, and reads at most 2 MB of any answer.
 
 ## Harvested from HomeBot
 
@@ -42,7 +42,8 @@ HomeBot's zone 3 (`zone3_status`, `zone3_secure_device`, `zone3_enforce` and `sc
 ## Rough edges
 
 - It does not install or set up AdGuard Home. Finish AdGuard Home's first-run setup in a browser first; until then this package gets a redirect and stops.
-- An AdGuard Home on another computer works only once the Bridge allows that exact address and port for this package. The Bridge allows numeric addresses, so give a number (like 192.168.1.2), not a `.local` or `.lan` name, in that case.
+- An AdGuard Home on another computer works only after the owner's Yes for that exact address and port. A number (like 192.168.1.2) or a `.local` or `.lan` name can be allowed. A link-local address (169.254.x.x, fe80::) can be saved, but it can't be allowed.
+- With no port given, the tries at 3000 and 80 can't pass the Bridge before a Yes, so it saves 3000 and asks for 3000. If yours is on another port, give the port.
 - Addresses in other private ranges (100.64.x.x, IPv6 home addresses that start with fd) are refused, on purpose. So is an address with a path after it (AdGuard Home behind a web server at `/adguard`).
 - An `https` address must have a certificate this computer trusts for that name. AdGuard Home's self-made certificates are refused; use its `http` address on the home network instead.
 - AdGuard Home has one kind of login, with full control. There is no read-only login to give it.

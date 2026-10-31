@@ -12,9 +12,10 @@ Every route refuses a request without this package's PUFFPAI_TOKEN.
 It talks to one place only: the AdGuard Home at the address the owner saves with ``set_address``.
 That address must be on this computer or the home network: an http(s) URL whose host is a loopback,
 RFC 1918 or link-local address, ``localhost``, or a name ending in ``.local`` or ``.lan``. The name
-is looked up at every call and every answer must be such an address; the connection then goes to
-the address that was checked. An address on this computer is reached directly; any other one goes
-through the Bridge proxy when the Core has set one, so the Bridge decides. Redirects are refused.
+is looked up at every call and every answer must be such an address. An address on this computer
+is reached directly, at the address that was checked. Any other one goes through the Bridge proxy
+when the Core has set one, with the name as saved, so the Bridge decides and checks the answers when
+it connects. Redirects are refused.
 
 The login (ADGUARD_USER, ADGUARD_PASSWORD) comes from the environment only (the Core puts it there
 from the vault), is sent as HTTP Basic only to the saved address, and is never written to disk or
@@ -312,6 +313,84 @@ def adguard_call(base: str, user: str, password: str, method: str, path: str, bo
     except json.JSONDecodeError:
         raise Problem(f"{where} sent something that is not AdGuard Home data.") from None
 
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+ASK_PATH = "/v1/bridge/addresses/ask"
+ASK_TIMEOUT_S = 5
+ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
+LINE_MOST = 300                    # the most of the Core's line it says back
+ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
+NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
+ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
+
+
+class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
+    """This package's token goes to the Core and nowhere else."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+#: Direct, never through the Bridge proxy: the Core is on this computer.
+_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+
+
+def _ask_core(place: str) -> tuple[str, str] | None:
+    """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
+    It grants nothing and never raises, so a failed ask never touches what was saved."""
+    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
+    token = os.environ.get("PUFFPAI_TOKEN", "").strip()
+    if not api or not token:
+        return None
+    try:
+        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                                              "Accept": "application/json"})
+        try:
+            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
+                code, raw = r.status, r.read(ASK_MOST + 1)
+        except urllib.error.HTTPError as exc:
+            with exc:
+                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        said = json.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
+        return None
+    state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
+    if not isinstance(state, str) or not isinstance(line, str):
+        return None
+    if code != ASK_STATUS.get(state) and not (state == "refused" and code >= 400):
+        return None
+    line = " ".join("".join(c if c.isprintable() else " " for c in line.replace(token, "[hidden]")).split())[:LINE_MOST]
+    return (state, line) if line else None
+
+
+def _card_words(host: str, port: int) -> str:
+    """What is true of this address now, after the save: the Core's line, and what it means."""
+    place = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    got = _ask_core(place)
+    if got is None:
+        return NO_CARD
+    state, line = got
+    if state == "allowed":
+        return f"{line} This package can reach {place} now, while the Bridge is open."
+    if state == "waiting":
+        if line.lower().startswith("waiting"):
+            return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
+        return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
+    return f"{line} No card was raised." if state == "refused" else line
+
+
+def _this_computer(host: str, port: int) -> bool:
+    """The address reached directly, as :func:`_opener` picks it: no Bridge step, and no ask."""
+    try:
+        return ipaddress.ip_address(resolve_checked(host, port).split("%", 1)[0]).is_loopback
+    except Problem:
+        return False
+
+
+def _after_saving(host: str, port: int) -> str:
+    return ON_THIS_COMPUTER if _this_computer(host, port) else _card_words(host, port)
+
 
 # ---------------------------------------------------------------- the store
 
@@ -434,11 +513,12 @@ class AdGuard:
                 continue
             with self.store.lock:
                 self.store.save({"address": base})
-            return f"Saved. AdGuard Home {version or ''} answered at {base}.".replace("  ", " ")
+            said = f"Saved. AdGuard Home {version or ''} answered at {base}.".replace("  ", " ")
+            return f"{said} {_after_saving(host, p)}"
         base = base_url(scheme, host, tries[0])
         with self.store.lock:
             self.store.save({"address": base})
-        return f"Saved {base}. Not checked yet: {heard}"
+        return f"Saved {base}. Not checked yet: {heard} {_after_saving(host, tries[0])}"
 
     def status(self) -> str:
         """From zone3_status (rebot_tools.py:2286)."""
@@ -571,7 +651,7 @@ def _p(kind: str, text: str) -> dict:
 
 TOOLS = [
     ("set_address", "Save where the owner's AdGuard Home is, like http://192.168.1.2:3000. Only an address on this "
-     "computer or the home network is taken. Without a port it tries 3000, then 80.",
+     "computer or the home network is taken. Without a port it tries 3000, then 80. For an address off this computer, the bot raises a Yes card for that address and port.",
      {"address": _p("string", "The AdGuard Home web address.")}, ["address"]),
     ("status", "AdGuard Home's state: protection on or off, DNS lookups and blocked lookups in its stats period, "
      "and how many filter lists and rules it has.", {}, []),
