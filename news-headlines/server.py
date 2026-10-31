@@ -12,8 +12,9 @@ package needs no Node-RED: it reads the RSS and Atom feeds the owner adds, with
 ``xml.etree``, and gives back titles, sources, times and links. It ships with no
 feeds and fetches no article pages.
 
-The owner picks the feeds, so the package cannot list its hosts ahead of time;
-its ``needs.hosts`` is empty and each feed's host must be allowed on the Bridge.
+The owner picks the feeds, so the package cannot list its hosts ahead of time:
+``needs.hosts`` is empty, ``needs.addresses`` is ``internet``, and ``add_feed``
+asks the Core for a Yes card for each feed's site and port.
 Every fetch: http or https only, never a private, loopback or link-local address,
 at most 1 MB, at most 15 seconds, redirects only to the same host.
 
@@ -181,11 +182,12 @@ def fetch(url: str) -> bytes:
         with _OPENER.open(req, timeout=TIMEOUT_S) as r:
             raw = r.read(MAX_ANSWER + 1)
     except urllib.error.HTTPError as exc:
-        raise Offline(f"{parts.hostname} answered with error {exc.code}. If that is the Bridge, allow "
-                      f"{parts.hostname} for News headlines on the Bridge page.") from None
+        raise Offline(f"{parts.hostname} answered with error {exc.code}. If that is the Bridge, allow this address "
+                      "and port for News headlines on the Bridge page, or add this feed again to raise its "
+                      "Yes card.") from None
     except (urllib.error.URLError, OSError) as exc:
-        raise Offline(f"Could not reach {parts.hostname} ({getattr(exc, 'reason', exc)}). Is it allowed for "
-                      f"News headlines on the Bridge page?") from None
+        raise Offline(f"Could not reach {parts.hostname} ({getattr(exc, 'reason', exc)}). Is this address and port allowed "
+                      f"for News headlines on the Bridge page?") from None
     if len(raw) > MAX_ANSWER:
         raise Offline(f"{parts.hostname} sent more than 1 MB, so the feed was not read.")
     return raw
@@ -252,6 +254,73 @@ def parse_feed(raw: bytes) -> list[dict]:
                           "time": when.isoformat() if when else ""})
     items.sort(key=lambda i: (_when(i["time"]) or EPOCH).timestamp(), reverse=True)
     return items[:PER_FEED]
+
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+ASK_PATH = "/v1/bridge/addresses/ask"
+ASK_TIMEOUT_S = 5
+ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
+LINE_MOST = 300                    # the most of the Core's line it says back
+ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
+NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
+
+
+class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
+    """This package's token goes to the Core and nowhere else."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+#: Direct, never through the Bridge proxy: the Core is on this computer.
+_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+
+
+def _ask_core(place: str) -> tuple[str, str] | None:
+    """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
+    It grants nothing and never raises, so a failed ask never touches what was saved."""
+    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
+    token = os.environ.get("PUFFPAI_TOKEN", "").strip()
+    if not api or not token:
+        return None
+    try:
+        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                                              "Accept": "application/json"})
+        try:
+            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
+                code, raw = r.status, r.read(ASK_MOST + 1)
+        except urllib.error.HTTPError as exc:
+            with exc:
+                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        said = json.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
+        return None
+    state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
+    if not isinstance(state, str) or not isinstance(line, str):
+        return None
+    if code != ASK_STATUS.get(state) and not (state == "refused" and code >= 400):
+        return None
+    line = " ".join("".join(c if c.isprintable() else " " for c in line.replace(token, "[hidden]")).split())[:LINE_MOST]
+    return (state, line) if line else None
+
+
+def _card_words(host: str, port: int) -> str:
+    """What is true of this feed's site now, after the save: the Core's line, and what it means."""
+    place = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    got = _ask_core(place)
+    if got is None:
+        return NO_CARD
+    state, line = got
+    if state == "allowed":
+        return f"{line} News headlines can reach {place} now, while the Bridge is open."
+    if state == "waiting":
+        if line.lower().startswith("waiting"):
+            return (f"{line} A Yes card for {place} is waiting for the owner, and nothing reaches this site until her "
+                    "Yes. Only one card waits at a time: adding a feed from another site closes this card, and adding "
+                    "this feed again raises it again.")
+        return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
+    return f"{line} No card was raised." if state == "refused" else line
 
 
 # ---------------------------------------------------------------- the store
@@ -346,14 +415,17 @@ class News:
         parts = check_url(url)
         name = _text(name, "name", 60) or parts.hostname
         doc = self.store.load()
+        port = parts.port if parts.port is not None else (443 if parts.scheme == "https" else 80)
+        if any(f["url"].lower() == url.lower() for f in doc["feeds"]):
+            return (f"There is already a feed with that address, so the list did not change. Asked again for its "
+                    f"site. {_card_words(parts.hostname, port)}")
         if len(doc["feeds"]) >= MAX_FEEDS:
             return f"There are already {MAX_FEEDS} feeds. Remove one first."
         if self._find(doc["feeds"], url) or self._find(doc["feeds"], name):
             return f"There is already a feed called {name} or with that address. Nothing changed."
         doc["feeds"].append({"name": name, "url": url, "added": _now()})
         self.store.save(doc)
-        return (f"Saved the feed {name} ({url}). News headlines can only reach the hosts the owner allows, so "
-                f"before its headlines can load, allow {parts.hostname} for News headlines on the Bridge page.")
+        return f"Saved the feed {name} ({url}). {_card_words(parts.hostname, port)}"
 
     def remove_feed(self, feed: str) -> str:
         feed = _text(feed, "feed", 500)
@@ -367,7 +439,8 @@ class News:
         if cache.pop(found["url"], None) is not None:
             self.store.save_cache(cache)
         host = urllib.parse.urlsplit(found["url"]).hostname
-        return f"Removed the feed {found['name']}. You can also close {host} for News headlines on the Bridge page."
+        return (f"Removed the feed {found['name']}. If {host} was allowed, it stays allowed for News headlines until "
+                "the owner removes it on the Bridge page.")
 
     def list_feeds(self) -> str:
         feeds = self.store.load()["feeds"]
@@ -413,8 +486,8 @@ def _p(kind: str, text: str) -> dict:
 
 
 TOOLS = [
-    ("add_feed", "Add a news feed (an RSS or Atom address) with a short name. Its host must then be allowed on "
-     "the Bridge before its headlines load.",
+    ("add_feed", "Add a news feed (an RSS or Atom address) with a short name. The bot raises a Yes card for its "
+     "site and port, and its headlines load after the owner's Yes. Adding a feed already on the list asks again.",
      {"url": _p("string", "The feed address, starting with http:// or https://."),
       "name": _p("string", "A short name for the feed, like the paper or site. Default: its host.")}, ["url"]),
     ("remove_feed", "Remove a news feed by its name or address.",

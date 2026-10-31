@@ -5,9 +5,12 @@ calls are replaced; these tests never touch the internet. Each server listens on
 import contextlib
 import importlib.util
 import json
+import socket
 import threading
+import time
 import urllib.error
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import pytest
@@ -96,7 +99,7 @@ def tool(base, tool_name, /, error=False, **args):
 def test_add_list_remove(base, tmp_path, fetched):
     assert "No news feeds yet" in tool(base, "list_feeds")
     out = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
-    assert "allow paper.example.org for News headlines on the Bridge page" in out
+    assert "No Yes card could be raised" in out and "allow this address and port on the Bridge page" in out
     assert "already" in tool(base, "add_feed", url="https://paper.example.org/rss", name="Other")
     assert tool(base, "list_feeds") == "1 news feed:\n- Paper: https://paper.example.org/rss"
     saved = json.loads((tmp_path / "data" / "feeds.json").read_text(encoding="utf-8"))
@@ -162,3 +165,243 @@ def test_manifest_matches_the_live_tool_list(base):
     assert set(m["abilities"]["examples"]) == set(m["abilities"]["tools"])
     assert {t["name"] for t in tools if not t["annotations"]["readOnlyHint"]} == set(m["abilities"]["changes"])
     assert m["needs"]["hosts"] == []
+
+
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+CORE_TOKEN = "core-token-" + "c" * 20
+ASK = "/v1/bridge/addresses/ask"
+WAITING = (202, {"state": "waiting", "line": "Waiting for the owner's Yes. Nothing opens before that."})
+ALLOWED = (200, {"state": "allowed", "line": "Allowed. The owner said Yes to this address and port."})
+STALE = (202, {"state": "waiting", "line": "The owner's Yes for this address can't be used right now."})
+REFUSED = (429, {"state": "refused", "error": "Too many.", "line": "This package has asked for too many addresses this hour."})
+
+
+class FakeCore(BaseHTTPRequestHandler):
+    """The one Core route a package asks. It records each ask and answers what the test set."""
+    state: dict
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        raw = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        self.state["asks"].append({"path": self.path, "auth": self.headers.get("Authorization"),
+                                   "type": self.headers.get("Content-Type"), "body": json.loads(raw)})
+        code, reply = self.state["reply"]
+        out = reply if isinstance(reply, bytes) else json.dumps(reply).encode()
+        self.send_response(code)
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+
+class FakeProxy(BaseHTTPRequestHandler):
+    """Stands in for the Bridge proxy: it records what it is asked for, reaches nothing, and answers what the test set."""
+    state: dict
+
+    def log_message(self, *a):
+        pass
+
+    def _seen(self):
+        self.state["seen"].append((self.command, self.path, self.headers.get("Host") if self.command != "CONNECT" else None))
+        code, out = self.state["reply"]
+        self.send_response(code)
+        self.send_header("Content-Length", str(len(out)))
+        self.end_headers()
+        self.wfile.write(out)
+
+    do_GET = do_POST = do_CONNECT = _seen
+
+
+@pytest.fixture(autouse=True)
+def no_core(monkeypatch):
+    """No test reaches a running Core: a test that wants one starts its own fake."""
+    monkeypatch.delenv("PUFFPAI_API", raising=False)
+    monkeypatch.delenv("PUFFPAI_TOKEN", raising=False)
+
+
+@pytest.fixture
+def core(monkeypatch):
+    """A fake Core on a free loopback port, in this process's environment as the Core sets it: no /v1 in PUFFPAI_API."""
+    state = {"asks": [], "reply": WAITING}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), type("Core", (FakeCore,), {"state": state}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{server.server_address[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    yield state
+    server.shutdown()
+    server.server_close()
+    thread.join(5)
+
+
+@pytest.fixture
+def proxy(monkeypatch):
+    """A fake Bridge proxy in the environment. Nothing passes it, so no test dials a real address."""
+    state = {"seen": [], "reply": (403, b"")}
+    server = ThreadingHTTPServer(("127.0.0.1", 0), type("Proxy", (FakeProxy,), {"state": state}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://pkg:secret@127.0.0.1:{server.server_address[1]}"
+    monkeypatch.setenv("HTTP_PROXY", url)
+    monkeypatch.setenv("HTTPS_PROXY", url)
+    monkeypatch.delenv("NO_PROXY", raising=False)
+    yield state
+    server.shutdown()
+    server.server_close()
+    thread.join(5)
+
+
+def a_closed_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def one_ask(core, place):
+    """Exactly one ask, with the package's token, the right path with no doubled /v1, and this one host:port."""
+    assert core["asks"] == [{"path": ASK, "auth": f"Bearer {CORE_TOKEN}", "type": "application/json",
+                             "body": {"address": place}}]
+
+
+@pytest.mark.parametrize("url, place", [
+    ("https://Paper.Example.org/rss", "paper.example.org:443"),
+    ("http://paper.example.org/rss", "paper.example.org:80"),
+    ("https://paper.example.org:8443/rss", "paper.example.org:8443"),
+    ("http://paper.example.org:8080/rss", "paper.example.org:8080"),
+])
+def test_the_ask_carries_the_token_and_the_site_and_port(base, tmp_path, core, fetched, url, place):
+    assert tool(base, "add_feed", url=url, name="Paper").startswith(f"Saved the feed Paper ({url}).")
+    one_ask(core, place)
+    assert [f["url"] for f in json.loads((tmp_path / "data" / "feeds.json").read_text(encoding="utf-8"))["feeds"]] == [url]
+    assert fetched == []                                     # adding never fetches, and the ask is not a fetch
+
+
+def test_a_proxy_in_the_environment_is_not_used_for_the_ask(base, core, proxy):
+    tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    one_ask(core, "paper.example.org:443")
+    assert proxy["seen"] == []
+
+
+def test_adding_a_feed_again_asks_again_and_says_so(base, tmp_path, core, fetched):
+    tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    tool(base, "add_feed", url="https://blog.example.net/atom", name="Blog")
+    assert [a["body"]["address"] for a in core["asks"]] == ["paper.example.org:443", "blog.example.net:443"]
+    core["asks"].clear()
+    out = tool(base, "add_feed", url="https://PAPER.example.org/rss", name="Other")
+    assert "already a feed with that address" in out and "Asked again" in out and "A Yes card for paper.example.org:443" in out
+    one_ask(core, "paper.example.org:443")
+    feeds = json.loads((tmp_path / "data" / "feeds.json").read_text(encoding="utf-8"))["feeds"]
+    assert [f["name"] for f in feeds] == ["Paper", "Blog"] and fetched == []
+
+
+def test_a_name_already_used_for_another_address_asks_nothing(base, core):
+    tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    core["asks"].clear()
+    assert "already a feed called Paper" in tool(base, "add_feed", url="https://other.example.org/rss", name="Paper")
+    assert core["asks"] == []
+
+
+def test_a_feed_can_ask_again_when_the_list_is_full(base, tmp_path, core):
+    store = ns.Store(tmp_path / "data")
+    store.save({"feeds": [{"name": f"n{i}", "url": f"https://s{i}.example.org/rss"} for i in range(ns.MAX_FEEDS)]})
+    assert "Asked again" in tool(base, "add_feed", url="https://s3.example.org/rss")
+    one_ask(core, "s3.example.org:443")
+    core["asks"].clear()
+    assert "Remove one first" in tool(base, "add_feed", url="https://new.example.org/rss")
+    assert core["asks"] == []
+
+
+@pytest.mark.parametrize("reply, says", [
+    (ALLOWED, ["Allowed. The owner said Yes", "can reach paper.example.org:443 now, while the Bridge is open"]),
+    (WAITING, ["Waiting for the owner's Yes", "A Yes card for paper.example.org:443 is waiting", "until her Yes",
+               "Only one card waits at a time", "adding this feed again raises it again"]),
+    (STALE, ["can't be used right now", "Nothing reaches paper.example.org:443 for now"]),
+    (REFUSED, ["too many addresses this hour", "No card was raised"]),
+])
+def test_each_reply_gives_true_words_and_the_feed_stays_saved(base, tmp_path, core, reply, says):
+    core["reply"] = reply
+    text = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert text.startswith("Saved the feed Paper") and all(w in text for w in says), text
+    assert (reply is not STALE) or "Yes card" not in text        # no card is said where the Core raised none
+    assert (tmp_path / "data" / "feeds.json").exists()
+
+
+@pytest.mark.parametrize("reply", [
+    (200, b"not json"), (500, b"<html>oops</html>"), (401, {"error": "no"}), (200, {"state": "granted", "line": "yes"}),
+    (500, {"state": "allowed", "line": "yes"}), (200, {"state": ["allowed"], "line": "yes"}), (202, {"state": "waiting", "line": ""}),
+])
+def test_a_reply_that_does_not_parse_says_saved_and_no_card(base, tmp_path, core, reply):
+    core["reply"] = reply
+    text = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert text.startswith("Saved the feed") and "No Yes card could be raised" in text and "Bridge page" in text
+    assert (tmp_path / "data" / "feeds.json").exists()
+
+
+def test_the_cores_line_is_capped_and_never_says_the_token(base, core):
+    core["reply"] = (202, {"state": "waiting", "line": f"Waiting {CORE_TOKEN}\n" + "x" * 5000})
+    text = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert CORE_TOKEN not in text and "\n" not in text and "x" * 300 not in text
+
+
+def test_no_api_no_token_or_the_core_down_says_saved_promptly(base, tmp_path, monkeypatch):
+    for i, (api, token) in enumerate(((None, CORE_TOKEN), ("http://127.0.0.1:9", None),
+                                      (f"http://127.0.0.1:{a_closed_port()}", CORE_TOKEN))):
+        for name, value in (("PUFFPAI_API", api), ("PUFFPAI_TOKEN", token)):
+            monkeypatch.delenv(name, raising=False) if value is None else monkeypatch.setenv(name, value)
+        started = time.monotonic()
+        text = tool(base, "add_feed", url=f"https://s{i}.example.org/rss", name=f"Feed {i}")
+        assert time.monotonic() - started < 6 and text.startswith(f"Saved the feed Feed {i}")
+        assert "No Yes card could be raised" in text and CORE_TOKEN not in text
+    assert len(json.loads((tmp_path / "data" / "feeds.json").read_text(encoding="utf-8"))["feeds"]) == 3
+
+
+def test_a_core_that_never_answers_does_not_hold_the_reply(base, monkeypatch):
+    monkeypatch.setattr(ns, "ASK_TIMEOUT_S", 0.3)
+    with socket.socket() as quiet:
+        quiet.bind(("127.0.0.1", 0))
+        quiet.listen(1)
+        monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{quiet.getsockname()[1]}")
+        monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+        started = time.monotonic()
+        text = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert time.monotonic() - started < 3 and "No Yes card could be raised" in text
+
+
+def test_a_refused_address_asks_nothing(base, core):
+    assert "did not fit add_feed" in tool(base, "add_feed", error=True, url="http://router.lan/rss", name="x")
+    assert core["asks"] == []
+
+
+def test_removing_a_feed_says_the_site_stays_allowed(base, core):
+    tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    core["asks"].clear()
+    out = tool(base, "remove_feed", feed="Paper")
+    assert "paper.example.org was allowed, it stays allowed" in out and "removes it on the Bridge page" in out
+    assert core["asks"] == []
+
+
+def test_the_manifest_declares_internet():
+    m = json.loads((PKG / "puffpai.json").read_text(encoding="utf-8"))
+    assert m["needs"]["addresses"] == "internet" and m["needs"]["hosts"] == []
+    assert "its own Yes" in m["description"] and "on the internet" in m["description"]
+    assert "its own Yes" in m["consent"] and "on the internet" in m["consent"]
+
+
+@pytest.mark.parametrize("url, sent", [
+    ("http://paper.example.org:8080/rss", ("GET", "http://paper.example.org:8080/rss", "paper.example.org:8080")),
+    ("https://paper.example.org/rss", ("CONNECT", "paper.example.org:443", None)),
+])
+def test_the_proxy_is_asked_for_the_name_and_the_answers_are_still_checked(proxy, monkeypatch, url, sent):
+    monkeypatch.setattr(ns, "_resolve", lambda host, port: ["93.184.216.34"])
+    monkeypatch.setattr(ns, "_OPENER", urllib.request.build_opener(ns._SameHost()))       # a real start: reads the environment
+    proxy["reply"] = (200, b"<rss/>")
+    with contextlib.suppress(ns.Offline):
+        ns.fetch(url)
+    assert proxy["seen"] and proxy["seen"][0] == sent
+    monkeypatch.setattr(ns, "_resolve", lambda host, port: ["10.0.0.7"])
+    proxy["seen"].clear()
+    with pytest.raises(ns.Offline, match="private address"):
+        ns.fetch(url)
+    assert proxy["seen"] == []
