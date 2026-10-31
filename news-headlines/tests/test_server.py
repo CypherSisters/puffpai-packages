@@ -314,9 +314,9 @@ def test_a_feed_can_ask_again_when_the_list_is_full(base, tmp_path, core):
 
 
 @pytest.mark.parametrize("reply, says", [
-    (ALLOWED, ["Allowed. The owner said Yes", "can reach paper.example.org:443 now, while the Bridge is open"]),
+    (ALLOWED, ["Allowed. The owner said Yes", "The owner allowed paper.example.org:443", "works while the Bridge is open and this package is on", "unless a block list stops it"]),
     (WAITING, ["Waiting for the owner's Yes", "A Yes card for paper.example.org:443 is waiting", "until her Yes",
-               "Only one card waits at a time", "adding this feed again raises it again"]),
+               "Only one card waits at a time", "adding this feed again asks again"]),
     (STALE, ["can't be used right now", "Nothing reaches paper.example.org:443 for now"]),
     (REFUSED, ["too many addresses this hour", "No card was raised"]),
 ])
@@ -405,3 +405,91 @@ def test_the_proxy_is_asked_for_the_name_and_the_answers_are_still_checked(proxy
     with pytest.raises(ns.Offline, match="private address"):
         ns.fetch(url)
     assert proxy["seen"] == []
+
+
+@contextlib.contextmanager
+def a_dripping_core(monkeypatch, head_first):
+    """A Core that sends one byte at a time, each in good time, for 4 seconds: of its head, or of a long body."""
+    stop = threading.Event()
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+
+    def serve():
+        with contextlib.suppress(OSError):
+            c, _ = listener.accept()
+            with c:
+                c.recv(65536)
+                head = b"HTTP/1.1 200 OK\r\nContent-Length: 9000\r\n\r\n"
+                if head_first:
+                    c.sendall(head)
+                for byte in (b"x" * 40 if head_first else head + b"x" * 40):
+                    if stop.wait(0.1):
+                        return
+                    c.sendall(bytes([byte]))
+    thread = threading.Thread(target=serve, daemon=True)
+    thread.start()
+    monkeypatch.setenv("PUFFPAI_API", f"http://127.0.0.1:{listener.getsockname()[1]}")
+    monkeypatch.setenv("PUFFPAI_TOKEN", CORE_TOKEN)
+    try:
+        yield
+    finally:
+        stop.set()
+        listener.close()
+        thread.join(5)
+
+
+@pytest.mark.parametrize("head_first", [False, True])
+def test_a_slow_drip_does_not_hold_the_reply(base, tmp_path, monkeypatch, head_first):
+    monkeypatch.setattr(ns, "ASK_TIMEOUT_S", 1)
+    with a_dripping_core(monkeypatch, head_first):
+        started = time.monotonic()
+        text = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert time.monotonic() - started < 2.5 and "No Yes card could be raised" in text
+    assert (tmp_path / "data" / "feeds.json").exists()
+
+
+@pytest.mark.parametrize("url", ["http://paper.example.org:443/rss", "https://paper.example.org:80/rss"])
+def test_a_port_that_can_not_work_with_its_scheme_is_refused_before_saving(base, tmp_path, core, url):
+    text = tool(base, "add_feed", error=True, url=url, name="Paper")
+    assert "Port 443 goes with https and port 80 with http" in text and "Nothing was saved" in text
+    assert not (tmp_path / "data" / "feeds.json").exists() and core["asks"] == []
+
+
+def test_the_two_pairings_that_do_work_still_ask(base, core):
+    tool(base, "add_feed", url="https://paper.example.org:443/rss", name="A")
+    tool(base, "add_feed", url="http://paper.example.org:80/rss", name="B")
+    assert [a["body"]["address"] for a in core["asks"]] == ["paper.example.org:443", "paper.example.org:80"]
+
+
+@pytest.mark.parametrize("url", ["https://www.example.org./feed", "http://router.lan./rss", "http://localhost./rss",
+                                 "https://www.example.org.:8443/feed", "https://www.example.org../feed"])
+def test_a_host_ending_in_a_dot_is_refused_so_the_asked_and_the_dialled_place_are_one(base, tmp_path, core, url):
+    text = tool(base, "add_feed", error=True, url=url, name="Dotted")
+    assert "did not fit add_feed" in text
+    assert not (tmp_path / "data" / "feeds.json").exists() and core["asks"] == []
+
+
+def test_a_saved_host_ending_in_a_dot_is_not_fetched(proxy):
+    with pytest.raises(ns.Offline, match="dot"):
+        ns.fetch("https://www.example.org./feed")
+    assert proxy["seen"] == []
+
+
+@pytest.mark.parametrize("reply", [(429, {"state": "refused", "line": "The owner said No to this address and port."}), WAITING])
+def test_adding_again_never_promises_a_card(base, core, reply):
+    core["reply"] = WAITING
+    first = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert "raises it again" not in first and "adding this feed again asks again" in first
+    assert "the reply will say what happened" in first and "can close this card" in first
+    core["reply"] = reply
+    again = tool(base, "add_feed", url="https://paper.example.org/rss", name="Paper")
+    assert "Asked again" in again and "raises it again" not in again
+    assert ("No card was raised" in again) is (reply is not WAITING)
+
+
+def test_the_words_outside_the_reply_do_not_promise_a_card():
+    readme = (PKG / "README.md").read_text(encoding="utf-8")
+    source = (PKG / "server.py").read_text(encoding="utf-8")
+    assert "raise its card again" not in readme and "raises it again" not in source and "raise its Yes card" not in source
+    assert "asks again" in readme and "the reply says what happened" in readme

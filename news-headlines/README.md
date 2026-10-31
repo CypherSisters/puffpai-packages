@@ -30,7 +30,7 @@ On remove, the owner is asked whether to keep them.
 
 Every fetch goes through the Bridge (the Core's proxy) and:
 
-- takes only `http://` and `https://` addresses, with no user name or password in them;
+- takes only `http://` and `https://` addresses, with no user name or password in them and no dot at the end of the host name; port 443 goes with `https://` and port 80 with `http://`, and the other way round is refused when the feed is added;
 - refuses a private, loopback, link-local or other non-public address, written as a number or reached through a name (the name is looked up first), and names like `localhost` or `something.local`;
 - waits at most 15 seconds and reads at most 1 MB;
 - follows a redirect only to the same host;
@@ -42,7 +42,7 @@ HomeBot's `auto_news_summary` asked a Node-RED flow for the day's news, and that
 
 ## Rough edges
 
-- Only one Yes card waits at a time for this package. Adding three feeds from three sites in a row leaves only the last card, and the others wait with no card: add each of those feeds again, one at a time, to raise its card again. Five new cards an hour at most, and a site the owner said No to is not raised again for an hour.
+- Only one Yes card waits at a time for this package. Adding three feeds from three sites in a row leaves only the last card, and the others wait with no card: add each of those feeds again, one at a time. That asks again, and the reply says what happened: five new cards an hour at most, and a site the owner said No to is not raised again for an hour.
 - The Yes is for one name and one port. A feed at `http://` (port 80) that sends you on to `https://` (port 443) is refused at the Bridge until the `https://` address has its own Yes: add the feed with its `https://` address. A feed whose site moves to another host (a redirect) is not followed; add it again with its new address.
 - A site stays allowed after its feed is removed, until the owner removes it on the Bridge page.
 - No article text. A `read_item` tool (fetch an article and return its readable words) was left out: the article's site is usually not the feed's host, so it would need yet another Yes per site, and turning any web page into safe readable text is not something this package can promise yet.

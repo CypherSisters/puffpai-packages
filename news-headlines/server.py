@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import hmac
 import html
+import http.client
 import ipaddress
 import json
 import math
@@ -38,6 +39,7 @@ import re
 import socket
 import tempfile
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -127,6 +129,8 @@ def check_url(url: str) -> urllib.parse.SplitResult:
         raise ValueError("that feed address has no host name")
     if parts.username or parts.password:
         raise ValueError("a feed address may not carry a user name or password")
+    if host.endswith("."):
+        raise ValueError("a feed address has no dot at the end of its host name; write it without the dot")
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
@@ -183,8 +187,8 @@ def fetch(url: str) -> bytes:
             raw = r.read(MAX_ANSWER + 1)
     except urllib.error.HTTPError as exc:
         raise Offline(f"{parts.hostname} answered with error {exc.code}. If that is the Bridge, allow this address "
-                      "and port for News headlines on the Bridge page, or add this feed again to raise its "
-                      "Yes card.") from None
+                      "and port for News headlines on the Bridge page, or add this feed again to ask "
+                      "again.") from None
     except (urllib.error.URLError, OSError) as exc:
         raise Offline(f"Could not reach {parts.hostname} ({getattr(exc, 'reason', exc)}). Is this address and port allowed "
                       f"for News headlines on the Bridge page?") from None
@@ -258,44 +262,57 @@ def parse_feed(raw: bytes) -> list[dict]:
 # ---------------------------------------------------------------- asking the Core for a Yes card (D110)
 
 ASK_PATH = "/v1/bridge/addresses/ask"
-ASK_TIMEOUT_S = 5
+ASK_TIMEOUT_S = 5                  # the whole ask: the connect and every read together
 ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
 LINE_MOST = 300                    # the most of the Core's line it says back
 ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
 NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
 
 
-class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
-    """This package's token goes to the Core and nowhere else."""
+class _DeadlineSocket(socket.socket):
+    """Each read gets only what is left of one deadline, so a slow drip can't hold the reply."""
+    deadline = 0.0
 
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
+    def recv_into(self, buffer, *args):
+        left = self.deadline - time.monotonic()
+        if left <= 0:
+            raise TimeoutError("the Core took too long")
+        self.settimeout(left)
+        return super().recv_into(buffer, *args)
 
 
-#: Direct, never through the Bridge proxy: the Core is on this computer.
-_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+class _AskConnection(http.client.HTTPConnection):
+    """One plain connection to the Core on this computer: never the Bridge proxy, and no redirect is followed."""
+
+    def connect(self):
+        deadline = time.monotonic() + ASK_TIMEOUT_S
+        plain = socket.create_connection((self.host, self.port), ASK_TIMEOUT_S)
+        self.sock = _DeadlineSocket(fileno=plain.detach())
+        self.sock.deadline = deadline
+        self.sock.settimeout(max(deadline - time.monotonic(), 0.001))
 
 
 def _ask_core(place: str) -> tuple[str, str] | None:
     """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
     It grants nothing and never raises, so a failed ask never touches what was saved."""
-    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
     token = os.environ.get("PUFFPAI_TOKEN", "").strip()
-    if not api or not token:
-        return None
+    conn = None
     try:
-        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
-                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
-                                              "Accept": "application/json"})
-        try:
-            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
-                code, raw = r.status, r.read(ASK_MOST + 1)
-        except urllib.error.HTTPError as exc:
-            with exc:
-                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        api = urllib.parse.urlsplit(os.environ.get("PUFFPAI_API", "").strip())
+        if api.scheme != "http" or not api.hostname or not token:
+            return None
+        conn = _AskConnection(api.hostname, api.port or 80)
+        conn.request("POST", ASK_PATH, body=json.dumps({"address": place}).encode("utf-8"),
+                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                              "Accept": "application/json"})
+        resp = conn.getresponse()
+        code, raw = resp.status, resp.read(ASK_MOST + 1)
         said = json.loads(raw.decode("utf-8"))
     except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
         return None
+    finally:
+        if conn is not None:
+            conn.close()
     state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
     if not isinstance(state, str) or not isinstance(line, str):
         return None
@@ -313,14 +330,22 @@ def _card_words(host: str, port: int) -> str:
         return NO_CARD
     state, line = got
     if state == "allowed":
-        return f"{line} News headlines can reach {place} now, while the Bridge is open."
+        return f"{line} The owner allowed {place}, and it works while the Bridge is open and this package is on, unless a block list stops it."
     if state == "waiting":
         if line.lower().startswith("waiting"):
             return (f"{line} A Yes card for {place} is waiting for the owner, and nothing reaches this site until her "
-                    "Yes. Only one card waits at a time: adding a feed from another site closes this card, and adding "
-                    "this feed again raises it again.")
+                    "Yes. Only one card waits at a time: adding a feed from another site can close this card, and adding "
+                    "this feed again asks again, and the reply will say what happened.")
         return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
     return f"{line} No card was raised." if state == "refused" else line
+
+
+PORT_PAIR = "Port 443 goes with https and port 80 with http, so the Bridge can't allow this pairing. Nothing was saved."
+
+
+def _pair_refused(scheme: str, port: int) -> bool:
+    """The Bridge takes only https on port 443 and only http on port 80, so a Yes for the other way round never works."""
+    return (scheme, port) in (("http", 443), ("https", 80))
 
 
 # ---------------------------------------------------------------- the store
@@ -416,6 +441,8 @@ class News:
         name = _text(name, "name", 60) or parts.hostname
         doc = self.store.load()
         port = parts.port if parts.port is not None else (443 if parts.scheme == "https" else 80)
+        if _pair_refused(parts.scheme, port):
+            raise ValueError(PORT_PAIR)
         if any(f["url"].lower() == url.lower() for f in doc["feeds"]):
             return (f"There is already a feed with that address, so the list did not change. Asked again for its "
                     f"site. {_card_words(parts.hostname, port)}")
