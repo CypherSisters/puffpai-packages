@@ -12,9 +12,11 @@ It talks to one Node-RED only: the address the owner sets with ``set_address``
 (default ``http://127.0.0.1:1880``, this computer). That address must be on
 this computer or the home network: a loopback, private (RFC 1918) or
 link-local address, or a name ending in ``.local`` or ``.lan``. A name is
-looked up at each request and every answer must be such an address; the
-connection goes to the address that was checked. Off this computer, the
-request goes through the Bridge proxy when PuffPAI gives one, never around it.
+looked up when it is saved. Off this computer, the request goes through the
+Bridge proxy when PuffPAI gives one, never around it, with the name as saved,
+and the Bridge checks the name's answers when it connects. With no proxy, a
+name is looked up at each request, every answer must be such an address, and
+the connection goes to the address that was checked.
 Every request has a 10 second limit, follows no redirect, and reads at most
 1 MB of answer.
 
@@ -44,6 +46,8 @@ import ssl
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -285,14 +289,80 @@ def fetch(base: str, method: str, path: str, body: bytes | None = None,
         raise Refused(f"Nothing answered at {base}. Is Node-RED running?") from None
     except OSError as exc:
         if proxy and "Tunnel connection failed" in str(exc):
-            raise Refused("The Bridge did not let this through. A Node-RED on another computer needs its IP address "
-                          "allowed for this package on the Bridge page; .local and .lan names do not pass it.") from None
+            raise Refused("The Bridge did not let this through. A Node-RED on another computer needs the owner's Yes: "
+                          "allow this address and port for this package.") from None
         raise Refused(f"Node-RED at {base} could not be reached ({type(exc).__name__}).") from None
     except http.client.HTTPException as exc:
         raise Refused(f"Node-RED at {base} gave an answer this package could not read ({type(exc).__name__}).") \
             from None
     finally:
         conn.close()
+
+# ---------------------------------------------------------------- asking the Core for a Yes card (D110)
+
+ASK_PATH = "/v1/bridge/addresses/ask"
+ASK_TIMEOUT_S = 5
+ASK_MOST = 16 * 1024               # the most it reads of the Core's reply
+LINE_MOST = 300                    # the most of the Core's line it says back
+ASK_STATUS = {"allowed": 200, "not_needed": 200, "waiting": 202}
+NO_CARD = "No Yes card could be raised right now. The owner can allow this address and port on the Bridge page."
+ON_THIS_COMPUTER = "It is on this computer, so it needs no Bridge step."
+
+
+class _NoAskRedirect(urllib.request.HTTPRedirectHandler):
+    """This package's token goes to the Core and nowhere else."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+#: Direct, never through the Bridge proxy: the Core is on this computer.
+_ASK_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoAskRedirect())
+
+
+def _ask_core(place: str) -> tuple[str, str] | None:
+    """Ask the Core for a Yes card for one ``host:port``: ``(state, its line)``, or None when no answer could be had.
+    It grants nothing and never raises, so a failed ask never touches what was saved."""
+    api = os.environ.get("PUFFPAI_API", "").strip().rstrip("/")
+    token = os.environ.get("PUFFPAI_TOKEN", "").strip()
+    if not api or not token:
+        return None
+    try:
+        req = urllib.request.Request(api + ASK_PATH, data=json.dumps({"address": place}).encode("utf-8"), method="POST",
+                                     headers={"Authorization": "Bearer " + token, "Content-Type": "application/json",
+                                              "Accept": "application/json"})
+        try:
+            with _ASK_OPENER.open(req, timeout=ASK_TIMEOUT_S) as r:
+                code, raw = r.status, r.read(ASK_MOST + 1)
+        except urllib.error.HTTPError as exc:
+            with exc:
+                code, raw = exc.code, exc.read(ASK_MOST + 1)
+        said = json.loads(raw.decode("utf-8"))
+    except Exception:  # noqa: BLE001 - no Core, no answer or no sense: the same plain words, and the save stands
+        return None
+    state, line = (said.get("state"), said.get("line")) if isinstance(said, dict) else (None, None)
+    if not isinstance(state, str) or not isinstance(line, str):
+        return None
+    if code != ASK_STATUS.get(state) and not (state == "refused" and code >= 400):
+        return None
+    line = " ".join("".join(c if c.isprintable() else " " for c in line.replace(token, "[hidden]")).split())[:LINE_MOST]
+    return (state, line) if line else None
+
+
+def _card_words(host: str, port: int) -> str:
+    """What is true of this address now, after the save: the Core's line, and what it means."""
+    place = f"[{host}]:{port}" if ":" in host else f"{host}:{port}"
+    got = _ask_core(place)
+    if got is None:
+        return NO_CARD
+    state, line = got
+    if state == "allowed":
+        return f"{line} This package can reach {place} now, while the Bridge is open."
+    if state == "waiting":
+        if line.lower().startswith("waiting"):
+            return f"{line} A Yes card for {place} is waiting for the owner. Nothing reaches it until her Yes."
+        return f"{line} Nothing reaches {place} for now."       # the Core's "waiting" with no card: its line says why
+    return f"{line} No card was raised." if state == "refused" else line
 
 
 # ---------------------------------------------------------------- the store
@@ -370,8 +440,8 @@ class NodeRed:
         status, _, answer, proxied = fetch(base, method, urlsplit(base).path + path, raw, headers)
         if proxied and status in (403, 407, 502):
             raise Refused(f"Refused on the way to {base} (HTTP {status}). Either the Bridge has not allowed this "
-                          "address for this package (allow its IP address on the Bridge page; .local and .lan "
-                          f"names do not pass it), or Node-RED did not take {KEY_ENV}.")
+                          "address and port for this package (allow them on the Bridge page), "
+                          f"or Node-RED did not take {KEY_ENV}.")
         if status in (401, 403):
             raise Refused(f"Node-RED at {base} asked for a login. " + (
                 f"It did not take {KEY_ENV}." if secret else
@@ -427,7 +497,9 @@ class NodeRed:
             except Refused as exc:
                 raise Refused(f"{exc} Nothing was saved.") from None
         self.store.save(address)
-        return f"Saved. The Node-RED address is now {address}. Ask for node_red_status to check it answers."
+        host, port = parts.hostname or "", parts.port or DEFAULT_PORT
+        words = ON_THIS_COMPUTER if host_kind(host) == "loopback" else _card_words(host, port)
+        return f"Saved. The Node-RED address is now {address}. {words} Ask for node_red_status to check it answers."
 
     def node_red_status(self) -> str:
         base = self.address()
@@ -556,7 +628,7 @@ TOOLS = [
      {"flow": _p("string", "The flow's name or id, as list_flows shows.")}, ["flow"]),
     ("node_red_status", "Say whether Node-RED is running at the saved address, and its version.", {}, []),
     ("set_address", "Save the address of your Node-RED (on this computer or your home network), like "
-     "http://192.168.1.20:1880. Port 1880 if none is given.",
+     "http://192.168.1.20:1880. Port 1880 if none is given. For an address off this computer, the bot raises a Yes card for that address and port.",
      {"address": _p("string", "The Node-RED address, like http://127.0.0.1:1880 or nodered.local.")}, ["address"]),
 ]
 CHANGES = ["run_flow", "enable_flow", "disable_flow", "set_address"]

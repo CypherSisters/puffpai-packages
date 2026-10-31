@@ -24,7 +24,7 @@
       "enable_flow": "Turn one Node-RED flow on, by its name or id.",
       "disable_flow": "Turn one Node-RED flow off, by its name or id.",
       "node_red_status": "Say whether Node-RED is running at the saved address, and its version.",
-      "set_address": "Save the address of your Node-RED (on this computer or your home network), like http://192.168.1.20:1880. Port 1880 if none is given."
+      "set_address": "Save the address of your Node-RED (on this computer or your home network), like http://192.168.1.20:1880. Port 1880 if none is given. For an address off this computer, the bot raises a Yes card for that address and port."
     },
     "examples": {
       "list_flows": ["which Node-RED flows do I have", "list my Node-RED flows"],
@@ -39,6 +39,7 @@
   "needs": {
     "packages": [],
     "hosts": [],
+    "addresses": "lan",
     "keys": [
       { "name": "NODE_RED_TOKEN", "why": "only if your Node-RED admin API asks for a login", "get_it": "Node-RED settings.js adminAuth" }
     ],
