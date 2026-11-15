@@ -3,7 +3,7 @@
   "id": "notes",
   "kind": "app",
   "name": "Notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A plain notebook kept on this computer, one Markdown file per note, so your notes are files you can open and take anywhere. Pin notes, sort them into notebooks and tags, search them, and tick checklist lines on the page. The bot can find, read and add to your notes, like adding milk to the shopping note, with no internet. Export gives a zip of the files; import takes a zip or a file of Markdown notes from another tool. It does not sync between computers, does not encrypt, and has no reminders.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

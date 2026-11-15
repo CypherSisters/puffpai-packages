@@ -228,6 +228,56 @@ def test_name_finding_exact_partial_several_none(base, data):
     assert {n: text_of(data, n) for n in files(data)} == before
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for t in ("Pesto Park", "Sliders Lane", "Berry Clinic", "Joseph Day", "José Alvarez", "Café Luna", "Café", "Cafè"):
+        tool(base, "add_note", title=t, body="about it")
+    before = {n: text_of(data, n) for n in files(data)}
+    # an accented letter is never a gap, so the pieces of a word find nothing else
+    for typed in ("crêpes", "müsli", "über", "Renée"):
+        assert f"no note matches {typed!r}" in tool_error(base, "remove_note", note=typed)
+    err = tool_error(base, "remove_note", note="Jose")                              # never just Joseph Day
+    assert "more than one note has a title with 'Jose': José Alvarez; Joseph Day" in err
+    assert "more than one note is called 'cafe'" in tool_error(base, "remove_note", note="cafe")
+    assert {n: text_of(data, n) for n in files(data)} == before
+    # two titles that differ only in accents get two files; neither is written over
+    assert len(files(data)) == 8 and {"caf.md", "caf-2.md"} <= set(files(data))
+    # a title kept with accents is found typed with them or without them
+    assert tool(base, "read_note", note="Café").startswith("Café (")                    # exact
+    assert tool(base, "read_note", note="jose alvarez").startswith("José Alvarez (")
+    assert "Deleted the note 'Café Luna'" in tool(base, "remove_note", note="CAFE LUNA")
+    tool(base, "add_note", title="Shopping", body="- [ ] crème fraîche\n- [ ] eggs")
+    assert tool(base, "tick_item", note="Shopping", item="creme") == "Ticked 'crème fraîche' in 'Shopping'."
+    assert "Café Luna" not in tool(base, "find_notes", words="cafe") and "Cafè" in tool(base, "find_notes", words="cafe")
+
+
+def test_a_note_is_found_by_whole_words_or_their_start_never_by_letters_inside_a_word(base, data):
+    for t in ("Hubert Bay", "Sliders Lane", "Café Luna", "To do"):
+        tool(base, "add_note", title=t, body="Kept for later.")
+    before = {n: text_of(data, n) for n in files(data)}
+    # letters inside a word, single letters (plain or accented) and two-letter words never find a note
+    for typed in ("über", "uber", "bërt", "bert", "İ", "i", "ç", "c", "ub", "do", "e l"):
+        assert f"no note matches {typed!r}" in tool_error(base, "remove_note", note=typed), typed
+        assert f"no note matches {typed!r}" in tool_error(base, "change_note", note=typed, pinned=True), typed
+        assert f"no note matches {typed!r}" in tool_error(base, "add_to_note", note=typed, text="x"), typed
+    assert {n: text_of(data, n) for n in files(data)} == before
+    # an exact title wins, short words and all, with or without accents, case or "the"
+    assert tool(base, "read_note", note="to do").startswith("To do (")
+    assert tool(base, "add_to_note", note="the cafe luna", text="Tuesday") == "Added to 'Café Luna': Tuesday."
+    # a word of 3 letters or more that starts a word of one title: that note
+    assert tool(base, "change_note", note="hub", pinned=True).startswith("Changed the note 'Hubert Bay'")
+    tool(base, "add_note", title="Hubert's list", body="- [ ] milk\n- [ ] ice\n- [ ] rice cakes")
+    before = {n: text_of(data, n) for n in files(data)}
+    err = tool_error(base, "remove_note", note="hub")                                   # several
+    assert "more than one note has a title with 'hub': Hubert Bay; Hubert's list" in err and "nothing was changed" in err
+    # a checklist item the same way: never letters inside a word, never one or two letters
+    for typed in ("i", "ce", "akes", "ç"):
+        assert "no item in" in tool_error(base, "tick_item", note="Hubert's list", item=typed), typed
+    assert {n: text_of(data, n) for n in files(data)} == before
+    assert tool(base, "tick_item", note="Hubert's list", item="ice") == "Ticked 'ice' in \"Hubert's list\"."
+    assert tool(base, "tick_item", note="Hubert's list", item="ric") == "Ticked 'rice cakes' in \"Hubert's list\"."
+    assert "Deleted the note 'Hubert Bay'" in tool(base, "remove_note", note="hubert bay")
+
+
 # ------------------------------------------------------------------ files by hand, unreadable files
 
 def test_files_copied_in_by_hand_show_up_and_bad_ones_are_never_written(base, data):
@@ -651,3 +701,12 @@ def test_a_request_without_the_token_is_never_drained_for_long(base, path):
     got, took = raw_answer(base, head)                                           # nothing sent at all
     assert got.startswith((b"HTTP/1.0 401", b"HTTP/1.1 401")) and took < 3, (got[:40], took)
     assert call(base + "/health")[0] == 200
+
+
+def test_a_note_is_deleted_by_its_title_only_never_by_words_in_its_text(base, data):
+    tool(base, "add_note", title="Shopping", body="Buy rhubarb and milk.")
+    before = {n: text_of(data, n) for n in files(data)}
+    assert "no note matches 'rhubarb'" in tool_error(base, "remove_note", note="rhubarb")
+    assert {n: text_of(data, n) for n in files(data)} == before
+    assert tool(base, "read_note", note="rhubarb").startswith("Shopping (")      # reading may go by the text
+    assert "Shopping" in tool(base, "remove_note", note="shopping")

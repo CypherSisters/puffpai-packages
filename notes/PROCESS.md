@@ -14,18 +14,17 @@
 
 ## Finding a note by its title (every tool that takes a note)
 
-1. The same id or title, in any case.
+1. The same id or title, in any case, with or without accents ("cafe luna" finds "Café Luna").
 2. The same title once words like "the", "my" and "note" are left out ("the shopping note" finds "Shopping").
-3. One title that holds the words.
-4. One title that has every word.
-5. One note whose title, tags or text has every word.
-6. At any step, more than one: nothing changes, and the answer lists them. None at all: nothing changes, and the answer lists the newest notes.
+3. One title where every word said of 3 letters or more is a whole word or the start of one, never letters inside a word ("hub" finds "Hubert Bay"; "ub", "i" or "über" find nothing). Shorter words count only in a whole title.
+4. One note whose title, tags or text has every word of 3 letters or more as a whole word. Deleting a note never uses this step: a note is deleted by its title only.
+5. At any step, more than one: nothing changes, and the answer lists them. None at all: nothing changes, and the answer lists the newest notes.
 
 ## Checklists
 
 1. A line that starts with `- [ ]` is a tick box; `- [x]` is a ticked one. Spaces before the dash are kept.
 2. On the page, ticking a box changes that one line in the file. If the line changed since the page read it, nothing changes and the page reads the note again.
-3. `tick_item` finds the item by its words: the same words first, then one item that holds them, then one that has every word. Several or none: nothing changes, and the answer lists the items.
+3. `tick_item` finds the item by its words: the same words first (case and accents ignored), then one item where every word of 3 letters or more is a whole word or the start of one, never letters inside a word. Several or none: nothing changes, and the answer lists the items.
 4. `add_to_note` adds a new tick box when the note already has tick boxes, and a plain line otherwise, unless told which.
 
 ## Search

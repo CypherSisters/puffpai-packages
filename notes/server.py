@@ -27,6 +27,7 @@ Copyright (c) 2026 Cypher Sisters. Apache-2.0 License.
 from __future__ import annotations
 
 import argparse
+import functools
 import hashlib
 import hmac
 import io
@@ -39,6 +40,7 @@ import stat
 import tempfile
 import threading
 import time
+import unicodedata
 import zipfile
 import zlib
 from datetime import datetime
@@ -49,7 +51,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "notes"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 FOLDER = "notes"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 2 * 1024 * 1024              # page changes and MCP calls
@@ -203,8 +205,41 @@ def _loads(text):
         raise ValueError("that is not UTF-8 text") from None
 
 
+WORD_RE = re.compile(r"[^\W_]+")                     # letters and digits of any script: what str.isalnum takes
+
+
+@functools.lru_cache(maxsize=65536)
+def _fold_word(word: str) -> tuple[str, ...]:
+    """One word that is not plain ASCII, lower case with its accents folded away (é is e, İ is i)."""
+    text = "".join(c for c in unicodedata.normalize("NFKD", word) if not unicodedata.combining(c))
+    return tuple(WORD_RE.findall(text.casefold()))
+
+
 def _words(text) -> list[str]:
-    return re.findall(r"[^\W_]+", str(text or "").lower())
+    """Lower-case words with accents folded (é is e), so 'Jose' finds 'José'; anything that is not a letter or
+    digit separates them. Each word that is not plain ASCII is folded once and kept, so long text stays quick."""
+    text = str(text or "")
+    if text.isascii():
+        return WORD_RE.findall(text.lower())
+    out: list[str] = []
+    for w in WORD_RE.findall(unicodedata.normalize("NFC", text)):
+        if w.isascii():
+            out.append(w.lower())
+        else:
+            out.extend(_fold_word(w))
+    return out
+
+
+def _bare(text) -> str:
+    """A whole title or item for comparing: folded words, a leading 'the' dropped."""
+    words = _words(text)
+    return " ".join(words[1:] if len(words) > 1 and words[0] == "the" else words)
+
+
+def _starts(given: list[str], text) -> bool:
+    """Each word given is a whole word of *text* or the start of one; never letters inside a word."""
+    have = _words(text)
+    return bool(given) and all(any(h.startswith(w) for h in have) for w in given)
 
 
 def safe_name(name: str) -> str:
@@ -361,6 +396,7 @@ class Notes:
         self.told: set[str] = set()             # ... already said on the page, so each is said once
         self.sig = None
         self.version = 0
+        self._hays: dict[str, tuple] = {}       # note id -> (its title, tags and text, their folded words)
 
     # ------------------------------------------------------------ the index
     def _signature(self):
@@ -500,9 +536,25 @@ class Notes:
             return self.notes[note["id"]]
 
     # ------------------------------------------------------------ finding
-    def find(self, ident, what: str = "note") -> dict:
-        """A note by its id or title (exact first, then one partial), then by words in it. Several or none:
-        ValueError with the candidates, and nothing changes."""
+    def _hay(self, n: dict) -> list[str]:
+        """The folded words of a note's title, tags and text. Text that is not plain ASCII is folded once for each
+        version of the note and kept as one string, so a search stays quick."""
+        if n["body"].isascii() and n["title"].isascii() and all(t.isascii() for t in n["tags"]):
+            return _words(n["title"] + " " + " ".join(n["tags"]) + " " + n["body"])
+        parts = (n["title"], tuple(n["tags"]), n["body"])
+        got = self._hays.get(n["id"])
+        if got is None or got[0][0] != parts[0] or got[0][1] != parts[1] or got[0][2] is not parts[2]:
+            got = (parts, " ".join(_words(n["title"] + " " + " ".join(n["tags"]) + " " + n["body"])))
+            if len(self._hays) >= MAX_NOTES:
+                self._hays.clear()
+            self._hays[n["id"]] = got
+        return got[1].split()
+
+    def find(self, ident, what: str = "note", by_text: bool = True) -> dict:
+        """A note by its id or its whole title (case, accents and words like 'the' or 'note' ignored), else the one
+        title where every word of 3 letters or more is a whole word or the start of one, else the one note holding
+        every such word. Never letters inside a word; shorter words only count in a whole title. Several or none:
+        ValueError with the candidates, and nothing changes. With by_text False (deleting) only the title counts."""
         text = _text(ident, what, 200)
         if not text:
             raise ValueError(f"say which {what}, by its title")
@@ -510,22 +562,20 @@ class Notes:
         low = text.lower()
         words = [w for w in _words(low) if w not in FILLER] or _words(low)
         bare = " ".join(words)
+        given = [w for w in words if len(w) >= 3]
 
         def pick(hits, how):
             if len(hits) == 1:
                 return hits[0]
             if len(hits) > 1:
                 raise ValueError(f"more than one note {how} {text!r}: " + "; ".join(n["title"] for n in hits[:12])
-                                 + ". Say which one.")
+                                 + ". Say which one; nothing was changed.")
             return None
 
         for test, how in ((lambda n: n["id"] == text or n["title"].lower() == low, "is called"),
-                          (lambda n: " ".join(_words(n["title"])) == bare, "is called"),
-                          (lambda n: low in n["title"].lower() or (bare and bare in " ".join(_words(n["title"]))),
-                           "has a title with"),
-                          (lambda n: words and all(w in _words(n["title"]) for w in words), "has a title with"),
-                          (lambda n: words and all(w in _words(n["title"] + " " + " ".join(n["tags"]) + " " + n["body"])
-                                                   for w in words), "holds")):
+                          (lambda n: bare and bare in (" ".join(_words(n["title"])), _bare(n["title"])), "is called"),
+                          (lambda n: _starts(given, n["title"]), "has a title with"),
+                          (lambda n: by_text and given and set(given) <= set(self._hay(n)), "holds")):
             got = pick([n for n in rows if test(n)], how)
             if got:
                 return got
@@ -553,7 +603,7 @@ class Notes:
         want = _words(words_t)
         for n in rows:
             if want:
-                hay = _words(n["title"] + " " + " ".join(n["tags"]) + " " + n["body"])
+                hay = self._hay(n)
                 if not all(any(h.startswith(w) for h in hay) for w in want):
                     continue
                 line = next((ln.strip() for ln in n["body"].split("\n")
@@ -645,9 +695,10 @@ class Notes:
             boxes = [(i, m) for i, ln in enumerate(lines) if (m := _check(ln))]
             if not boxes:
                 raise ValueError(f"the note {n['title']!r} has no checklist; lines that start with - [ ] are its items")
+            given = [w for w in _words(want) if len(w) >= 3]          # never letters inside a word
             hits = [b for b in boxes if b[1][2].strip().lower() == want] or \
-                [b for b in boxes if want in b[1][2].lower()] or \
-                [b for b in boxes if all(w in _words(b[1][2]) for w in _words(want))]
+                [b for b in boxes if _bare(want) and _bare(b[1][2]) == _bare(want)] or \
+                [b for b in boxes if _starts(given, b[1][2])]
             if len(hits) != 1:
                 names = "; ".join(b[1][2] for b in (hits or boxes)[:20])
                 raise ValueError((f"more than one item in {n['title']!r} matches {item!r}: " if hits else
@@ -692,7 +743,7 @@ class Notes:
 
     def remove_note(self, note=None) -> str:
         with self.lock:
-            n = self.find(note)
+            n = self.find(note, by_text=False)       # a delete goes by the title only, never by words in the text
             path = self.dir / n["file"]
             try:                                     # read it first: remove only the note that was found
                 now, _ = parse_note(read_file(path)[0], n["file"][:-3], "")
