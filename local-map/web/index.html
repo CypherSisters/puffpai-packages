@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<!-- Local Map page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local Map</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-bad:var(--red,#d9534f);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+@media (prefers-color-scheme:dark){:root{
+--p-bg:var(--bg,#14181d);--p-card:var(--card,#1d232a);--p-line:var(--line,#323b46);--p-text:var(--text,#e6ebf0);
+--p-text2:var(--text2,#9aa6b4);--p-chip:var(--chip,#262e37)}}
+html{font-size:15px}
+body{margin:0;font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);padding:12px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.4rem;margin:0 0 6px;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;margin:14px 0 6px}
+p{margin:6px 0}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+input,select{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:7px 8px;min-height:42px}
+input[type=number]{width:110px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:42px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button:disabled{opacity:.5;cursor:default}
+label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-text2)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:8px}
+.note{color:var(--p-text2);font-size:.85rem}
+#msg{min-height:1.4em;color:var(--p-text2)}
+#msg.bad,.bad{color:var(--p-bad)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+#map{height:68vh;min-height:360px;border:1px solid var(--p-line);background:var(--p-chip)}
+.list{max-height:68vh;overflow:auto;padding:0}
+.pt{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-bottom:1px solid var(--p-line);cursor:pointer;min-height:44px}
+.pt:hover{background:var(--p-chip)}
+.pt .t{flex:1;min-width:0}
+.pt .n{font-weight:600;overflow-wrap:anywhere}
+.pt .s{color:var(--p-text2);font-size:.82rem;overflow-wrap:anywhere}
+.mk{display:flex;align-items:center;justify-content:center;width:24px;height:24px;font:700 11px/1 var(--font-body);color:#fff;border:2px solid #fff;box-shadow:0 0 0 1px #0006}
+.mk.mine{border-color:#000;outline:2px solid #fff}
+.mk.home{background:#111;width:28px;height:28px}
+.picks{display:flex;gap:6px;flex-wrap:wrap}
+.picks label{flex-direction:row;align-items:center;gap:6px;border:1px solid var(--p-line);padding:6px 10px;min-height:42px;color:var(--p-text);font-size:.95rem}
+.picks input{min-height:auto}
+.bar{height:12px;background:var(--p-chip);border:1px solid var(--p-line);margin-top:6px}
+.bar div{height:100%;width:0;background:var(--p-accent)}
+.credit{font-size:.8rem;color:var(--p-text2);margin-top:6px}
+.leaflet-container{font:inherit;background:var(--p-chip)}
+.leaflet-bar a,.leaflet-control-attribution{border-radius:0!important}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{border-radius:0;background:var(--p-card);color:var(--p-text)}
+details summary{cursor:pointer;min-height:36px;display:flex;align-items:center}
+</style>
+</head>
+<body>
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M6 12l16-6 20 6 16-6v46l-16 6-20-6-16 6z" fill="none" stroke="currentColor" stroke-width="4" stroke-linejoin="round"/><path d="M22 6v46M42 12v46" stroke="currentColor" stroke-width="4"/></svg>Local Map</h1>
+<div id="msg" role="status"></div>
+<p id="notice" class="bad" role="status"></p>
+
+<div class="layout">
+<div>
+  <div id="map" aria-label="Map"></div>
+  <div class="credit">Map data (c) OpenStreetMap contributors, openstreetmap.org/copyright (Open Database License). Street map tiles from the Protomaps project. Town list from GeoNames, geonames.org (CC BY 4.0). Distances are straight-line, not by road.</div>
+  <div class="row">
+    <button id="homeTap">Tap the map to set home</button>
+    <label>Home latitude<input id="h_lat" type="number" step="any"></label>
+    <label>Home longitude<input id="h_lon" type="number" step="any"></label>
+    <button id="homeSave">Set home</button>
+  </div>
+  <p id="homeNote" class="note"></p>
+</div>
+<div>
+  <div class="card list" id="listCard">
+    <div class="row" style="padding:8px 10px;margin:0">
+      <label style="flex:1">Show<select id="filter"><option value="">Every kind</option></select></label>
+    </div>
+    <div id="list"></div>
+  </div>
+</div>
+</div>
+
+<h2>Your own points</h2>
+<div class="card">
+  <p class="note">Meeting places, water, a neighbor who can help. They stay when the region is downloaded again.</p>
+  <form id="mineForm" class="row">
+    <label>Name<input id="m_name" maxlength="80" required></label>
+    <label>Kind<select id="m_kind"></select></label>
+    <label>Latitude<input id="m_lat" type="number" step="any" required></label>
+    <label>Longitude<input id="m_lon" type="number" step="any" required></label>
+    <label>Note<input id="m_note" maxlength="300" placeholder="optional"></label>
+    <button type="button" id="mineTap">Tap the map</button>
+    <button class="primary" type="submit" id="mineSave">Add</button>
+    <button type="button" id="mineCancel" hidden>Cancel</button>
+  </form>
+</div>
+
+<h2 id="pickTitle">Choose your region</h2>
+<div class="card">
+  <p id="explain">Local Map keeps a street map of one area you choose, and a list of emergency places there (fire stations, hospitals, pharmacies, shelters, drinking water and more), in its own folder on this computer. Nothing leaves this computer until you press Check size (which reads only the map file's index) or Download. Then, one time, it contacts three hosts: build-metadata.protomaps.dev is asked only for the list of map builds; build.protomaps.com sends the street map, so it can tell which map area was fetched; overpass-api.de receives the corner coordinates of the area, rounded outward to a 0.05 degree grid, and sends the emergency places. All three see this computer's internet address. Nothing else about you is sent: not home, not your own points. Searching for a town below happens on this computer only. After the download, the map works with no internet.</p>
+  <div class="row">
+    <label style="flex:1;min-width:200px">Town<input id="q" placeholder="Type a town name" autocomplete="off"></label>
+    <select id="hits" aria-label="Towns found" hidden></select>
+  </div>
+  <div class="row">
+    <label>Latitude<input id="r_lat" type="number" step="any"></label>
+    <label>Longitude<input id="r_lon" type="number" step="any"></label>
+    <label>Radius<input id="r_rad" type="number" step="any" min="0.5" max="50" value="10"></label>
+    <label>Unit<select id="r_unit"><option value="km">km</option><option value="miles">miles</option></select></label>
+  </div>
+  <div class="row picks" id="details">
+    <label><input type="radio" name="detail" value="small"> Small (streets to zoom 12)</label>
+    <label><input type="radio" name="detail" value="standard" checked> Standard (zoom 14)</label>
+    <label><input type="radio" name="detail" value="detailed"> Detailed (zoom 15)</label>
+  </div>
+  <div class="row">
+    <button id="preview">Show the area</button>
+    <button id="check">Check size</button>
+    <button class="primary" id="download">Download</button>
+    <button id="cancel" hidden>Cancel</button>
+  </div>
+  <p id="boxInfo" class="note"></p>
+  <p id="jobInfo"></p>
+  <div class="bar" id="bar" hidden><div></div></div>
+  <details><summary>Size limit</summary>
+    <div class="row"><label>Largest download, MB<input id="cap" type="number" min="5" max="5000" step="1"></label><button id="capSave">Save</button></div>
+  </details>
+</div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/protomaps-leaflet.js"></script>
+<script>
+// Paths are relative, so the page works through the Core, which adds this app's token.
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+const MARK={'Fire station':['F','#c0392b'],'Police':['P','#1f4e9c'],'Hospital':['H','#c2185b'],'Clinic or urgent care':['C','#e65100'],
+ 'Doctor':['D','#6a1b9a'],'Pharmacy':['Rx','#00796b'],'Public health office':['PH','#37474f'],'Shelter':['S','#5d4037'],
+ 'Food bank or meals':['Fd','#558b2f'],'Drinking water':['W','#0277bd'],'Fuel':['G','#424242'],'Community center':['CC','#00838f'],
+ 'Town hall':['T','#4e342e'],'Assembly point':['A','#9e6a00'],'Defibrillator':['AED','#b71c1c'],'Siren':['Si','#ad1457'],
+ 'Ambulance station':['Am','#d84315'],'Meeting place':['M','#2e7d32'],'Water':['W','#01579b'],'Neighbor who can help':['N','#4527a0'],
+ 'Supplies':['Su','#6d4c41'],'Medical':['+','#c62828'],'Other':['?','#455a64']};
+let st=null,stamp='',map=null,base=null,layer=null,boxRect=null,homeMark=null,editing=null,tapFor='',shownRegion='';
+
+function dark(){const c=getComputedStyle(document.body).backgroundColor.match(/\d+/g);
+  if(!c)return matchMedia('(prefers-color-scheme: dark)').matches;
+  const [r,g,b]=c.map(Number);return (0.2126*r+0.7152*g+0.0722*b)<110}
+
+async function post(path,body){
+  const r=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+  const out=await r.json().catch(()=>({error:'Local Map sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Local Map could not do that.');return out}
+async function get(path){const r=await fetch(path);const out=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(out.error||'Local Map could not answer.');return out}
+
+function icon(kind,cls){const m=MARK[kind]||['?','#455a64'];
+  return L.divIcon({className:'',html:`<div class="mk ${cls||''}" style="background:${m[1]}">${esc(m[0])}</div>`,iconSize:[24,24],iconAnchor:[12,12]})}
+
+function setupMap(){
+  map=L.map('map',{zoomControl:true,attributionControl:true,maxZoom:18,worldCopyJump:false}).setView([20,0],2);
+  map.attributionControl.setPrefix(false);
+  map.attributionControl.addAttribution('(c) OpenStreetMap, openstreetmap.org/copyright');
+  layer=L.layerGroup().addTo(map);
+  map.on('click',e=>{const lat=+e.latlng.lat.toFixed(6),lon=+e.latlng.lng.toFixed(6);
+    if(tapFor==='home'){tapFor='';$('homeTap').textContent='Tap the map to set home';
+      post('api/home',{latitude:lat,longitude:lon}).then(o=>{say(o.text);pull(true)}).catch(err=>say(err.message,true))}
+    else if(tapFor==='mine'){tapFor='';$('mineTap').textContent='Tap the map';$('m_lat').value=lat;$('m_lon').value=lon}
+    else if(!st||!st.region){$('r_lat').value=lat;$('r_lon').value=lon}})}
+
+function drawBase(){const r=st.region,key=r?JSON.stringify([r.box,r.max_zoom,r.fetched_on]):'';
+  if(key===shownRegion)return;shownRegion=key;
+  if(base){map.removeLayer(base);base=null}
+  if(!r)return;
+  base=protomapsL.leafletLayer({url:'tiles/{z}/{x}/{y}.mvt',flavor:dark()?'dark':'light',lang:'en',maxDataZoom:r.max_zoom,attribution:''});
+  base.addTo(map);base.bringToBack();map.setMaxZoom(Math.min(18,r.max_zoom+3));
+  const b=r.box,bounds=L.latLngBounds([b.south,b.west],[b.north,b.east]);
+  map.setMaxBounds(bounds.pad(0.5));map.fitBounds(bounds)}
+
+function far(p){return p.far?`${p.far.km} km (${p.far.miles} mi) ${p.far.dir}`:''}
+function render(){
+  const r=st.region;
+  $('pickTitle').textContent=r?'Change or refresh the region':'Choose your region';
+  $('cap').value=st.cap_mb;$('notice').textContent=st.notice||'';$('homeNote').textContent=st.home_note||'';
+  const kinds=[...st.kinds,...st.my_kinds.filter(k=>!st.kinds.includes(k))],f=$('filter').value;
+  $('filter').innerHTML='<option value="">Every kind</option>'+kinds.map(k=>`<option${k===f?' selected':''}>${esc(k)}</option>`).join('');
+  if(!$('m_kind').options.length)$('m_kind').innerHTML=[...new Set([...st.my_kinds,...st.kinds])].map(k=>`<option>${esc(k)}</option>`).join('');
+  drawBase();
+  layer.clearLayers();
+  const pts=st.points.filter(p=>!f||p.kind===f);
+  if(st.home){pts.sort((a,b)=>a.far.km-b.far.km);
+    homeMark=L.marker([st.home.lat,st.home.lon],{icon:L.divIcon({className:'',html:'<div class="mk home">Ho</div>',iconSize:[28,28],iconAnchor:[14,14]}),title:'Home'}).addTo(layer);
+    $('h_lat').value=st.home.lat;$('h_lon').value=st.home.lon}
+  else pts.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+  pts.forEach(p=>{L.marker([p.lat,p.lon],{icon:icon(p.kind,p.mine?'mine':''),title:p.name||p.kind}).addTo(layer)
+    .bindPopup(`<b>${esc(p.name||'Unnamed')}</b><br>${esc(p.kind)}${p.far?'<br>'+esc(far(p))+', straight-line':''}${p.phone?'<br>'+esc(p.phone):''}${p.note?'<br>'+esc(p.note):''}<br><span class="note">${p.mine?'Your own point':'Source '+esc(p.source)+', fetched '+esc(p.fetched)}</span>`)});
+  const fix=(st.needs_fixing||[]).map(h=>`<div class="pt"><div class="mk mine" style="background:#455a64">!</div><div class="t">
+      <div class="n">${esc(h.name)}</div><div class="s">Your own point. Needs fixing: its position in the saved file will not read, so it is kept as it is and not shown on the map.</div>
+      ${h.id?`<div class="row" style="margin-top:4px"><button data-fix="${esc(h.id)}">Fix</button></div>`:''}</div></div>`).join('');
+  $('list').innerHTML=fix+(pts.length?pts.map(p=>{const a=p.address||{};const addr=[[a.housenumber,a.street].filter(Boolean).join(' '),a.city].filter(Boolean).join(', ');
+    const m=MARK[p.kind]||['?','#455a64'];
+    return `<div class="pt" data-go="${esc(p.id)}"><div class="mk ${p.mine?'mine':''}" style="background:${m[1]}">${esc(m[0])}</div><div class="t">
+      <div class="n">${esc(p.name||'Unnamed')}</div><div class="s">${esc(p.kind)}${p.far?' . '+esc(far(p)):''}</div>
+      ${addr||p.phone?`<div class="s">${esc(addr)}${addr&&p.phone?' . ':''}${esc(p.phone)}</div>`:''}
+      ${p.note?`<div class="s">${esc(p.note)}</div>`:''}
+      <div class="s">${p.mine?'Your own point':'Source '+esc(p.source)+', fetched '+esc(p.fetched)}</div>
+      ${p.mine?`<div class="row" style="margin-top:4px"><button data-edit="${esc(p.id)}">Edit</button><button data-del="${esc(p.id)}">Remove</button></div>`:''}</div></div>`}).join('')
+    :`<p class="note" style="padding:10px">${r?'No points of this kind in the region. OpenStreetMap may not list them here; add your own below.':'No region yet. Choose one below and press Download.'}</p>`);
+  showJob(st.job)}
+
+let jobSaid=false;   // the line under the title follows the job the owner started, and clears once the map is shown
+function showJob(j){
+  const running=j.state==='checking'||j.state==='downloading';
+  if(jobSaid){if(running)say(j.message);
+    else{jobSaid=false;if(j.state==='done')say('');else say(j.message,j.state==='failed'||j.state==='too_big')}}
+  $('cancel').hidden=!running;$('check').disabled=running;$('download').disabled=running;
+  $('jobInfo').textContent=j.message||'';$('jobInfo').className=(j.state==='failed'||j.state==='too_big')?'bad':'';
+  $('bar').hidden=j.state!=='downloading';
+  if(j.total_bytes)$('bar').firstElementChild.style.width=Math.min(100,100*j.done_bytes/j.total_bytes)+'%';
+  if(j.state==='downloading')$('jobInfo').textContent=`${j.message} ${(j.done_bytes/1048576).toFixed(1)} of ${(j.total_bytes/1048576).toFixed(1)} MB`}
+
+async function pull(force){
+  try{const u=await get('api/updated');showJob(u.job);
+    if(!force&&u.last_updated===stamp&&st)return;
+    st=await get('api/state');stamp=st.last_updated;render()}
+  catch(e){if(!st)say('Local Map is not answering. Is it running?',true)}}
+
+function regionBody(){return {lat:$('r_lat').value,lon:$('r_lon').value,radius:$('r_rad').value,unit:$('r_unit').value,
+  detail:(document.querySelector('input[name=detail]:checked')||{}).value||'standard',label:$('q').dataset.label||''}}
+
+$('preview').onclick=async()=>{try{const b=regionBody();const q=new URLSearchParams(b);const o=await get('api/box?'+q);
+  const x=o.box;if(boxRect)map.removeLayer(boxRect);
+  boxRect=L.rectangle([[x.south,x.west],[x.north,x.east]],{color:'#2a7d9c',weight:2,fill:false}).addTo(map);map.fitBounds(boxRect.getBounds());
+  $('boxInfo').textContent=`The box that is fetched and sent, rounded outward to a 0.05 degree grid so its middle is not the point you chose: west ${x.west}, south ${x.south}, east ${x.east}, north ${x.north}. Tiles: Small ${o.tile_counts.small}, Standard ${o.tile_counts.standard}, Detailed ${o.tile_counts.detailed}. A rough guess at ${o.detail}: ${o.rough_mb[o.detail]} MB; press Check size for the real number (it reads only the map file's index).`;
+  say('')}catch(e){say(e.message,true)}};
+$('check').onclick=async()=>{try{say((await post('api/check',regionBody())).text);jobSaid=true;pull(true)}catch(e){say(e.message,true)}};
+$('download').onclick=async()=>{try{say((await post('api/download',regionBody())).text);jobSaid=true;pull(true)}catch(e){say(e.message,true)}};
+$('cancel').onclick=async()=>{try{say((await post('api/cancel')).text)}catch(e){say(e.message,true)}};
+$('capSave').onclick=async()=>{try{say((await post('api/settings',{cap_mb:$('cap').value})).text);pull(true)}catch(e){say(e.message,true)}};
+$('homeTap').onclick=()=>{tapFor=tapFor==='home'?'':'home';$('homeTap').textContent=tapFor?'Now tap the map':'Tap the map to set home'};
+$('mineTap').onclick=()=>{tapFor=tapFor==='mine'?'':'mine';$('mineTap').textContent=tapFor?'Now tap the map':'Tap the map'};
+$('homeSave').onclick=async()=>{try{say((await post('api/home',{latitude:$('h_lat').value,longitude:$('h_lon').value})).text);pull(true)}catch(e){say(e.message,true)}};
+$('filter').onchange=()=>render();
+let qTimer=null;
+$('q').oninput=()=>{clearTimeout(qTimer);qTimer=setTimeout(async()=>{const v=$('q').value.trim();
+  if(v.length<2){$('hits').hidden=true;return}
+  try{const o=await get('api/places?q='+encodeURIComponent(v));const h=o.places;$('hits').hidden=!h.length;
+    $('hits').innerHTML='<option value="">'+h.length+' found, pick one</option>'+h.map((p,i)=>`<option value="${i}">${esc(p.label)}</option>`).join('');
+    $('hits')._p=h}catch(e){say(e.message,true)}},250)};
+$('hits').onchange=()=>{const p=($('hits')._p||[])[+$('hits').value];if(!p||$('hits').value==='')return;
+  $('r_lat').value=p.lat;$('r_lon').value=p.lon;$('q').dataset.label=p.label;$('preview').click()};
+function resetMine(){editing=null;$('mineForm').reset();$('mineSave').textContent='Add';$('mineCancel').hidden=true}
+$('mineCancel').onclick=resetMine;
+$('mineForm').onsubmit=async e=>{e.preventDefault();
+  const body={name:$('m_name').value,kind:$('m_kind').value,latitude:$('m_lat').value,longitude:$('m_lon').value,note:$('m_note').value};
+  try{const o=editing?await post('api/mine/update',{id:editing,...body}):await post('api/mine/add',body);say(o.text);resetMine();pull(true)}catch(err){say(err.message,true)}};
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button');
+  if(b&&b.dataset.edit){const p=st.points.find(x=>x.id===b.dataset.edit);if(!p)return;editing=p.id;
+    $('m_name').value=p.name||'';$('m_kind').value=p.kind;$('m_lat').value=p.lat;$('m_lon').value=p.lon;$('m_note').value=p.note||'';
+    $('mineSave').textContent='Save';$('mineCancel').hidden=false;$('mineForm').scrollIntoView({behavior:'smooth'});return}
+  if(b&&b.dataset.fix){const h=(st.needs_fixing||[]).find(x=>x.id===b.dataset.fix);if(!h)return;editing=h.id;
+    $('m_name').value=h.name;if(h.kind)$('m_kind').value=h.kind;$('m_lat').value='';$('m_lon').value='';$('m_note').value=h.note||'';
+    $('mineSave').textContent='Save';$('mineCancel').hidden=false;$('mineForm').scrollIntoView({behavior:'smooth'});return}
+  if(b&&b.dataset.del){const p=st.points.find(x=>x.id===b.dataset.del);if(!p||!confirm('Remove your point '+p.name+'?'))return;
+    try{say((await post('api/mine/remove',{id:p.id})).text);pull(true)}catch(err){say(err.message,true)}return}
+  const row=e.target.closest('[data-go]');if(row&&!b){const p=st.points.find(x=>x.id===row.dataset.go);
+    if(p){map.setView([p.lat,p.lon],Math.max(map.getZoom(),15));window.scrollTo({top:0,behavior:'smooth'})}}});
+
+setupMap();pull(true);
+setInterval(()=>pull(false),3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "local-map",
+  "kind": "app",
+  "name": "Local Map",
+  "version": "1.0.0",
+  "description": "An offline street map of one region you choose, with its emergency places from OpenStreetMap: fire stations, police, hospitals, clinics, pharmacies, shelters, food banks, drinking water, fuel and more. You pick the region and press Download once; after that the map, the list of places, straight-line distances from home and your own points (meeting places, water, a neighbor who can help) work with no internet. It does not give directions by road, does not update by itself, and OpenStreetMap does not list every shelter or food bank.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/map.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "save_my_point",
+      "remove_my_point",
+      "set_home"
+    ],
+    "tools": {
+      "nearest": "Use when asked for the nearest or closest place of a kind, like the nearest hospital or water: finds the nearest emergency places of one kind (or of any kind) from home or from a named point on the offline map, with name, kind, straight-line distance and direction, phone and address.",
+      "list_points": "Use only when asked to list every place of one kind on the offline map, like all the shelters or all the pharmacies: lists them, nearest home first. Never to put, move or rename a point, and never to look up one place before another tool: where_is, save_my_point and remove_my_point find a place by name themselves.",
+      "where_is": "Use when asked where one place is, or how far one place is from home, by name; no need to look it up first. Finds a point on the offline map (like City Hall or the library) or a town in the place list and says its coordinates and its straight-line distance and direction from home. Not to put, move or rename a point.",
+      "save_my_point": "Use when the owner wants a place of their own put on the map, moved or renamed, by its name: if a point with that name is already there it is changed, otherwise it is added. Works by name; no need to look it up first. Use it straight away with the name as said, like meeting place, water point or Sam next door.",
+      "remove_my_point": "Use when asked to take one of your own points off the map, remove it or delete it, by name; no need to look it up first. Removes that point.",
+      "set_home": "Use when asked to set or move home on the offline map to a latitude and longitude, like set home to 37.46, -122.43: it saves home there straight away, no need to look anything up first; distances are measured from there.",
+      "map_status": "Use only when asked about the downloaded map as a whole: which region it holds, its detail, its size on disk, when it was fetched, how many emergency points of each kind, and whether home is set. Not for one place, and not to put, move, rename or remove a point."
+    },
+    "examples": {
+      "nearest": [
+        "where is the nearest hospital",
+        "what are the three closest places to get drinking water"
+      ],
+      "list_points": [
+        "list the shelters on the map",
+        "which pharmacies are on the offline map"
+      ],
+      "where_is": [
+        "where is City Hall on the map",
+        "how far is the library from home"
+      ],
+      "save_my_point": [
+        "put our meeting place on the map at home: the library steps",
+        "rename the meeting place to North Gate",
+        "move our water point to 37.47, -122.43"
+      ],
+      "remove_my_point": [
+        "take the library steps off the map",
+        "delete our old water point"
+      ],
+      "set_home": [
+        "set home on the map to 37.46, -122.43"
+      ],
+      "map_status": [
+        "what region does the offline map have",
+        "when was the map downloaded"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Local Map",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Local Map",
+        "icon": "icons/map.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [
+      "build-metadata.protomaps.dev",
+      "build.protomaps.com",
+      "overpass-api.de"
+    ],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.3,
+      "disk_gb": 0.3
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Local Map keeps a street map of one region you choose, and a list of emergency places there, in its own folder on this computer. Once, and only when you press Check size or Download on its page, it contacts three hosts: build-metadata.protomaps.dev is asked only for the list of map builds; build.protomaps.com sends the street map, so it can tell which map area was fetched; overpass-api.de receives the corner coordinates of the area, rounded outward to a 0.05 degree grid, and sends the emergency places. All three see this computer's internet address. Nothing else is sent. After that it works with no internet. It does not use the brain."
+}
