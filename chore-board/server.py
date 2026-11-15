@@ -31,6 +31,7 @@ import socket
 import tempfile
 import threading
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -39,7 +40,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "chore-board"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "chores.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 64 * 1024
@@ -149,8 +150,10 @@ def _every(text: str) -> str | None:
 
 
 def _words(text) -> list[str]:
-    """The words of a name: letters and digits, lower case; anything else separates them."""
-    return "".join(ch if ch.isalnum() else " " for ch in str(text or "").lower()).split()
+    """The words of a name: letters and digits of any script, lower case with accents folded (é is e), so
+    'Jose' finds 'José'; anything else separates them."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(ch if ch.isalnum() else " " for ch in text if not unicodedata.combining(ch)).casefold().split()
 
 
 def _repeat_words(c: dict) -> str:

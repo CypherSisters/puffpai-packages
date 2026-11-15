@@ -337,6 +337,27 @@ def test_partial_match_is_whole_words_only(base, data):
     assert (data / "chores.json").read_text(encoding="utf-8") == before
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for name in ("Pesto Park", "Sliders Lane", "Berry Clinic", "José Alvarez", "Café Luna"):
+        tool(base, "add_chore", name=name)
+    for name in ("Joseph", "José", "Zoë", "Ren"):
+        tool(base, "add_person", name=name)
+    # an accented letter is never a gap, so the pieces of a word find nothing else
+    for typed in ("crêpes", "müsli", "über"):
+        assert f"no chore called {typed!r}" in tool_error(base, "remove_chore_or_person", chore=typed)
+    assert "no person called 'Renée'" in tool_error(base, "list_due", person="Renée")
+    before = (data / "chores.json").read_text(encoding="utf-8")
+    assert "More than one person matches 'Jose': Joseph, José" in tool_error(base, "list_due", person="Jose")
+    assert (data / "chores.json").read_text(encoding="utf-8") == before
+    # a name kept with accents is found typed with them or without them
+    assert tool(base, "list_due", person="José") == "Nothing is due today for José."             # exact
+    assert tool(base, "list_due", person="zoe").startswith("Using 'Zoë'.")
+    assert tool(base, "remove_chore_or_person", chore="jose alvarez").startswith("Using 'José Alvarez'. Removed")
+    assert tool(base, "remove_chore_or_person", chore="CAFE").startswith("Using 'Café Luna'. Removed")
+    saved = json.loads((data / "chores.json").read_text(encoding="utf-8"))
+    assert [c["name"] for c in saved["chores"]] == ["Pesto Park", "Sliders Lane", "Berry Clinic"]
+
+
 def test_hostile_text_answers_within_a_second_on_every_argument(base, data, clock):
     household(base)
     tool(base, "add_chore", name="Dishes", repeat="daily", assign_to="Alex")

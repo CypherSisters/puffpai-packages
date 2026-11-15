@@ -3,7 +3,7 @@
   "id": "chore-board",
   "kind": "app",
   "name": "Chore Board",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A household chore board: the people in the household, chores that repeat once, daily, weekly or every few days, each assigned to one person or to a rotation that moves to the next person when it is done, what is due today and this week, and a tally of who did what in the last 7 and 30 days. It does not remind anyone on its own and does not send messages; you ask, or look at the page.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
