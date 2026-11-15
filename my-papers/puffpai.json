@@ -1,0 +1,112 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "my-papers",
+  "kind": "app",
+  "name": "My Papers",
+  "version": "1.0.0",
+  "description": "Household paperwork filing that stays on this computer: add a paper (with its file, or just a record of where the paper copy is), find it again by its words, type, person, tag or year, and see what is coming due, expiring or renewing. It keeps real due dates, expiry dates and renewals, suggests how long to keep tax papers, and exports everything as one zip. It does not read scans or photos (no OCR) and does not encrypt the files.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/papers.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "add_paper_record",
+      "change_paper",
+      "remove_paper"
+    ],
+    "tools": {
+      "find_papers": "Use only to search, when the owner asks if we have a paper, where one is, or what papers there are: finds papers by words in them and by type, person, tag or year, with each one's title, type, date and the line that matched.",
+      "read_paper": "Read a paper named by its title; it finds the paper itself, so do not look it up first. It gives all its fields and up to 4000 characters of its text, so you can answer what it says and quote it.",
+      "coming_up": "List papers with a due date, expiry, renewal or follow-up date in the next days (60 unless asked), and anything overdue, soonest first.",
+      "add_paper_record": "File a new paper record whenever the owner says to file, note or keep track of a paper, like where a paper copy is kept. It saves the title, type, sender, dates, people, tags, amount and notes, without a file.",
+      "change_paper": "Change a paper named by its title; it finds the paper itself, so do not look it up first. It sets or clears its due date, its type, its tags, where the paper copy is, or its other fields.",
+      "list_types_and_counts": "Count the papers of each type, and say how many stored files had no text found.",
+      "keep_or_shred": "List the papers that are past their keep-until date. It is a list only and deletes nothing.",
+      "remove_paper": "Delete a paper named by its title; it finds the paper itself, so do not look it up first. Its stored file goes too when no other paper uses that file."
+    },
+    "examples": {
+      "find_papers": [
+        "do we have anything from City Water",
+        "list our tax papers",
+        "where is the car title"
+      ],
+      "read_paper": [
+        "read me the City Water bill",
+        "what does the lease say about pets"
+      ],
+      "coming_up": [
+        "what bills are due soon",
+        "what papers expire in the next 90 days"
+      ],
+      "add_paper_record": [
+        "file this: the car title is in the blue binder",
+        "keep track of Sam's new passport, it expires 2035-06-01"
+      ],
+      "change_paper": [
+        "set the due date on the City Water bill to 2027-04-15",
+        "the lease is in the green binder now, change it"
+      ],
+      "list_types_and_counts": [
+        "how many papers do I have of each kind"
+      ],
+      "keep_or_shred": [
+        "which papers can I shred now"
+      ],
+      "remove_paper": [
+        "delete the old gym contract from my papers"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "My Papers",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "My Papers",
+        "icon": "icons/papers.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "My Papers keeps the papers you add, and copies of their files, in its own folder on this computer; it uses no internet and does not use the brain. The bot can find and read your papers when you ask it in chat, and the files are not encrypted by this app."
+}

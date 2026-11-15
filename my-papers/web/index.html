@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<!-- My Papers page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Papers</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:14px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1000px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+input,select,textarea{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:7px 8px;min-height:40px;width:100%}
+textarea{min-height:70px;resize:vertical}
+button,.btn{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation;text-decoration:none;display:inline-flex;align-items:center}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.bad{color:var(--p-bad)}
+.tabs{display:flex;gap:0;flex-wrap:wrap;margin-top:10px}
+.tabs button{border-right-width:0}.tabs button:last-child{border-right-width:1px}
+.tabs button.on{background:var(--p-accent);color:var(--p-on-accent);border-color:var(--p-accent)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--p-line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.pick{cursor:pointer}
+th{font-size:.8rem;color:var(--p-text2);font-weight:600}
+.sub{color:var(--p-text2);font-size:.9rem}
+.line{color:var(--p-text2);font-size:.85rem;font-style:italic}
+.flag{display:inline-block;padding:1px 7px;font-size:.8rem;font-weight:600;margin-left:6px;background:var(--p-chip)}
+.flag.late{background:var(--p-bad);color:#fff}
+.flag.soon{background:var(--p-warn);color:#000}
+.empty{color:var(--p-text2);padding:6px 0}
+form.grid,.filters{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-items:end}
+form.grid label,.filters label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-text2)}
+.wide{grid-column:1/-1}
+.picks{display:flex;flex-wrap:wrap;gap:6px}
+.picks label{flex-direction:row;align-items:center;gap:6px;border:1px solid var(--p-line);padding:6px 10px;min-height:40px;color:var(--p-text);font-size:.95rem}
+.picks input{min-height:auto;width:auto}
+.note{color:var(--p-text2);font-size:.85rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px}
+dt{color:var(--p-text2);font-size:.85rem}
+pre{white-space:pre-wrap;word-break:break-word;font:inherit;font-size:.9rem;max-height:420px;overflow:auto;border:1px solid var(--p-line);padding:8px;background:var(--p-bg)}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="8" y="22" width="48" height="34" fill="none" stroke="currentColor" stroke-width="4"/><rect x="16" y="8" width="30" height="36" fill="none" stroke="currentColor" stroke-width="4"/><path d="M22 18h18M22 26h18M8 34h48" stroke="currentColor" stroke-width="4"/></svg>My Papers</h1>
+<div class="tabs" role="tablist">
+<button data-tab="coming" class="on">Coming up</button><button data-tab="find">Find</button><button data-tab="types">By type</button><button data-tab="add">Add a paper</button><button data-tab="move">Export and import</button>
+</div>
+<div id="msg"></div>
+
+<section id="v_coming"><h2>Coming up <small>due, expiring, renewing or to follow up in the next 60 days, and anything overdue</small></h2><div class="card" id="coming"></div></section>
+
+<section id="v_find" hidden><h2>Find</h2>
+<div class="card"><div class="filters">
+<label class="wide">Words<input id="q" placeholder="water bill, lease, passport" aria-label="Words"></label>
+<label>Type<select id="ft"></select></label>
+<label>Person<select id="fp"></select></label>
+<label>Tag<input id="ftag" maxlength="40"></label>
+<label>Year<input id="fy" type="number" min="1900" max="2200" step="1"></label>
+</div></div>
+<div class="card" id="found" style="margin-top:8px"></div></section>
+
+<section id="v_types" hidden><h2>By type</h2><div class="card" id="types"></div></section>
+
+<section id="v_add" hidden><h2 id="formTitle">Add a paper</h2>
+<div class="card"><form class="grid" id="form">
+<label class="wide" id="fileBox">File (optional, at most 20 MB)<input id="f_file" type="file"></label>
+<label>Title<input id="f_title" maxlength="200" placeholder="City Water bill March"></label>
+<label>Type<select id="f_type"></select></label>
+<label>From<input id="f_from" maxlength="120" placeholder="City Water"></label>
+<label>Date on the paper<input id="f_date" type="date"></label>
+<label>Due<input id="f_due" type="date"></label>
+<label>Expires<input id="f_expires" type="date"></label>
+<label>Renews every (months)<input id="f_renews" type="number" min="0" max="120" step="1" placeholder="none"></label>
+<label>Follow up on<input id="f_follow" type="date"></label>
+<label>Keep until<input id="f_keep" type="date"></label>
+<label>Amount<input id="f_amount" inputmode="decimal" maxlength="20" placeholder="82.50"></label>
+<label>Currency<input id="f_cur" maxlength="10" placeholder="USD"></label>
+<label>Binder (where the paper copy is)<input id="f_binder" maxlength="60" placeholder="blue binder 2"></label>
+<label>Tags (commas)<input id="f_tags" maxlength="400" placeholder="water, house"></label>
+<div class="wide note" id="taxHint" hidden></div>
+<div class="wide"><div class="note">People</div><div class="picks" id="picks"></div></div>
+<label class="wide">Other people (commas)<input id="f_people" maxlength="300"></label>
+<label class="wide">Notes<textarea id="f_notes" maxlength="4000"></textarea></label>
+<div class="wide"><button class="primary" type="submit" id="saveBtn">Add</button> <button type="button" id="cancelBtn" hidden>Cancel</button></div>
+</form></div></section>
+
+<section id="v_move" hidden><h2>Export and import</h2>
+<div class="card"><p class="note">Export gives one zip: one JSON file per paper and the stored files in a folder. Import takes that zip, or a zip of files with an optional <code>name.ext.json</code> beside each file. Import never writes over a paper; it skips what is already here.</p>
+<div class="row"><a class="btn" id="exportLink" download>Export everything</a>
+<label class="btn">Import a zip<input id="imp" type="file" accept=".zip" hidden></label></div>
+<p class="note" id="unread"></p></div></section>
+
+<section id="v_paper" hidden><h2 id="pTitle"></h2><div class="card" id="paper"></div></section>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/my-papers/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let info={types:[],counts:{},people:[]},_stamp='',editing=null,current=null,tab='coming';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+async function getj(path){const r=await fetch(BASE+path);const out=await r.json().catch(()=>({error:'My Papers sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'My Papers could not answer.');return out}
+async function post(path,body,raw){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':raw?'application/zip':'application/json'},body:raw?body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'My Papers sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'My Papers could not save.');return out}
+
+function show(t){tab=t;for(const s of ['coming','find','types','add','move','paper'])$('v_'+s).hidden=s!==t;
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));draw()}
+function draw(){if(tab==='coming')drawComing();else if(tab==='find')drawFind();else if(tab==='types')drawTypes()}
+
+function row(p,extra){return `<tr class="pick" data-open="${esc(p.id)}"><td>${esc(p.title)}${extra||''}<div class="sub">${esc(p.type)}${p.from?' from '+esc(p.from):''}${p.date?', '+esc(p.date):''}${p.people.length?', '+esc(p.people.join(', ')):''}${p.binder?', paper copy in '+esc(p.binder):''}</div>${p.line?`<div class="line">${esc(p.line)}</div>`:''}</td><td class="sub">${esc(p.file_name||'record only')}</td></tr>`}
+
+async function drawComing(){try{const c=await getj('coming');
+  $('coming').innerHTML=c.items.length?'<table>'+c.items.map(i=>row(i,`<span class="flag ${i.overdue?'late':i.days<=7?'soon':''}">${esc(i.what)} ${esc(i.date)}${i.overdue?', '+(-i.days)+' days overdue':i.days===0?', today':''}</span>`)).join('')+'</table>'
+  :'<p class="empty">Nothing due, expiring or renewing in the next 60 days.</p>'}catch(e){say(e.message,true)}}
+
+let findTimer=null;
+async function drawFind(){const qs=new URLSearchParams();
+  for(const [k,id] of [['q','q'],['type','ft'],['person','fp'],['tag','ftag'],['year','fy']])if($(id).value)qs.set(k,$(id).value);
+  try{const out=await getj('papers?'+qs);
+    $('found').innerHTML=out.papers.length?`<p class="note">${out.papers.length} found${out.fts?'':' (plain word matching)'}</p><table>`+out.papers.map(p=>row(p)).join('')+'</table>'
+      :'<p class="empty">No papers match.</p>'}catch(e){say(e.message,true)}}
+for(const id of ['q','ft','fp','ftag','fy'])$(id).addEventListener('input',()=>{clearTimeout(findTimer);findTimer=setTimeout(drawFind,250)});
+
+function drawTypes(){const c=info.counts||{};
+  $('types').innerHTML='<table>'+info.types.map(t=>`<tr class="pick" data-type="${esc(t)}"><td>${esc(t)}</td><td class="sub">${c[t]||0}</td></tr>`).join('')+'</table>'}
+
+async function openPaper(id){try{const p=await getj('paper/'+encodeURIComponent(id));current=p;
+  $('pTitle').textContent=p.title;
+  const a=p.amount&&p.amount.value!=null?`${p.amount.value.toFixed(2)} ${p.amount.currency||''}`:'';
+  const f=p.file;
+  const fields=[['Type',p.type],['From',p.from],['Date on the paper',p.date],['Added',(p.added||'').slice(0,10)],['People',(p.people||[]).join(', ')],
+    ['Tags',(p.tags||[]).join(', ')],['Amount',a],['Due',p.due],['Expires',p.expires],
+    ['Renews',p.renews_every_months?`every ${p.renews_every_months} months, next ${p.next_renewal}`:''],['Follow up',p.follow_up],
+    ['Keep until',p.keep_until],['Paper copy in',p.binder],['Notes',p.notes],
+    ['File',f?`${f.name} (${f.kind}, ${Math.ceil(f.size/1024)} KB)`:'none, a record only']].filter(x=>x[1]);
+  $('paper').innerHTML='<dl>'+fields.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')+'</dl>'+
+    (p.keep_hint?`<p class="note">${esc(p.keep_hint)}</p>`:'')+
+    `<div class="row">${f?`<a class="btn" href="${esc(BASE+'file/'+encodeURIComponent(p.id))}" download>Download the file</a>`:''}<button data-edit="1">Edit</button><button class="bad" data-del="1">Delete</button><button data-back="1">Back</button></div>`+
+    (p.text?`<h2>Text found in the file</h2>${p.text_note?`<p class="note">${esc(p.text_note)}</p>`:''}<pre>${esc(p.text)}</pre>`:f?`<p class="note">${esc(p.text_note)}</p>`:'');
+  show('paper')}catch(e){say(e.message,true)}}
+
+function fillSelects(){
+  const opts=info.types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');
+  const keepT=$('ft').value,keepP=$('fp').value,keepF=$('f_type').value;
+  $('ft').innerHTML='<option value="">Any type</option>'+opts;$('ft').value=keepT;
+  $('fp').innerHTML='<option value="">Anyone</option>'+info.people.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');$('fp').value=keepP;
+  $('f_type').innerHTML=opts;$('f_type').value=keepF||'other';
+  $('unread').textContent=info.unreadable.length?`${info.unreadable.length} paper files would not read and are left as they are: ${info.unreadable.join(', ')}`:'';
+  $('exportLink').href=BASE+'export'}
+function drawPicks(chosen){const set=new Set((chosen||[]).map(n=>n.toLowerCase()));
+  $('picks').innerHTML=info.people.map(n=>`<label><input type="checkbox" value="${esc(n)}"${set.has(n.toLowerCase())?' checked':''}>${esc(n)}</label>`).join('')||'<span class="note">No people yet; type names below.</span>';
+  $('f_people').value=(chosen||[]).filter(n=>!info.people.some(k=>k.toLowerCase()===n.toLowerCase())).join(', ')}
+
+function addMonths(iso,m){const d=new Date(iso+'T00:00:00');const day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+m);
+  const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+function taxHint(){const tax=$('f_type').value==='tax';$('taxHint').hidden=!tax;$('taxHint').textContent=tax?info.tax_hint:'';
+  if(tax&&!$('f_keep').value&&$('f_date').value)$('f_keep').value=addMonths($('f_date').value,36)}
+$('f_type').addEventListener('change',taxHint);$('f_date').addEventListener('change',taxHint);
+
+function resetForm(){editing=null;$('form').reset();$('formTitle').textContent='Add a paper';$('saveBtn').textContent='Add';
+  $('cancelBtn').hidden=true;$('fileBox').hidden=false;$('f_type').value='other';drawPicks([]);taxHint()}
+
+function readFile(file){return new Promise((ok,bad)=>{const r=new FileReader();
+  r.onload=()=>ok(String(r.result).split(',',2)[1]||'');r.onerror=()=>bad(new Error('The page could not read that file.'));r.readAsDataURL(file)})}
+
+$('form').addEventListener('submit',async e=>{e.preventDefault();
+  const people=[...$('picks').querySelectorAll('input:checked')].map(i=>i.value).concat($('f_people').value.split(',').map(s=>s.trim()).filter(Boolean));
+  const body={title:$('f_title').value,type:$('f_type').value,from:$('f_from').value,date:$('f_date').value,due:$('f_due').value,
+    expires:$('f_expires').value,renews_every_months:$('f_renews').value||'0',follow_up:$('f_follow').value,keep_until:$('f_keep').value,
+    amount:$('f_amount').value,currency:$('f_cur').value,binder:$('f_binder').value,tags:$('f_tags').value,people,notes:$('f_notes').value};
+  try{let out;
+    if(editing){out=await post('api/update',{id:editing,...body})}
+    else{const file=$('f_file').files[0];
+      if(file){if(file.size>info.max_file_mb*1048576)throw new Error(`That file is larger than ${info.max_file_mb} MB.`);
+        say('Reading the file...');body.file={name:file.name,data:await readFile(file)}}
+      out=await post('api/add',body)}
+    say(out.text);const id=editing||out.id;resetForm();await pull(true);openPaper(id)}catch(err){say(err.message,true)}});
+$('cancelBtn').addEventListener('click',()=>{const id=editing;resetForm();say('');if(id)openPaper(id)});
+
+$('imp').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;
+  try{say('Importing...');const out=await post('api/import',file,true);say(out.text+(out.notes&&out.notes.length?' '+out.notes.join('; '):''));pull(true)}catch(err){say(err.message,true)}});
+
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button,tr.pick');if(!t)return;const d=t.dataset;
+  try{
+    if(d.tab){say('');if(d.tab==='add'&&!editing)resetForm();show(d.tab)}
+    else if(d.open)openPaper(d.open);
+    else if(d.type){$('ft').value=d.type;$('q').value='';show('find')}
+    else if(d.back)show('find');
+    else if(d.edit&&current){const p=current;resetForm();editing=p.id;
+      $('f_title').value=p.title||'';$('f_type').value=p.type||'other';$('f_from').value=p.from||'';$('f_date').value=p.date||'';
+      $('f_due').value=p.due||'';$('f_expires').value=p.expires||'';$('f_renews').value=p.renews_every_months||'';$('f_follow').value=p.follow_up||'';
+      $('f_keep').value=p.keep_until||'';$('f_amount').value=p.amount&&p.amount.value!=null?p.amount.value:'';$('f_cur').value=p.amount?p.amount.currency||'':'';
+      $('f_binder').value=p.binder||'';$('f_tags').value=(p.tags||[]).join(', ');$('f_notes').value=p.notes||'';drawPicks(p.people||[]);
+      $('fileBox').hidden=true;$('formTitle').textContent='Edit '+p.title;$('saveBtn').textContent='Save';$('cancelBtn').hidden=false;taxHint();show('add')}
+    else if(d.del&&current){if(!confirm('Delete the paper '+current.title+'? Its stored file is deleted too when no other paper uses it.'))return;
+      say((await post('api/remove',{id:current.id})).text);current=null;await pull(true);show('coming')}
+  }catch(err){say(err.message,true)}});
+
+// Poll the stamp; read again only when it changed (the brain may change things too).
+async function pull(force){
+  try{const {last_updated}=await getj('updated');if(!force&&last_updated===_stamp)return;
+    info=await getj('info');_stamp=info.last_updated;fillSelects();if(!editing&&tab!=='add')drawPicks([]);draw()}
+  catch(e){if(!_stamp)say(e.message||'My Papers is not answering. Is it running?',true)}}
+
+pull(true).then(()=>resetForm());
+setInterval(pull,5000);
+</script>
+</body>
+</html>
