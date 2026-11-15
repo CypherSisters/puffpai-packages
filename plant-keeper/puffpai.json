@@ -1,0 +1,55 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "plant-keeper",
+  "kind": "agent",
+  "name": "Plant Keeper",
+  "version": "1.0.0",
+  "description": "An agent that knows the household's plants and tells you what needs doing. It keeps each plant (kind, where it lives, pot, light, how often to water and feed) and a care log, and works out what is due today or this week from your own intervals. The bot's own brain suggests a starting care plan for a new plant, which you can accept or ignore, and answers questions about one plant from your description and its log. It does not identify plants from photos, does not send reminders on its own, and its advice is not checked by anyone.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/plant.svg",
+  "scope": ["plants.care_plan", "plants.log", "plants.what_is_due"],
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "agent.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_plant", "log_care", "change_plant", "remove_plant"],
+    "tools": {
+      "plants_due": "When the owner asks what the plants need: which plants are due for water or feed today, or this week, worked out from each plant's own interval and the care log.",
+      "add_plant": "When the owner has a new plant to keep track of: adds it by name with its kind and where it lives, and asks the bot's brain for a suggested starting care plan that the owner can accept later.",
+      "log_care": "When a plant was watered, fed, repotted, pruned or moved, log it by the plant's name, no need to look it up first. Also takes a short note about the plant, or all for every plant.",
+      "plant_history": "When the owner asks when a plant was last watered, fed, repotted or pruned, or for its care log: one plant by name, no need to look it up first.",
+      "change_plant": "When a plant's details or care intervals change: change one plant by name, no need to look it up first. Also accepts the brain's suggested plan for it.",
+      "ask_about_plant": "When the owner asks what is wrong with a plant or how to care for it, ask about it by the plant's name, no need to look it up first. The bot's brain answers from the owner's words and that plant's care log.",
+      "list_plants": "Only when the owner asks to see the whole list of their plants: every plant with where it lives and its intervals. The other plant tools take a name, so this is not needed first.",
+      "remove_plant": "When a plant has died or gone, remove it by name, no need to look it up first: deletes the plant and its care log."
+    },
+    "examples": {
+      "plants_due": ["what do my plants need today", "which plants need watering this week"],
+      "add_plant": ["add my new peace lily in the living room to my plants", "I bought a rosemary for the back bed, keep track of it"],
+      "log_care": ["I watered the fern", "I fed the tomatoes yesterday"],
+      "plant_history": ["when did I last repot the snake plant", "show me the care history of the basil"],
+      "change_plant": ["change the fern's watering to every 5 days", "accept the suggested plan for the peace lily"],
+      "ask_about_plant": ["the basil's leaves are going yellow, what is wrong with it", "why is my fern dropping leaves"],
+      "list_plants": ["which plants do I have", "list my plants"],
+      "remove_plant": ["remove the basil from my plants, it died"]
+    }
+  },
+  "ui": {
+    "pages": [ { "id": "main", "title": "Plant Keeper", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Plant Keeper", "icon": "icons/plant.svg", "opens": "main" } ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "brain": { "text": true, "images": false },
+    "hardware": { "ram_gb": 0.2 }
+  },
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Plant Keeper keeps your plants, their care log and your hemisphere setting in its own folder on this computer (plants.json); it uses the bot's own brain on this computer to suggest a starting care plan for a new plant and to answer questions about one plant, and it uses no internet."
+}

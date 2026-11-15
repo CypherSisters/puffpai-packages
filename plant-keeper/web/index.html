@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!-- Plant Keeper page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plant Keeper</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{color:var(--p-text2);font-size:.85rem}
+.late{color:var(--p-bad);font-weight:600}
+.sug{border-left:4px solid var(--p-warn);padding:6px 10px;margin-top:6px;white-space:pre-wrap;font-size:.9rem}
+select,button{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-chip);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 10px;min-height:40px;touch-action:manipulation}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 58V30M32 34C20 34 12 26 12 12c14 0 20 8 20 22zM32 30c0-12 8-20 20-20 0 12-8 20-20 20z" fill="none" stroke="currentColor" stroke-width="4"/></svg>Plant Keeper</h1>
+<div class="row"><span class="note" id="season"></span>
+<label class="note">Hemisphere <select id="hemi" aria-label="Hemisphere"><option value="north">North</option><option value="south">South</option></select></label></div>
+</div>
+<p class="note">Ask the bot to add a plant, log care, or say what is due. This page shows what Plant Keeper holds on this computer.</p>
+<div id="msg"></div>
+
+<h2>Due this week <small id="today"></small></h2>
+<div class="card" id="due"></div>
+
+<h2>Plants <small id="count"></small></h2>
+<div class="card" id="plants"></div>
+
+<h2>Care log <small>newest first</small></h2>
+<div class="card" id="log"></div>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/plant-keeper/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let v=null,_stamp='';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Plant Keeper could not read its saved file.',true);return}
+    const {last_updated}=await chk.json();if(v&&!force&&last_updated===_stamp)return;
+    const r=await fetch(BASE+'view');if(!r.ok)return;
+    v=await r.json();_stamp=v.last_updated||'';render()}
+  catch(e){if(!v)say('Plant Keeper is not answering. Is it running?',true)}}
+
+function render(){
+  $('season').textContent='Season: '+v.season;$('hemi').value=v.hemisphere;$('today').textContent='today is '+v.today;
+  const week=[];const end=new Date(v.today);end.setDate(end.getDate()+6);const last=end.toISOString().slice(0,10);
+  for(const p of v.plants)for(const d of p.due)if(d.due<=last)week.push([d.due,p,d]);
+  week.sort((a,b)=>a[0].localeCompare(b[0]));
+  $('due').innerHTML=week.length?'<table><tr><th>Plant</th><th>Job</th><th>Due</th><th>Last done</th></tr>'+week.map(([,p,d])=>
+    `<tr><td>${esc(p.name)}</td><td>${esc(d.job)}</td><td class="${d.late>0?'late':''}">${esc(d.late>0?d.due+' ('+d.late+' days late)':d.due)}</td><td>${esc(d.last||'not logged')}</td></tr>`).join('')+'</table>'
+    :'<p class="note">Nothing is due this week, or no intervals are set yet.</p>';
+  $('count').textContent=v.plants.length+' kept';
+  $('plants').innerHTML=v.plants.length?'<table><tr><th>Name</th><th>Kind</th><th>Where</th><th>Pot</th><th>Light</th><th>Water</th><th>Feed</th><th>Notes</th></tr>'+v.plants.map(p=>
+    `<tr><td>${esc(p.name)}</td><td>${esc(p.kind)}</td><td>${esc(p.place)} (${p.outdoor?'outdoor':'indoor'})</td><td>${esc(p.pot)}</td><td>${esc(p.light)}</td>
+    <td>${esc(p.water_days?'every '+p.water_days+' days':'not set')}</td><td>${esc(p.feed_days?'every '+p.feed_days+' days':'not set')}</td><td>${esc(p.notes)}
+    ${p.suggested?`<div class="sug">${esc(v.suggestion_line)}\n${esc('Water every '+(p.suggested.water_days||'(not said)')+' days; feed '+(p.suggested.feed_days?'every '+p.suggested.feed_days+' days':'not now'))}\n${esc(p.suggested.note)}\nAsk the bot to accept the suggested plan for ${esc(p.name)} to use its watering and feeding days.</div>`:''}${p.brain_note?`<div class="sug">${esc(p.brain_note)}</div>`:''}</td></tr>`).join('')+'</table>'
+    :'<p class="note">No plants yet. Tell the bot about one.</p>';
+  $('log').innerHTML=v.log.length?'<table><tr><th>Date</th><th>Plant</th><th>What</th><th>Note</th></tr>'+v.log.map(e=>
+    `<tr><td>${esc(e.date)}</td><td>${esc(e.plant)}</td><td>${esc(e.what)}</td><td>${esc(e.note)}</td></tr>`).join('')+'</table>'
+    :'<p class="note">Nothing logged yet.</p>'}
+
+$('hemi').addEventListener('change',async e=>{
+  try{const r=await fetch(BASE+'api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hemisphere:e.target.value})});
+    const out=await r.json().catch(()=>({error:'Plant Keeper sent an answer this page could not read.'}));
+    if(!r.ok)throw new Error(out.error||'Plant Keeper could not save.');say(out.text);pull(true)}catch(err){say(err.message,true)}});
+
+pull(true);
+setInterval(pull,5000);
+</script>
+</body>
+</html>
