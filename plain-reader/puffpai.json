@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "plain-reader",
+  "kind": "skill",
+  "name": "Plain Reader",
+  "version": "1.0.0",
+  "description": "Teaches the brain to explain a contract, lease, bill, medical bill, explanation of benefits, official letter or terms of service in plain words: what it asks of you, dates, money, one-sided terms and questions to ask, each point quoting the document, with a fixed line that it is not legal, medical or financial advice. It adds no tools of its own and fetches nothing.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/document.svg",
+  "consent": "This skill is text the brain reads. It runs nothing and uses no internet."
+}
