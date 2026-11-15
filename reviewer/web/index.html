@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!-- Reviewer page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviewer</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{color:var(--p-text2);font-size:.85rem}
+.late{color:var(--p-bad);font-weight:600}
+.sug{border-left:4px solid var(--p-warn);padding:6px 10px;margin-top:6px;white-space:pre-wrap;font-size:.9rem}
+select,button{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-chip);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 10px;min-height:40px;touch-action:manipulation}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+.rep{border-top:1px solid var(--p-line);padding:8px 0}
+.rep:first-child{border-top:0}
+.rep h3{font-size:.98rem;margin-bottom:4px}
+.rep ul,.rep ol{padding-left:20px;font-size:.92rem}
+.raw{white-space:pre-wrap;font-size:.9rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 6h30l10 10v42H12z" fill="none" stroke="currentColor" stroke-width="4"/><path d="M20 26h24M20 36h24M20 46h14" stroke="currentColor" stroke-width="4"/></svg>Reviewer</h1>
+</div>
+<p class="note">Paste something you wrote into chat and ask the bot for a review. Reviewer never changes your text and does not keep it; it keeps only these reports, on this computer. Facts are never checked.</p>
+<div id="msg"></div>
+<div id="jobs"></div>
+<h2>Reviews <small>newest first</small></h2>
+<div class="card" id="reviews"></div>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/reviewer/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let v=null,_stamp='';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+const RANKS=[['must','Must fix'],['should','Should fix'],['could','Could fix']];
+
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Reviewer could not read its saved file.',true);return}
+    const {last_updated}=await chk.json();if(v&&!force&&last_updated===_stamp&&!(v.jobs||[]).length)return;
+    const r=await fetch(BASE+'view');if(!r.ok)return;
+    v=await r.json();_stamp=v.last_updated||'';render()}
+  catch(e){if(!v)say('Reviewer is not answering. Is it running?',true)}}
+
+function one(r){
+  let h=`<div class="rep"><h3>${esc(r.title)} <span class="note">${esc(r.label)}${r.reader?', for '+esc(r.reader):''}, ${esc(r.date)}${r.parts>1?', read in '+esc(r.parts)+' parts':''}</span></h3>`;
+  h+=`<p><b>What it is:</b> ${esc(r.what||r.label)}</p>`;
+  if(r.raw)h+=`<p class="note">The brain's notes were not in the usual shape:</p><div class="raw">${esc(r.raw)}</div>`;
+  h+='<p><b>Works well</b></p><ul>'+(r.good.map(g=>`<li>${esc(g)}</li>`).join('')||'<li>nothing noted</li>')+'</ul>';
+  h+='<p><b>Problems</b></p>';
+  for(const [k,t] of RANKS){const ps=r.problems.filter(p=>p.rank===k);if(!ps.length)continue;
+    h+=`<p class="note">${esc(t)}</p><ol>`+ps.map(p=>`<li>"${esc(p.quote)}"${p.found?'':' <span class="late">(not found in the text)</span>'}. Why: ${esc(p.why)}${p.fix?' Fix: '+esc(p.fix):''}</li>`).join('')+'</ol>'}
+  if(!r.problems.length)h+='<p class="note">none noted</p>';
+  h+='<p><b>Questions for the writer</b></p><ul>'+(r.questions.map(q=>`<li>${esc(q)}</li>`).join('')||'<li>none</li>')+'</ul>';
+  h+='<p><b>Not checked</b></p><ul>'+r.not_checked.map(x=>`<li>${esc(x)}</li>`).join('')+'</ul></div>';
+  return h}
+
+function render(){
+  $('jobs').innerHTML=(v.jobs||[]).map(j=>`<p class="note">${esc(j.title)}: ${j.state==='reading'?'still being read':esc(j.said)}</p>`).join('');
+  $('reviews').innerHTML=v.reviews.length?v.reviews.map(one).join(''):'<p class="note">No reviews yet.</p>'}
+
+pull(true);
+setInterval(pull,5000);
+</script>
+</body>
+</html>

@@ -1,0 +1,51 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "reviewer",
+  "kind": "agent",
+  "name": "Reviewer",
+  "version": "1.0.0",
+  "description": "An agent that reads something you made and comments on it. Paste a letter, an essay, a plan, a how-to or a block of code, say what kind it is and who it is for, and the bot's own brain reads it (in parts when it is long) and fills a fixed report: what it is, what works well, the problems ranked must fix, should fix and could fix (each with the quoted words, why and a fix), questions for you, and what was not checked. It can compare two versions and say whether the must-fix problems were fixed. It never changes your text, never runs code, and does not check facts. It keeps its review reports, which quote short passages of what you pasted so the comments make sense. It does not keep the whole text.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/review.svg",
+  "scope": ["review.read", "review.report"],
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "agent.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["review_text", "remove_review"],
+    "tools": {
+      "review_text": "When the owner pastes something they wrote and asks for a review or comments: the bot's brain reads it as the kind of thing it is, for the reader named, and a report is saved. The text is never changed.",
+      "list_reviews": "Only when the owner asks to see the list of saved reviews, never to remove or read one: the review reports, newest first. The other review tools take a few words of a title, so this is not needed first.",
+      "read_review": "When the owner asks to see a saved review again: one report by its title, no need to look it up first, or latest.",
+      "compare_versions": "When the owner pastes an earlier and a newer version of the same text: what changed, line by line, and whether the earlier review's must-fix problems were fixed.",
+      "review_checklist": "When the owner asks what the reviewer checks, or how a kind of text is judged: the reviewer's checklist for general writing, a formal letter, a plan or proposal, instructions, or code.",
+      "remove_review": "When the owner no longer wants a saved review, remove it by a few words of what it was about or latest, no need to look it up or list the reviews first: deletes that report."
+    },
+    "examples": {
+      "review_text": ["review this cover letter for a hiring manager: Dear Sam, I am writing to apply for the job of shop manager. I have run a shop for five years.", "give me comments on this plan for the school fair: we hold it on the first Saturday in May and ask each family for two cakes"],
+      "list_reviews": ["list my saved reviews", "which reviews have you done for me"],
+      "read_review": ["read me the review of my cover letter again", "show the latest review"],
+      "compare_versions": ["compare these two versions of my note and tell me what changed. Old: We meet at 5. New: We meet at 6 by the gate."],
+      "review_checklist": ["what does the reviewer check in a plan or proposal", "how do you judge code"],
+      "remove_review": ["remove my saved review of the cover letter"]
+    }
+  },
+  "ui": {
+    "pages": [ { "id": "main", "title": "Reviewer", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Reviewer", "icon": "icons/review.svg", "opens": "main" } ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "brain": { "text": true, "images": false },
+    "hardware": { "ram_gb": 0.2 }
+  },
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Reviewer keeps its files in its own folder on this computer (reviews.json). It keeps its review reports, which quote short passages of what you pasted so the comments make sense. It does not keep the whole text. It uses the bot's own brain on this computer to read the text you paste and to compare versions, and it uses no internet."
+}
