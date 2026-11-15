@@ -1,0 +1,89 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "prep-calculator",
+  "kind": "tool",
+  "name": "Prep Calculator",
+  "version": "1.0.0",
+  "description": "Emergency preparedness sums done in plain code, not guessed: water to store and how long it lasts, food energy for a household, battery runtime, a power and solar budget, rough generator fuel, bleach drops for drinking water, and the unit conversions a prepper needs. Answers give US and metric units and name every planning figure used. It works with no internet and stores nothing. Planning figures only, not medical, electrical or engineering advice.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/water-drop.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [],
+    "tools": {
+      "water_needed": "Work out how much drinking and hygiene water to store for a number of people (and pets) for a number of days, in US gallons and liters, and how many jugs or cans that is.",
+      "water_on_hand": "Work out how many days the water you have will last for a number of people (and pets).",
+      "food_needed": "Work out the food energy in kilocalories that adults, children and heavy workers need for a number of days, and roughly how much of one shelf food (rice, dried beans, oats, peanut butter, canned beans) gives that.",
+      "battery_runtime": "Work out how many hours a battery runs a load, from its watt-hours (or amp-hours and volts), its type and whether the load runs through an inverter.",
+      "power_budget": "Add up the watt-hours a day for a list of devices, and the battery size and solar panel watts that would cover it.",
+      "generator_fuel": "Give a rough range of the fuel a small gasoline or propane generator burns for a load and a number of hours, with the carbon monoxide safety line.",
+      "bleach_for_water": "Work out how many drops of plain unscented household bleach (5 to 9 percent) make clear or cloudy water safer to drink, per public guidance, with the steps that follow.",
+      "unit_convert": "Convert gallons, liters and quarts; pounds, kilograms, ounces and grams; Fahrenheit and Celsius; miles and kilometers; and watt-hours and amp-hours at a given voltage."
+    },
+    "examples": {
+      "water_needed": [
+        "how much water do 4 people need for 2 weeks",
+        "water to store for a family of 3 and a dog for 7 days"
+      ],
+      "water_on_hand": [
+        "how long will 20 gallons of water last 2 people"
+      ],
+      "food_needed": [
+        "how much rice feeds 2 adults for a month",
+        "calories for 2 adults and 2 kids for 14 days"
+      ],
+      "battery_runtime": [
+        "how long will a 1280 watt-hour lithium battery run a 100 watt load"
+      ],
+      "power_budget": [
+        "what battery and solar do I need for a 60 watt fridge all day and 10 watt lights for 5 hours"
+      ],
+      "generator_fuel": [
+        "how much gas does a generator use running 2000 watts for 10 hours"
+      ],
+      "bleach_for_water": [
+        "how much bleach for 5 gallons of water",
+        "drops of 8.25 percent bleach for 10 liters of cloudy water"
+      ],
+      "unit_convert": [
+        "convert 5 gallons to liters",
+        "how many amp-hours is 1280 watt-hours at 12.8 volts"
+      ]
+    }
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "delete"
+  },
+  "consent": "Prep Calculator runs on this computer only and uses no internet. It stores nothing."
+}

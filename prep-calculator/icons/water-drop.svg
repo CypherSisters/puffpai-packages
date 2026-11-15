@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Prep Calculator">
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="#2f6f9e"/>
+  <path d="M32 12 C32 12 18 28 18 37 a14 14 0 0 0 28 0 C46 28 32 12 32 12 Z" fill="#ffffff"/>
+  <rect x="25" y="34" width="14" height="4" rx="2" fill="#2f6f9e"/>
+  <rect x="25" y="41" width="14" height="4" rx="2" fill="#2f6f9e"/>
+</svg>
