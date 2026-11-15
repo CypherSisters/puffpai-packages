@@ -293,6 +293,52 @@ def test_ratings_and_scenarios_are_read_from_everyday_words():
         dc.pick_scenario("zombies")
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    rows = [{"id": str(i), "what": w} for i, w in enumerate(
+        ("Pesto Park torch", "Sliders Lane radio", "Berry Clinic phone list", "Joseph's charger", "José Alvarez key",
+         "Café Luna meeting spot"))]
+    # "crêpes" was "cr" + "pes" and found Pesto Park torch; an accented letter is never a gap
+    for typed in ("crêpes", "müsli", "über", "Renée"):
+        with pytest.raises(ValueError, match=f"no open fix matches {typed!r}"):
+            dc.find(rows, typed, "open fix", key="what")
+    with pytest.raises(ValueError, match="more than one open fix matches 'Jose': Joseph's charger; José Alvarez key"):
+        dc.find(rows, "Jose", "open fix", key="what")
+    # a name kept with accents is found typed with them or without them
+    assert dc.find(rows, "José Alvarez key", "open fix", key="what")["id"] == "4"
+    assert dc.find(rows, "jose alvarez", "open fix", key="what")["id"] == "4"
+    assert dc.find(rows, "CAFE LUNA", "open fix", key="what")["id"] == "5"
+    # a scenario is never read from the pieces of a word: "Fallón" holds no "fall"
+    assert "no scenario matches 'Fallón'" in tool_error(base, "start_drill", scenario="Fallón")
+    assert not (data / "drills.json").exists() or not saved(data)["drills"]                # nothing started
+    assert dc.pick_scenario("a week with no running water")["id"] == dc.pick_scenario("Talé water")["id"]
+
+
+def test_a_drill_fix_or_scenario_is_found_by_whole_words_never_by_letters_inside_a_word(base, data):
+    run_own(base, "earthquake", "not ready")
+    run_own(base, "smoke", "ready")
+    before = saved(data)
+    # letters inside a word, single letters (plain or accented) and two-letter words never find anything
+    for typed in ("ü", "İ", "i", "ç", "c", "a", "an", "on", "uake", "über", "e l", "fire"):
+        assert "no drill matches" in tool_error(base, "remove_drill", drill=typed), typed
+        assert "no open fix matches" in tool_error(base, "mark_fixed", item=typed), typed
+    for typed in ("ç", "İ", "i", "house fire", "fire", "uake"):
+        assert "no scenario matches" in tool_error(base, "start_drill", scenario=typed), typed
+    assert saved(data) == before
+    # an exact name wins, short words and all, with or without case, accents or "the"
+    assert dc.pick_scenario("an EARTHQUAKE")["id"] == dc.pick_scenario("the An earthquake")["id"]
+    assert dc.pick_scenario("a wïldfire smoke week")["id"] == "wildfire-smoke"
+    # a trigger word counts only as a whole word of what was said
+    assert dc.pick_scenario("a quake")["id"] == dc.pick_scenario("earthquake")["id"]
+    # a word of 3 letters or more that starts a word of one name: that one
+    assert tool(base, "drill_history", drill="ear").startswith("An earthquake on ")
+    run_own(base, "earthquake", "ready")
+    before = saved(data)
+    out = tool_error(base, "remove_drill", drill="ear")                                       # several
+    assert "more than one drill matches 'ear'" in out and out.count("An earthquake on") == 2
+    assert saved(data) == before
+    assert tool(base, "remove_drill", drill="wil").startswith("Removed the drill A wildfire smoke week on ")
+
+
 # ------------------------------------------------------------------ name finding
 
 def test_names_exact_partial_several_none(base, data):

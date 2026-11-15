@@ -3,7 +3,7 @@
   "id": "drill-coach",
   "kind": "agent",
   "name": "Drill Coach",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An agent that walks the household through an emergency practice and writes down what to fix. It has six practice scenarios (a winter power cut, a flood with an order to leave, a wildfire smoke week, an earthquake, a week with no running water, a medical emergency with phones down), each a set of timed what-now prompts. The household answers each prompt; the bot's own brain suggests a rating (ready, partly or not ready) that counts only once you confirm or change it, and writes a short summary at the end. What was not ready, or not confirmed, goes on a fix list. The drill runs and finishes with no brain at all if you rate it yourselves. It is practice only, and does not call or alert anyone. It checks whether your household is ready. It does not teach first aid: use a first aid course and the First Aid Basics pack for that.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

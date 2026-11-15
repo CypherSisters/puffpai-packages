@@ -2,8 +2,8 @@
 
 ## Picking a scenario (start_drill)
 
-1. Code finds the scenario by its name: an exact name, then the one name that contains the words, then the one name that holds every longer word said.
-2. If none fits, code looks for the scenario's everyday words in what was said (like power cut, blackout, flood, smoke, quake, no water, medical). One scenario: that one. Several or none: nothing changes, and the answer lists them.
+1. Code finds the scenario by its name: an exact name (case and accents ignored), else the one name where every word said of 3 letters or more is a whole word or the start of one, never letters inside a word; shorter words are ignored.
+2. If none fits, code looks for the scenario's everyday words as whole words in what was said (like power cut, blackout, flood, smoke, quake, no water, medical), never inside a word, so "house fire" is not the wildfire smoke drill. One scenario: that one. Several or none: nothing changes, and the answer lists them.
 3. If a drill is going and has an answer or a rating, nothing changes: finish it first. A drill that is going with no answer at all is dropped.
 4. Code saves the new drill with today's date, who took part, and every prompt of the scenario, and gives the setting and prompt 1.
 
@@ -32,7 +32,7 @@
 ## The fix list (fix_list, mark_fixed)
 
 1. The fix list shows the open items, each with its scenario and date, and how many are fixed.
-2. Marking fixed finds one open item by its words (exact, then the one that contains them, then the one that holds every longer word); none or several changes nothing and lists them. It saves today as the day it was fixed.
+2. Marking fixed, reading or removing a drill finds one item by its words the same way: the exact words first, else the one where every word of 3 letters or more is a whole word or the start of one; none or several changes nothing and lists them. It saves today as the day it was fixed.
 
 ## Past drills (drill_history, remove_drill)
 

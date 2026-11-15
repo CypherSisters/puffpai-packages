@@ -34,6 +34,7 @@ import string
 import tempfile
 import threading
 import time
+import unicodedata
 from datetime import date, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -44,7 +45,7 @@ PAGE = HERE / "web" / "index.html"
 SCENARIOS_FILE = HERE / "scenarios.json"
 NAME = "drill-coach"
 TITLE = "Drill Coach"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "drills.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
@@ -404,9 +405,28 @@ class Store:
 FILLER = ("the", "and", "our", "drill", "practice", "scenario", "one", "with", "for", "item", "fix")
 
 
+def _fold(text) -> str:
+    """Lower case with accents folded away (é is e, ü is u); letters of every script stay letters."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(c for c in text if not unicodedata.combining(c)).casefold()
+
+
+def _words(text, keep: str = "") -> list[str]:
+    """The folded words: letters and digits of any script (and the characters in *keep*); the rest are gaps."""
+    return "".join(c if c.isalnum() or c in keep else " " for c in _fold(text)).split()
+
+
+def _whole(text) -> str:
+    """A whole name for comparing: folded words, a leading 'the' dropped."""
+    words = _words(text, "-")
+    return " ".join(words[1:] if len(words) > 1 and words[0] == "the" else words)
+
+
 def find(rows: list[dict], name, what: str, key: str = "name") -> dict:
-    """The one row *name* points to: latest, an exact name first, then one unambiguous part of a name, then the one
-    holding every longer word said. None or several: a ValueError that names the candidates, and nothing changes."""
+    """The one row *name* points to: latest, an exact name first (case, accents and a leading 'the' ignored), else
+    the one name where every word said of 3 letters or more is a whole word or the start of one, never letters
+    inside a word; shorter words are ignored. None or several: a ValueError that names the candidates, and nothing
+    changes."""
     text = _text(name, what, 300)
     if not text:
         raise ValueError(f"say which {what}, by its words")
@@ -416,10 +436,12 @@ def find(rows: list[dict], name, what: str, key: str = "name") -> dict:
     exact = [r for r in rows if str(r.get(key, "")).lower() == low or r.get("id") == text]
     if len(exact) == 1:
         return exact[0]
-    hits = exact or [r for r in rows if low in str(r.get(key, "")).lower()]
+    whole = _whole(low)                  # accents folded, so 'cafe luna' is 'Café Luna'
+    hits = exact or [r for r in rows if whole and _whole(r.get(key, "")) == whole]
     if not hits:
-        words = [w for w in re.findall(r"[a-z0-9-]+", low) if len(w) > 2 and w not in FILLER]
-        hits = [r for r in rows if words and all(w in str(r.get(key, "")).lower() for w in words)]
+        words = [w for w in _words(low, "-") if len(w) >= 3 and w not in FILLER]
+        hits = [r for r in rows if words and all(any(h.startswith(w) for h in _words(r.get(key, ""), "-"))
+                                                 for w in words)]
     if len(hits) == 1:
         return hits[0]
     if hits:
@@ -430,12 +452,13 @@ def find(rows: list[dict], name, what: str, key: str = "name") -> dict:
 
 
 def pick_scenario(value) -> dict:
-    """A scenario by its name (as find does), else by its everyday words, like power cut or blackout."""
+    """A scenario by its name (as find does), else by its everyday words, like power cut or blackout, each a whole
+    word or words of what was said (accents folded), never letters inside a word."""
     try:
         return find(SCENARIOS, value, "scenario")
     except ValueError as exc:
-        low = " " + " ".join(re.findall(r"[a-z0-9]+", _text(value, "scenario", 300).lower())) + " "
-        hits = [s for s in SCENARIOS if any(f" {w} " in low for w in s["words"])]
+        low = " " + " ".join(_words(_text(value, "scenario", 300))) + " "
+        hits = [s for s in SCENARIOS if any(len(w) >= 3 and f" {' '.join(_words(w))} " in low for w in s["words"])]
         if len(hits) == 1:
             return hits[0]
         if hits:
