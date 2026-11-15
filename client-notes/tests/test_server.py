@@ -277,6 +277,26 @@ def test_the_same_rule_for_every_tool_that_takes_a_client(four, data):
     assert len(saved(data)["clients"]) == 3
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for name in ("Pesto Park", "Sliders Lane", "Berry Clinic", "Joseph Day", "Ren Bay", "José Alvarez", "Café Luna",
+                 "Zoë Ray"):
+        tool(base, "add_client", name=name)
+    # "über" is the one word "uber", never "ber" (which starts Berry): nothing is shown or removed
+    for typed in ("crêpes", "müsli", "über", "Renée"):
+        assert tool_error(base, "remove_note_or_client", client=typed).startswith(f"No client matches {typed!r}.")
+    out = tool_error(base, "remove_note_or_client", client="Jose")                  # starts José and Joseph
+    assert "Joseph Day (C-0004); José Alvarez (C-0006)" in out and "nothing was shown or changed" in out
+    assert len(saved(data)["clients"]) == 8
+    # a name kept with accents is found typed with them or without them
+    assert tool(base, "client_summary", client="José Alvarez").startswith("C-0006 José Alvarez")
+    assert tool(base, "client_summary", client="jose alvarez").startswith("Showing José Alvarez (C-0006).")
+    assert tool(base, "client_summary", client="Zoe").startswith("Showing Zoë Ray (C-0008).")
+    assert tool(base, "remove_note_or_client", client="CAFE LUNA") == \
+        "Showing Café Luna (C-0007).\nRemoved the client C-0007 Café Luna."
+    assert [c["name"] for c in saved(data)["clients"]] == ["Pesto Park", "Sliders Lane", "Berry Clinic", "Joseph Day",
+                                                           "Ren Bay", "José Alvarez", "Zoë Ray"]
+
+
 # ------------------------------------------------------------------ the double confirm
 
 def test_removing_a_client_with_notes_needs_the_exact_code(base, data):

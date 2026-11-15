@@ -35,6 +35,7 @@ import secrets
 import tempfile
 import threading
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -43,7 +44,7 @@ from urllib.parse import parse_qs, urlsplit
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "client-notes"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "clients.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 1024 * 1024
@@ -220,7 +221,7 @@ def _as_date(value) -> date | None:
 
 def _pick(table: dict, value, default: str) -> tuple[str, bool]:
     """(the key whose words match *value*, whether it matched). Unknown words give *default*."""
-    words = " " + " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split()) + " "
+    words = " " + " ".join(_words(value)) + " "
     if not words.strip():
         return default, True
     for key, hints in table.items():
@@ -429,7 +430,10 @@ class Store:
 # ------------------------------------------------------------- the logic
 
 def _words(text) -> list[str]:
-    return re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).split()
+    """Lower-case words, accents folded (é is e): letters and digits of any script, everything else a gap.
+    So 'über' is the one word 'uber', never 'ber'."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(c if c.isalnum() else " " for c in text if not unicodedata.combining(c)).casefold().split()
 
 
 def _who(c: dict) -> str:

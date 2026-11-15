@@ -3,7 +3,7 @@
   "id": "client-notes",
   "kind": "app",
   "name": "Client Notes",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Notes per client for a one-person practice (a counsellor, coach, tutor, tradesperson, carer, or a small law or accounts office), kept on this computer: each client with a private code like C-0001, contact details, status, tags and consent on file, and a timeline of session, call, email and visit notes with what was agreed, actions and the next contact date. It shows open actions, who is due for contact and this week, prints one record or one note, and exports to JSON or text. It does not encrypt the notes, does not send reminders, bills or messages, and writes no clinical or professional judgement: it stores what you type.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
