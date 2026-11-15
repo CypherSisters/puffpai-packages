@@ -1,0 +1,115 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "client-notes",
+  "kind": "app",
+  "name": "Client Notes",
+  "version": "1.0.0",
+  "description": "Notes per client for a one-person practice (a counsellor, coach, tutor, tradesperson, carer, or a small law or accounts office), kept on this computer: each client with a private code like C-0001, contact details, status, tags and consent on file, and a timeline of session, call, email and visit notes with what was agreed, actions and the next contact date. It shows open actions, who is due for contact and this week, prints one record or one note, and exports to JSON or text. It does not encrypt the notes, does not send reminders, bills or messages, and writes no clinical or professional judgement: it stores what you type.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/client-notes.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "add_client",
+      "add_session_note",
+      "mark_action_done",
+      "remove_note_or_client"
+    ],
+    "tools": {
+      "find_client": "Use to look up which clients there are: by words in a name, code, tag or the about note, or by status (active, paused, closed). It lists each with the last note and next contact date.",
+      "client_summary": "Use to catch up on one client, by name or code; no need to look it up first: the latest notes, open actions, next contact date and consent on file.",
+      "add_client": "Use when the owner takes on a new client: a display name or initials, and if given the contact details, start date, status, tags, a short about note and consent on file. The app gives a private code like C-0001.",
+      "add_session_note": "Use to write down a session, call, email or visit with a client, by name or code; no need to look it up first: what was discussed, what was agreed, actions, the length and the next contact date.",
+      "list_open_actions": "Use to see the actions still open: across all clients, or for one client by name or code, soonest due first.",
+      "mark_action_done": "Use when the owner says an action from a note is done: it finds the action by its words, so no need to look it up first.",
+      "who_is_due": "Use when the owner asks which clients are due for contact or have not been seen lately: it lists clients whose next contact date is in the next 7 days or past, and active clients with no note in 30 days (or the number of days asked).",
+      "remove_note_or_client": "Use only when the owner asks to delete a client's note or a client, by name or code; no need to look it up first. It removes one note (by its date, or latest), or a client who has no notes left; a client with notes is removed only when confirm is that client's exact code."
+    },
+    "examples": {
+      "find_client": [
+        "which of my clients are paused",
+        "find my clients tagged tutoring"
+      ],
+      "client_summary": [
+        "catch me up on C-0002 before the session",
+        "give me a summary of Alex's file"
+      ],
+      "add_client": [
+        "add a new client Sam L, started today, consent on file",
+        "take on a new client, initials J.T., tag coaching"
+      ],
+      "add_session_note": [
+        "note for C-0001: 50 minute session today, we talked about sleep and agreed to keep a diary",
+        "log a 15 minute call with Jo about the invoice"
+      ],
+      "list_open_actions": [
+        "what actions are still open across all my clients",
+        "what do I still owe C-0003"
+      ],
+      "mark_action_done": [
+        "the send the worksheet action is done",
+        "I posted the invoice to Jo, tick that off"
+      ],
+      "who_is_due": [
+        "which clients am I due to contact in the next few days",
+        "which clients haven't I seen in 60 days"
+      ],
+      "remove_note_or_client": [
+        "delete the latest note for C-0002",
+        "remove client C-0005, they never started"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Client Notes",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Client Notes",
+        "icon": "icons/client-notes.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Client Notes keeps your clients' names, contact details and the notes you write about them in its own folder on this computer (clients.json), in plain files that this app does not encrypt; it uses no internet and does not use the brain. The bot can read and change them when you ask it in chat, except the words of a note you mark private."
+}

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<!-- Client Notes page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Notes</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.2rem;font-weight:700;margin:2px 0 6px}
+h3{font-size:.95rem;font-weight:700;margin:10px 0 4px}
+.wrap{max-width:1200px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 10px}
+.grid label{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--p-text2)}
+.grid label.wide{grid-column:1/-1}
+input,select,textarea{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 8px;min-height:40px;width:100%}
+textarea{min-height:90px;resize:vertical}
+input[type=checkbox]{width:22px;height:22px;min-height:22px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.tab.on{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input,.row select{width:auto;flex:1 1 160px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:1px 7px;font-size:.78rem;background:var(--p-chip);color:var(--p-text2);margin:2px 4px 0 0}
+.tag.warn{background:var(--p-warn);color:#000}
+.note{color:var(--p-text2);font-size:.85rem}
+.notice{border-left:4px solid var(--p-warn);padding:8px 12px;background:var(--p-card);margin:8px 0;font-weight:600}
+.layout{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:12px;margin-top:10px}
+@media (max-width:760px){.layout{grid-template-columns:1fr}}
+.list button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--p-line);background:transparent;padding:8px 6px}
+.list button:first-child{border-top:0}
+.list button.sel{background:var(--p-chip);font-weight:700}
+.entry{border-top:1px solid var(--p-line);padding:8px 0}
+.entry:first-child{border-top:0}
+.pre{white-space:pre-wrap}
+.tick{display:flex;align-items:center;gap:8px;min-height:36px}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#printArea{display:none}
+@media print{
+  @page{margin:14mm}
+  body{background:#fff;color:#000;padding:0;font:10.5pt/1.4 Arial,Helvetica,sans-serif}
+  .screen{display:none!important}
+  #printArea{display:block}
+  #printArea h1{font:bold 15pt Arial,Helvetica,sans-serif;margin-bottom:4pt}
+  #printArea h2{font:bold 12pt Arial,Helvetica,sans-serif;margin:10pt 0 3pt;border-bottom:1px solid #000}
+  #printArea p,#printArea li{margin:1pt 0;break-inside:avoid}
+  #printArea ul{padding-left:14pt}
+  #printArea .pre{white-space:pre-wrap}
+}
+</style>
+</head>
+<body>
+<div class="wrap screen">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="8" width="40" height="50" fill="none" stroke="currentColor" stroke-width="4"/><path d="M20 22h24M20 32h24M20 42h14" stroke="currentColor" stroke-width="4"/></svg>Client Notes</h1>
+<div class="row">
+<button class="tab on" data-tab="clients">Clients</button><button class="tab" data-tab="actions">Open actions</button><button class="tab" data-tab="week">This week</button>
+<button class="primary" id="newClient">New client</button>
+<button id="exportAll">Export all (JSON)</button><button id="exportAllText">Export all (text)</button><button id="importBtn">Import</button>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+</div>
+</div>
+<p class="notice" id="notice">These notes are kept in plain files on this computer and are not encrypted by this app. Your profession may have rules about keeping client records: check them.</p>
+<div id="msg"></div>
+
+<div id="tab-clients" class="layout">
+<div>
+<div class="card"><div class="row"><input id="search" placeholder="Search name, code or tag" aria-label="Search clients">
+<select id="statusPick" aria-label="Status"><option value="">All</option><option value="active" selected>Active</option><option value="paused">Paused</option><option value="closed">Closed</option></select></div></div>
+<div class="card list" id="list" style="margin-top:8px"></div>
+</div>
+<div class="card" id="view"><p class="note">Pick a client, or add a new one.</p></div>
+</div>
+<div id="tab-actions" class="card" style="margin-top:10px" hidden></div>
+<div id="tab-week" class="card" style="margin-top:10px" hidden></div>
+</div>
+<div id="printArea"></div>
+
+<script>
+// Paths are relative, so the page works at /pkg/client-notes/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let doc=null,_stamp='',_loaded=false,_waiting=false,current='',form=null,tab='clients';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Client Notes sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Client Notes could not save.');
+  return out}
+
+// Poll the stamp; read everything only when it changed (the bot may change things too). A form being filled in is never redrawn.
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Client Notes could not read its saved notes.',true);return}
+    const {last_updated}=await chk.json();if(_loaded&&!force&&last_updated===_stamp)return;
+    const v=await fetch(BASE+'view');if(!v.ok)return;
+    doc=await v.json();_stamp=doc.last_updated||'';_loaded=true;
+    if(form&&!force){_waiting=true;renderList();return}render()}
+  catch(e){if(!_loaded)say('Client Notes is not answering. Is it running?',true)}}
+
+const byId=id=>doc.clients.find(c=>c.id===id);
+const notesOf=c=>doc.notes.filter(n=>n.client_id===c.id).sort((a,b)=>b.when.localeCompare(a.when));
+const who=c=>c.code+' '+c.name;
+const when=n=>n.when.replace('T',' ');
+function render(){renderList();if(!form)renderView();renderActions();renderWeek()}
+
+function renderList(){
+  const q=$('search').value.trim().toLowerCase(),st=$('statusPick').value;
+  const rows=doc.clients.filter(c=>(!st||c.status===st)&&(!q||[c.name,c.code,...c.tags].join(' ').toLowerCase().includes(q))).sort((a,b)=>a.code.localeCompare(b.code));
+  $('list').innerHTML=rows.map(c=>`<button data-open="${esc(c.id)}" class="${c.id===current?'sel':''}"><b>${esc(c.code)}</b> ${esc(c.name)}
+    ${doc.due_soon.includes(c.id)?'<span class="tag warn">due</span>':''}${doc.not_seen.includes(c.id)?'<span class="tag">not seen '+esc(doc.not_seen_days)+'+ days</span>':''}
+    <br><span class="note">${esc(c.status)}${c.last_note?' &middot; last note '+esc(c.last_note):''}${c.next_contact?' &middot; next '+esc(c.next_contact):''}</span></button>`).join('')
+    ||`<p class="note">${doc.clients.length?'No client matches.':'No clients yet.'}</p>`}
+
+function actionsHtml(n){return n.actions.map(a=>`<label class="tick"><input type="checkbox" data-note="${esc(n.id)}" data-action="${esc(a.id)}"${a.done?' checked':''}>
+  <span>${esc(a.what)}${a.who?' <span class="note">(who: '+esc(a.who)+')</span>':''}${a.by?' <span class="note">by '+esc(a.by)+'</span>':''}${a.done_on?' <span class="note">done '+esc(a.done_on)+'</span>':''}</span></label>`).join('')}
+
+function renderView(){
+  const c=current&&byId(current);
+  if(!c){$('view').innerHTML='<p class="note">Pick a client, or add a new one.</p>';return}
+  const ns=notesOf(c),con=c.consent;
+  $('view').innerHTML=`<div class="head"><h2>${esc(c.code)} &middot; ${esc(c.name)}</h2>
+    <div class="row"><button class="primary" data-addnote="${esc(c.id)}">Add note</button><button data-editclient="${esc(c.id)}">Edit</button>
+    <button data-printclient="${esc(c.id)}">Print record</button><button data-exportone="${esc(c.id)}">Export (JSON)</button><button data-exporttext="${esc(c.id)}">Export (text)</button></div></div>
+    <p class="note">${esc(c.status)} &middot; started ${esc(c.started||'not given')} &middot; consent on file: ${esc(con.on_file||'not recorded')}${con.date?' ('+esc(con.date)+')':''}${c.next_contact?' &middot; next contact '+esc(c.next_contact):''}</p>
+    ${[c.phone,c.email,c.address].filter(Boolean).length?`<p>${esc([c.phone,c.email,c.address].filter(Boolean).join(' · '))}</p>`:''}
+    <div>${c.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+    ${c.about?`<p class="pre" style="margin-top:6px">${esc(c.about)}</p>`:''}${con.note?`<p class="note">Consent: ${esc(con.note)}</p>`:''}
+    <h3>Notes (${ns.length})</h3>
+    ${ns.map(n=>`<div class="entry"><div class="head"><b>${esc(when(n))} &middot; ${esc(n.kind)}${n.minutes?' &middot; '+esc(n.minutes)+' min':''}${n.private?' <span class="tag">private</span>':''}</b>
+      <div class="row"><button data-editnote="${esc(n.id)}">Edit</button><button data-printnote="${esc(n.id)}">Print</button><button data-removenote="${esc(n.id)}">Remove</button></div></div>
+      ${n.discussed?`<p class="pre"><span class="note">Discussed:</span> ${esc(n.discussed)}</p>`:''}${n.agreed?`<p class="pre"><span class="note">Agreed:</span> ${esc(n.agreed)}</p>`:''}
+      ${actionsHtml(n)}${n.next_contact?`<p class="note">Next contact: ${esc(n.next_contact)}</p>`:''}</div>`).join('')||'<p class="note">No notes yet.</p>'}
+    <div class="row" style="margin-top:14px"><button data-removeclient="${esc(c.id)}">Close and remove this client</button></div>`}
+
+function clientForm(c){form='client';
+  const v=k=>esc(c?c[k]:''),con=c?c.consent:{on_file:'',date:'',note:''};
+  $('view').innerHTML=`<h2>${c?'Edit '+esc(who(c)):'New client'}</h2><form class="grid" id="clientForm">
+    <label>Display name or initials<input name="name" maxlength="80" required value="${v('name')}"></label>
+    <label>Private code<input name="code" maxlength="20" value="${c?v('code'):esc(doc.next_code)}" pattern="[A-Za-z0-9][A-Za-z0-9-]{0,19}"></label>
+    <label>Status<select name="status">${doc.statuses.map(s=>`<option value="${esc(s)}"${c&&c.status===s?' selected':''}>${esc(s)}</option>`).join('')}</select></label>
+    <label>Started<input name="started" type="date" value="${c?v('started'):esc(doc.today)}"></label>
+    <label>Phone (optional)<input name="phone" maxlength="40" value="${v('phone')}"></label>
+    <label>Email (optional)<input name="email" maxlength="120" value="${v('email')}"></label>
+    <label class="wide">Address (optional)<input name="address" maxlength="300" value="${v('address')}"></label>
+    <label class="wide">Tags, comma separated<input name="tags" maxlength="900" value="${c?esc(c.tags.join(', ')):''}"></label>
+    <label class="wide">About<textarea name="about" maxlength="2000">${v('about')}</textarea></label>
+    <label>Consent on file<select name="on_file"><option value="">not recorded</option><option value="yes"${con.on_file==='yes'?' selected':''}>yes</option><option value="no"${con.on_file==='no'?' selected':''}>no</option></select></label>
+    <label>Consent date<input name="consent_date" type="date" value="${esc(con.date)}"></label>
+    <label class="wide">Consent note<input name="consent_note" maxlength="500" value="${esc(con.note)}"></label>
+    <div class="row wide"><button class="primary">Save</button><button type="button" data-cancel="1">Cancel</button></div>
+    <input type="hidden" name="id" value="${c?esc(c.id):''}"></form>`}
+
+function noteForm(c,n){form='note';
+  const v=k=>esc(n?n[k]:'');
+  $('view').innerHTML=`<h2>${n?'Edit note':'New note'} for ${esc(who(c))}</h2><form class="grid" id="noteForm">
+    <label>Date<input name="date" type="date" value="${esc(n?n.when.slice(0,10):doc.today)}" max="${esc(doc.today)}"></label>
+    <label>Time<input name="time" type="time" value="${esc(n&&n.when.length>10?n.when.slice(11,16):'')}"></label>
+    <label>Kind<select name="kind">${doc.kinds.map(k=>`<option value="${esc(k)}"${n&&n.kind===k?' selected':''}>${esc(k)}</option>`).join('')}</select></label>
+    <label>Minutes<input name="minutes" type="number" min="0" max="1440" value="${n&&n.minutes?esc(n.minutes):''}"></label>
+    <label class="wide">What was discussed<textarea name="discussed" maxlength="8000">${v('discussed')}</textarea></label>
+    <label class="wide">What was agreed<textarea name="agreed" maxlength="4000" style="min-height:58px">${v('agreed')}</textarea></label>
+    <label class="wide">Actions, one per line (like: Alex: send the worksheet by 2027-03-31)<textarea name="actions" maxlength="20000" style="min-height:58px">${n?esc(n.actions.map(a=>(a.who?a.who+': ':'')+a.what+(a.by?' by '+a.by:'')).join('\n')):''}</textarea></label>
+    <label>Next contact<input name="next_contact" type="date" value="${v('next_contact')}"></label>
+    <label class="tick"><input type="checkbox" name="private"${n&&n.private?' checked':''}> Private: keep this note's words off chat</label>
+    <div class="row wide"><button class="primary">Save</button><button type="button" data-cancel="1">Cancel</button></div></form>`;
+  $('noteForm').dataset.client=c.id;if(n){$('noteForm').dataset.id=n.id;$('noteForm').dataset.keep=JSON.stringify(n.actions)}}
+
+function renderActions(){
+  const rows=doc.notes.flatMap(n=>n.actions.filter(a=>!a.done).map(a=>({n,a,c:byId(n.client_id)}))).sort((x,y)=>(x.a.by||'9999').localeCompare(y.a.by||'9999'));
+  $('tab-actions').innerHTML='<h2>Open actions</h2>'+(rows.length?'<table><tr><th></th><th>Client</th><th>Action</th><th>Who</th><th>By</th><th>From the note of</th></tr>'+rows.map(({n,a,c})=>`<tr>
+    <td><input type="checkbox" aria-label="Done" data-note="${esc(n.id)}" data-action="${esc(a.id)}"></td><td><button data-open="${esc(c.id)}">${esc(who(c))}</button></td>
+    <td>${esc(a.what)}</td><td>${esc(a.who)}</td><td>${esc(a.by)}${a.by&&a.by<doc.today?' <span class="tag warn">overdue</span>':''}</td><td>${esc(when(n))}</td></tr>`).join('')+'</table>':'<p class="note">No open actions.</p>')}
+
+function renderWeek(){const [mon,sun]=doc.week;
+  const inWeek=d=>d&&d>=mon&&d<=sun;
+  const notes=doc.notes.filter(n=>inWeek(n.when.slice(0,10))).sort((a,b)=>a.when.localeCompare(b.when));
+  const due=doc.clients.filter(c=>c.status!=='closed'&&c.next_contact&&c.next_contact<=sun).sort((a,b)=>a.next_contact.localeCompare(b.next_contact));
+  const acts=doc.notes.flatMap(n=>n.actions.filter(a=>!a.done&&a.by&&a.by<=sun).map(a=>({n,a,c:byId(n.client_id)})));
+  const unseen=doc.not_seen.map(byId);
+  $('tab-week').innerHTML=`<h2>This week <span class="note">${esc(mon)} to ${esc(sun)}</span></h2>
+    <h3>Next contact due this week or before</h3>${due.map(c=>`<p><button data-open="${esc(c.id)}">${esc(who(c))}</button> ${esc(c.next_contact)}${c.next_contact<doc.today?' <span class="tag warn">overdue</span>':''}</p>`).join('')||'<p class="note">None.</p>'}
+    <h3>Actions due this week or before</h3>${acts.map(({n,a,c})=>`<p>${esc(who(c))}: ${esc(a.what)} <span class="note">by ${esc(a.by)}</span></p>`).join('')||'<p class="note">None.</p>'}
+    <h3>Notes written this week</h3>${notes.map(n=>`<p>${esc(when(n))} &middot; ${esc(who(byId(n.client_id)))} &middot; ${esc(n.kind)}</p>`).join('')||'<p class="note">None.</p>'}
+    <h3>Active clients with no note in ${esc(doc.not_seen_days)} days or more</h3>${unseen.map(c=>`<p><button data-open="${esc(c.id)}">${esc(who(c))}</button> <span class="note">last note ${esc(c.last_note||'none')}</span></p>`).join('')||'<p class="note">None.</p>'}`}
+
+function showTab(t){tab=t;for(const k of ['clients','actions','week'])$('tab-'+k).hidden=k!==t;
+  document.querySelectorAll('button.tab').forEach(b=>b.classList.toggle('on',b.dataset.tab===t))}
+
+document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault();const b=Object.fromEntries(new FormData(f));
+  try{
+    if(f.id==='clientForm'){const client={name:b.name,code:b.code,status:b.status,started:b.started,phone:b.phone,email:b.email,address:b.address,
+        tags:b.tags,about:b.about,consent:{on_file:b.on_file,date:b.consent_date,note:b.consent_note}};if(b.id)client.id=b.id;
+      say((await post('api/client',{client})).text);form=null;await pull(true);
+      const c=doc.clients.find(x=>x.code===(b.code||'').trim().toUpperCase())||doc.clients[doc.clients.length-1];if(c){current=c.id;render()}}
+    else if(f.id==='noteForm'){const keep=f.dataset.keep?JSON.parse(f.dataset.keep):[];
+      const actions=b.actions.split('\n').map(x=>x.trim()).filter(Boolean).map(line=>{const old=keep.find(a=>(a.who?a.who+': ':'')+a.what+(a.by?' by '+a.by:'')===line);return old||line});
+      const note={client_id:f.dataset.client,date:b.date,time:b.time,kind:b.kind,minutes:b.minutes||0,discussed:b.discussed,agreed:b.agreed,actions,next_contact:b.next_contact,private:!!b.private};
+      if(f.dataset.id)note.id=f.dataset.id;
+      say((await post('api/note',{note})).text);form=null;pull(true)}
+  }catch(err){say(err.message,true)}});
+
+document.addEventListener('input',e=>{if(e.target.id==='search')renderList()});
+document.addEventListener('change',async e=>{const t=e.target;
+  try{if(t.id==='statusPick')renderList();
+    else if(t.dataset.action){say((await post('api/action',{note_id:t.dataset.note,action_id:t.dataset.action,done:t.checked})).text);pull(true)}}
+  catch(err){say(err.message,true);pull(true)}});
+
+async function download(path,name){const r=await fetch(BASE+path);if(!r.ok)throw new Error('Client Notes could not export.');
+  const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)}
+const stem=c=>'client-notes-'+(c?c.code+'-':'')+doc.today;
+
+document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.tab){showTab(d.tab)}
+    else if(d.open){current=d.open;form=null;showTab('clients');render()}
+    else if(t.id==='newClient'){showTab('clients');clientForm(null)}
+    else if(d.cancel){form=null;_waiting=false;render()}
+    else if(d.editclient){clientForm(byId(d.editclient))}
+    else if(d.addnote){noteForm(byId(d.addnote),null)}
+    else if(d.editnote){const n=doc.notes.find(x=>x.id===d.editnote);noteForm(byId(n.client_id),n)}
+    else if(d.removenote){const n=doc.notes.find(x=>x.id===d.removenote);if(!confirm('Remove the note of '+when(n)+' for good?'))return;
+      say((await post('api/remove_note',{id:d.removenote})).text);pull(true)}
+    else if(d.removeclient){await closeAndRemove(byId(d.removeclient))}
+    else if(d.exportone){const c=byId(d.exportone);await download('export?id='+encodeURIComponent(c.id),stem(c)+'.json');say('Exported '+who(c)+'.')}
+    else if(d.exporttext){const c=byId(d.exporttext);await download('export_text?id='+encodeURIComponent(c.id),stem(c)+'.txt');say('Exported '+who(c)+' as text.')}
+    else if(t.id==='exportAll'){await download('export',stem(null)+'.json');say('Exported every client.')}
+    else if(t.id==='exportAllText'){await download('export_text',stem(null)+'.txt');say('Exported every client as text.')}
+    else if(t.id==='importBtn'){$('importFile').click()}
+    else if(d.printclient){printClient(byId(d.printclient))}
+    else if(d.printnote){const n=doc.notes.find(x=>x.id===d.printnote);printNote(byId(n.client_id),n)}
+  }catch(err){say(err.message,true)}});
+
+// Close and remove: offers an export first, then asks twice; the second time the owner types the client's code.
+async function closeAndRemove(c){const n=notesOf(c).length;
+  if(n&&confirm('Export '+who(c)+"'s record before removing it? OK downloads it first; Cancel goes on without it."))await download('export?id='+encodeURIComponent(c.id),stem(c)+'.json');
+  if(!confirm('Remove '+who(c)+(n?' and all '+n+' notes':'')+' from this computer for good?'))return say('Nothing was removed.');
+  const typed=prompt('To remove '+who(c)+' for good, type the client code exactly: '+c.code);
+  if(typed===null||typed.trim()!==c.code)return say('The code did not match. Nothing was removed.',true);
+  say((await post('api/remove_client',{id:c.id,confirm:typed.trim()})).text);current='';pull(true)}
+
+$('importFile').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;
+  try{const data=JSON.parse(await file.text());say((await post('api/import',{data})).text);pull(true)}catch(err){say(err.message||'That file is not a Client Notes export.',true)}});
+
+// Print views: plain text in plain elements, every value escaped.
+function noteHtml(n){return `<h2>${esc(when(n))} &middot; ${esc(n.kind)}${n.minutes?' &middot; '+esc(n.minutes)+' min':''}${n.private?' &middot; private':''}</h2>
+  ${n.discussed?`<p><b>Discussed:</b></p><p class="pre">${esc(n.discussed)}</p>`:''}${n.agreed?`<p><b>Agreed:</b></p><p class="pre">${esc(n.agreed)}</p>`:''}
+  ${n.actions.length?'<ul>'+n.actions.map(a=>`<li>[${a.done?'x':' '}] ${esc(a.what)}${a.who?' (who: '+esc(a.who)+')':''}${a.by?', by '+esc(a.by):''}</li>`).join('')+'</ul>':''}
+  ${n.next_contact?`<p>Next contact: ${esc(n.next_contact)}</p>`:''}`}
+function clientHead(c){const con=c.consent;return `<h1>${esc(who(c))}</h1><p>Status ${esc(c.status)}. Started ${esc(c.started||'not given')}. Consent on file: ${esc(con.on_file||'not recorded')}${con.date?', '+esc(con.date):''}${con.note?'. '+esc(con.note):''}</p>
+  ${[c.phone,c.email,c.address].filter(Boolean).length?`<p>${esc([c.phone,c.email,c.address].filter(Boolean).join(' · '))}</p>`:''}${c.tags.length?`<p>Tags: ${esc(c.tags.join(', '))}</p>`:''}${c.about?`<p class="pre">${esc(c.about)}</p>`:''}`}
+function printClient(c){$('printArea').innerHTML=clientHead(c)+notesOf(c).map(noteHtml).join('')+`<p style="margin-top:12pt">Printed ${esc(doc.today)}.</p>`;window.print()}
+function printNote(c,n){$('printArea').innerHTML=`<h1>${esc(who(c))}</h1>`+noteHtml(n)+`<p style="margin-top:12pt">Printed ${esc(doc.today)}.</p>`;window.print()}
+
+pull(true);
+setInterval(pull,4000);
+</script>
+</body>
+</html>
