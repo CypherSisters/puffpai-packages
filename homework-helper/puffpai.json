@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "homework-helper",
+  "kind": "skill",
+  "name": "Homework Helper",
+  "version": "1.0.0",
+  "description": "Teaches the brain to help a learner with schoolwork one step at a time: it asks what they tried, gives one step or hint, checks understanding with a small question, and shows a similar worked example after two hints. It does not hand over answers to graded work or write essays. It adds no tools of its own and fetches nothing; with Calculator installed it does sums with that.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/book.svg",
+  "consent": "This skill is text the brain reads. It runs nothing, stores nothing and uses no internet."
+}
