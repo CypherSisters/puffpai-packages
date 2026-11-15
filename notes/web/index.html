@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<!-- Notes page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. The Markdown renderer below is adapted from snarkdown (MIT); see NOTICE.md. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notes</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.15rem;font-weight:700;margin:0 0 4px}
+.wrap{max-width:1200px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+input,select,textarea{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 8px;min-height:40px;width:100%}
+textarea{min-height:320px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:.9rem}
+input[type=checkbox]{width:22px;height:22px;min-height:22px;flex:none}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input,.row select{width:auto;flex:1 1 140px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:1px 7px;font-size:.78rem;background:var(--p-chip);color:var(--p-text2);margin:2px 4px 0 0}
+.note{color:var(--p-text2);font-size:.85rem}
+.warn{border-left:4px solid var(--p-warn);padding:8px 12px;background:var(--p-card);margin-top:8px;font-size:.9rem}
+.cols{display:grid;grid-template-columns:minmax(260px,360px) 1fr;gap:12px;margin-top:10px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+#list{list-style:none;margin-top:8px;max-height:70vh;overflow:auto}
+#list li{border-top:1px solid var(--p-line);padding:7px 4px;cursor:pointer;min-height:44px}
+#list li.on{background:var(--p-chip)}
+#list li b{display:block}
+#list .line{color:var(--p-text2);font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+.md{line-height:1.5;margin-top:10px;overflow-wrap:anywhere}
+.md h1,.md h2,.md h3{font-family:var(--font-display);margin:10px 0 4px}
+.md ul,.md ol{padding-left:22px}
+.md pre{background:var(--p-chip);padding:8px;overflow:auto}
+.md blockquote{border-left:3px solid var(--p-line);padding-left:10px;color:var(--p-text2)}
+.tick{display:flex;align-items:center;gap:8px;min-height:40px;padding:2px 0}
+.tick.done span{text-decoration:line-through;color:var(--p-text2)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 10px;margin:8px 0}
+.grid label{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--p-text2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M14 6h28l10 10v42H14z" fill="none" stroke="currentColor" stroke-width="4"/><path d="M22 28h20M22 36h20M22 44h14" stroke="currentColor" stroke-width="3"/></svg>Notes</h1>
+<div class="row"><button class="primary" id="newBtn">New note</button><button id="exportBtn">Export</button><button id="importBtn">Import</button>
+<input type="file" id="importFile" accept=".zip,.md,.markdown,.txt" hidden></div>
+</div>
+<p class="note">Each note is a plain Markdown file on this computer. Lines that start with - [ ] are tick boxes.</p>
+<div id="msg"></div>
+<div id="unreadable"></div>
+<div id="renewed"></div>
+<div class="cols">
+<div class="card">
+<input id="q" type="search" placeholder="Search titles, text and tags" aria-label="Search">
+<div class="row" style="margin-top:6px"><select id="bookPick" aria-label="Notebook"></select><select id="tagPick" aria-label="Tag"></select></div>
+<p class="note" id="count" style="margin-top:6px"></p>
+<ul id="list"></ul>
+</div>
+<div class="card" id="view"><p class="note">Pick a note, or make a new one.</p></div>
+</div>
+</div>
+
+<script>
+/* md-start: a small Markdown renderer adapted from snarkdown (MIT, see NOTICE.md).
+   Changes: the text is escaped first, so no tag in an entry can reach the page; a link keeps its address only
+   when it is a web address (http or https); a picture shows as its words, never loads. */
+const MD_TAGS={'':['<em>','</em>'],_:['<strong>','</strong>'],'*':['<strong>','</strong>'],'~':['<s>','</s>'],'\n':['<br />'],' ':['<br />'],'-':['<hr />']};
+function mdOutdent(str){return str.replace(RegExp('^'+(str.match(/^(\t| )+/)||'')[0],'gm'),'')}
+function mdAttr(str){return (str+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function mdUrl(u){u=String(u||'').trim();return /^https?:\/\/[^\s"<>]+$/i.test(u)?u:''}
+function mdParse(md,prevLinks){
+  let tokenizer=/((?:^|\n+)(?:\n---+|\* \*(?: \*)+)\n)|(?:^``` *(\w*)\n([\s\S]*?)\n```$)|((?:(?:^|\n+)(?:\t|  {2,}).+)+\n*)|((?:(?:^|\n)([>*+-]|\d+\.)\s+.*)+)|(?:!\[([^\]]*?)\]\(([^)]+?)\))|(\[)|(\](?:\(([^)]+?)\))?)|(?:(?:^|\n+)([^\s].*)\n(-{3,}|={3,})(?:\n+|$))|(?:(?:^|\n+)(#{1,6})\s*(.+)(?:\n+|$))|(?:`([^`].*?)`)|(  \n\n*|\n{2,}|__|\*\*|[_*]|~~)/gm,
+    context=[],out='',links=prevLinks||Object.create(null),last=0,chunk,prev,token,inner,t;
+  function tag(token){let desc=MD_TAGS[token[1]||''];let end=context[context.length-1]==token;
+    if(!desc)return token;if(!desc[1])return desc[0];if(end)context.pop();else context.push(token);return desc[end|0]}
+  function flush(){let str='';while(context.length)str+=tag(context[context.length-1]);return str}
+  md=md.replace(/^\[(.+?)\]:\s*(.+)$/gm,(s,name,url)=>{links[name.toLowerCase()]=url;return ''}).replace(/^\n+|\n+$/g,'');
+  while((token=tokenizer.exec(md))){
+    prev=md.substring(last,token.index);last=tokenizer.lastIndex;chunk=token[0];
+    if(prev.match(/[^\\](\\\\)*\\$/)){/* escaped */}
+    else if(t=(token[3]||token[4])){
+      chunk='<pre class="code"><code>'+mdOutdent(mdAttr(t).replace(/^\n+|\n+$/g,''))+'</code></pre>'}
+    else if(t=token[6]){
+      if(t.match(/\./))token[5]=token[5].replace(/^\d+/gm,'');
+      inner=mdParse(mdOutdent(token[5].replace(/^\s*[>*+.-]/gm,'')));
+      if(t=='>')t='blockquote';else{t=t.match(/\./)?'ol':'ul';inner=inner.replace(/^(.*)(\n|$)/gm,'<li>$1</li>')}
+      chunk='<'+t+'>'+inner+'</'+t+'>'}
+    else if(token[8]){chunk='[picture: '+mdAttr(token[7])+']'}
+    else if(token[10]){
+      const url=mdUrl(token[11]||(Object.prototype.hasOwnProperty.call(links,prev.toLowerCase())?links[prev.toLowerCase()]:''));
+      out=out.replace('<a>',url?'<a href="'+mdAttr(url)+'" target="_blank" rel="noopener noreferrer">':'<a>');
+      chunk=flush()+'</a>'}
+    else if(token[9]){chunk='<a>'}
+    else if(token[12]||token[14]){
+      t='h'+(token[14]?token[14].length:(token[13]>'='?1:2));chunk='<'+t+'>'+mdParse(token[12]||token[15],links)+'</'+t+'>'}
+    else if(token[16]){chunk='<code>'+mdAttr(token[16])+'</code>'}
+    else if(token[17]||token[1]){chunk=tag(token[17]||'--')}
+    out+=prev;out+=chunk}
+  return (out+md.substring(last)+flush()).replace(/^\n+|\n+$/g,'')}
+/* Escape first: & < and " become entities, so the text itself can never open a tag or leave an address. */
+function renderMd(text){return mdParse(String(text??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'))}
+/* md-end */
+
+// A second guard in the page: only these tags and these attributes are kept, whatever the renderer made.
+const OK_TAGS=new Set(['EM','STRONG','S','BR','HR','PRE','CODE','BLOCKQUOTE','UL','OL','LI','A','H1','H2','H3','H4','H5','H6']);
+function safeNodes(html){
+  const tpl=document.createElement('template');tpl.innerHTML=html;
+  for(const el of [...tpl.content.querySelectorAll('*')]){
+    if(!OK_TAGS.has(el.tagName)){el.replaceWith(document.createTextNode(el.textContent));continue}
+    for(const a of [...el.attributes]){
+      const keep=(el.tagName==='A'&&(a.name==='href'&&mdUrl(a.value)||a.name==='rel'||a.name==='target'))||(a.name==='class'&&el.tagName==='PRE');
+      if(!keep)el.removeAttribute(a.name)}
+    if(el.tagName==='A'&&el.hasAttribute('href')){el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer')}}
+  return tpl.content}
+
+// Paths are relative, so the page works at /pkg/notes/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+let current=null,editingNote=false,_stamp='',listing=null;
+
+async function getJson(path){const r=await fetch(BASE+path);const out=await r.json().catch(()=>({error:'Notes sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Notes could not read that.');return out}
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Notes sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Notes could not save.');return out}
+
+async function loadList(){
+  const p=new URLSearchParams({q:$('q').value,tag:$('tagPick').value,notebook:$('bookPick').value});
+  listing=await getJson('list?'+p);_stamp=listing.stamp;
+  const keep=(sel,vals,label)=>{const v=sel.value;sel.innerHTML=`<option value="">${esc(label)}</option>`+vals.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');sel.value=vals.includes(v)?v:''};
+  keep($('bookPick'),listing.notebooks,'All notebooks');keep($('tagPick'),listing.tags,'All tags');
+  $('count').textContent=listing.notes.length+' of '+listing.count+' notes';
+  $('list').innerHTML=listing.notes.map(n=>`<li data-id="${esc(n.id)}" class="${current&&current.id===n.id?'on':''}"><b>${esc(n.title)}${n.pinned?'<span class="tag">pinned</span>':''}</b>
+    <div class="line">${esc(n.updated.slice(0,10))}${n.notebook?' &middot; '+esc(n.notebook):''}${n.tags.length?' &middot; #'+n.tags.map(esc).join(' #'):''}${n.line?' &middot; '+esc(n.line):''}</div></li>`).join('')||'<li class="note">No notes here.</li>';
+  $('unreadable').innerHTML=listing.unreadable.length?`<div class="warn">These files in the notes folder would not read, so Notes leaves them as they are: ${listing.unreadable.map(b=>esc(b.file)+' ('+esc(b.why)+')').join('; ')}.</div>`:'';
+  // Said once: the server sends each file here one time only, so this stays until the page is opened again.
+  if(listing.renewed&&listing.renewed.length)$('renewed').innerHTML+=`<div class="warn">These notes had an id Notes could not use, so each has a new one, written into its file the next time it is saved (the file keeps its name): ${listing.renewed.map(b=>esc(b.file)+' ('+esc(b.why)+')').join('; ')}.</div>`}
+
+// A note's text: plain Markdown parts through the safe renderer, and each "- [ ]" line as a tick box.
+function renderBody(body){
+  const frag=document.createDocumentFragment(),lines=String(body||'').split('\n');let buf=[];
+  const flush=()=>{if(buf.length){const d=document.createElement('div');d.appendChild(safeNodes(renderMd(buf.join('\n'))));frag.appendChild(d);buf=[]}};
+  lines.forEach((ln,i)=>{const m=ln.match(/^(\s*)- \[( |x|X)\] (.*)$/);
+    if(!m){buf.push(ln);return}
+    flush();const lab=document.createElement('label');lab.className='tick'+(m[2]===' '?'':' done');lab.style.marginLeft=(Math.min(m[1].length,12)*8)+'px';
+    const cb=document.createElement('input');cb.type='checkbox';cb.checked=m[2]!==' ';cb.dataset.line=String(i);cb.dataset.text=m[3];
+    const span=document.createElement('span');span.appendChild(safeNodes(renderMd(m[3])));
+    lab.appendChild(cb);lab.appendChild(span);frag.appendChild(lab)});
+  flush();return frag}
+
+function showNote(n){current=n;editingNote=false;const v=$('view');
+  v.innerHTML=`<div class="head"><h2>${esc(n.title)}${n.pinned?'<span class="tag">pinned</span>':''}</h2><div class="row">
+    <button id="editBtn">Edit</button><button id="pinBtn">${n.pinned?'Unpin':'Pin'}</button><button id="delBtn">Delete</button></div></div>
+    <p class="note">${n.notebook?'Notebook '+esc(n.notebook)+' &middot; ':''}updated ${esc(n.updated.replace('T',' '))} &middot; file ${esc(n.file)}</p>
+    <div>${n.tags.map(t=>`<span class="tag">#${esc(t)}</span>`).join('')}</div><div class="md"></div>`;
+  v.querySelector('.md').appendChild(renderBody(n.body));
+  document.querySelectorAll('#list li').forEach(li=>li.classList.toggle('on',li.dataset.id===n.id))}
+
+function editNote(n){editingNote=true;current=n;const v=$('view');
+  v.innerHTML=`<div class="grid"><label>Title<input id="eTitle" maxlength="200" value="${esc(n?n.title:'')}"></label>
+    <label>Notebook<input id="eBook" maxlength="60" list="books" value="${esc(n?n.notebook:'')}"></label>
+    <label>Tags, with commas<input id="eTags" maxlength="900" value="${esc(n?n.tags.join(', '):'')}"></label></div>
+    <datalist id="books">${(listing?listing.notebooks:[]).map(b=>`<option value="${esc(b)}">`).join('')}</datalist>
+    <textarea id="eBody" aria-label="Text">${esc(n?n.body:'')}</textarea>
+    <div class="row" style="margin-top:8px"><button class="primary" id="saveBtn">Save</button><button id="cancelBtn">Cancel</button></div>`;
+  $('eTitle').focus()}
+
+async function openNote(id){try{showNote(await getJson('note?id='+encodeURIComponent(id)))}catch(e){say(e.message,true)}}
+
+document.addEventListener('click',async e=>{
+  const li=e.target.closest('#list li[data-id]');if(li){if(editingNote&&!confirm('Leave without saving?'))return;return openNote(li.dataset.id)}
+  const t=e.target.closest('button');if(!t)return;
+  try{
+    if(t.id==='newBtn'){editNote(null)}
+    else if(t.id==='cancelBtn'){if(current)showNote(current);else{editingNote=false;$('view').innerHTML='<p class="note">Pick a note, or make a new one.</p>'}}
+    else if(t.id==='saveBtn'){const b={title:$('eTitle').value,body:$('eBody').value,notebook:$('eBook').value,tags:$('eTags').value};
+      if(current){say((await post('api/change',{id:current.id,...b})).text);editingNote=false;await loadList();openNote(current.id)}
+      else{const out=await post('api/add',b);say(out.text);editingNote=false;await loadList();openNote(out.id)}}
+    else if(t.id==='editBtn'){editNote(current)}
+    else if(t.id==='pinBtn'){say((await post('api/change',{id:current.id,pinned:!current.pinned})).text);await loadList();openNote(current.id)}
+    else if(t.id==='delBtn'){if(!confirm('Delete the note '+current.title+'? Its file is removed from this computer.'))return;
+      say((await post('api/remove',{id:current.id})).text);current=null;$('view').innerHTML='<p class="note">Deleted.</p>';loadList()}
+    else if(t.id==='exportBtn'){const r=await fetch(BASE+'export');if(!r.ok)throw new Error('Notes could not export.');
+      const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='notes.zip';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);say('Exported every note as a zip of Markdown files.')}
+    else if(t.id==='importBtn'){$('importFile').click()}
+  }catch(err){say(err.message,true)}});
+
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.dataset&&t.dataset.line!==undefined&&current){
+    try{say((await post('api/tick',{id:current.id,line:Number(t.dataset.line),text:t.dataset.text,done:t.checked})).text)}catch(err){say(err.message,true)}
+    await loadList();return openNote(current.id)}
+  if(t.id==='bookPick'||t.id==='tagPick')loadList().catch(err=>say(err.message,true))});
+let _qt=0;$('q').addEventListener('input',()=>{clearTimeout(_qt);_qt=setTimeout(()=>loadList().catch(err=>say(err.message,true)),250)});
+
+$('importFile').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;
+  try{const r=await fetch(BASE+'api/import',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-File-Name':encodeURIComponent(file.name)},body:await file.arrayBuffer()});
+    const out=await r.json().catch(()=>({error:'Notes sent an answer this page could not read.'}));if(!r.ok)throw new Error(out.error);
+    say(out.text+(out.notes&&out.notes.length?' '+out.notes.join('; '):''));loadList()}catch(err){say(err.message||'That file could not be imported.',true)}});
+
+// Poll the stamp; read again only when a note changed (the bot may change things too).
+async function pull(){try{const s=await getJson('updated');if(s.stamp!==_stamp){await loadList();if(current&&!editingNote)openNote(current.id)}}catch(e){}}
+loadList().catch(e=>say('Notes is not answering. Is it running?',true));
+setInterval(pull,4000);
+</script>
+</body>
+</html>

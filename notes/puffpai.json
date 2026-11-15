@@ -1,0 +1,115 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "notes",
+  "kind": "app",
+  "name": "Notes",
+  "version": "1.0.0",
+  "description": "A plain notebook kept on this computer, one Markdown file per note, so your notes are files you can open and take anywhere. Pin notes, sort them into notebooks and tags, search them, and tick checklist lines on the page. The bot can find, read and add to your notes, like adding milk to the shopping note, with no internet. Export gives a zip of the files; import takes a zip or a file of Markdown notes from another tool. It does not sync between computers, does not encrypt, and has no reminders.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/notes.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "add_note",
+      "add_to_note",
+      "change_note",
+      "tick_item",
+      "remove_note"
+    ],
+    "tools": {
+      "find_notes": "Use to search the notes by words, tag or notebook: gives each matching note's title, notebook, tags and the line that matched, pinned notes first.",
+      "read_note": "Use to read out one note in full, by its title or words in it; no need to look it up first.",
+      "add_note": "Use when the owner asks to write down a new note: its title, its text, and if wanted tags and a notebook. Lines that start with - [ ] become tick boxes.",
+      "add_to_note": "Use when the owner asks to add a line or an item to a note that is already there, by its title; no need to look it up first. In a note with tick boxes it goes in as a new tick box.",
+      "change_note": "Use to change a note by its title; no need to look it up first: rename it, replace its text, set its tags, pin or unpin it, or move it to another notebook.",
+      "tick_item": "Use when the owner says an item on a note's checklist is done or not done, by the note's title and the item's words; no need to look either up first.",
+      "list_notebooks_and_tags": "Use to see how the notes are sorted: every notebook and tag, with how many notes each has.",
+      "remove_note": "Use when the owner asks to delete a note, by its title as they said it; no need to look it up or search first, the app finds it. Its file is removed from this computer."
+    },
+    "examples": {
+      "find_notes": [
+        "find my notes about the garden",
+        "which notes are tagged recipes"
+      ],
+      "read_note": [
+        "read me my shopping note",
+        "what does my note about the car say"
+      ],
+      "add_note": [
+        "make a new note called Garden ideas: plant tomatoes by the fence",
+        "start a note for the trip packing list"
+      ],
+      "add_to_note": [
+        "add milk to the shopping note",
+        "put call the plumber on my to do note"
+      ],
+      "change_note": [
+        "pin the shopping note",
+        "move the garden ideas note to the Home notebook"
+      ],
+      "tick_item": [
+        "tick off milk on the shopping note",
+        "mark eggs as done on my shopping note"
+      ],
+      "list_notebooks_and_tags": [
+        "what notebooks do I have in my notes",
+        "what tags do my notes use"
+      ],
+      "remove_note": [
+        "delete my packing list note"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Notes",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Notes",
+        "icon": "icons/notes.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Notes keeps your notes as Markdown files in its own folder on this computer (notes/); it uses no internet and does not use the brain. The bot can find, read, add to, change and delete notes when you ask it in chat, and the files are not encrypted by this app."
+}
