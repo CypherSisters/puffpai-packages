@@ -1,0 +1,112 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "radio-plan",
+  "kind": "app",
+  "name": "Radio Plan",
+  "version": "1.0.0",
+  "description": "The household's plan for staying in touch by radio when phones fail, kept on this computer: the radios you own, the channels and what each is for, each person's call sign, the check-in times and what to do if no one answers, the weather alert and broadcast stations to listen to, a message log and a practice log. It prints the plan and a pocket card for each person, shows when the next check-in is, and the bot can answer from it with no internet. It stores what you type: it ships no frequency lists, does not say what is legal to transmit where you live, and does not control a radio.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/radio.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "update_radio_plan",
+      "log_message",
+      "log_radio_practice",
+      "remove_radio_item"
+    ],
+    "tools": {
+      "show_radio_plan": "Use to read out the household radio plan for when phones fail: the whole plan, or one section (radios, channels, people and call signs, check-in times, listen-only stations, practice). For the message log, use list_messages.",
+      "next_check_in": "Use when someone asks when the next radio check-in is: says from the clock when it is, on which channel, how long to listen, and what to do if no one answers.",
+      "which_channel": "Use when someone asks which radio channel to use, by name; no need to look it up first: for a purpose (primary, backup, neighbors, emergency, listen only, weather) or for a person (their call sign, primary and backup channel).",
+      "update_radio_plan": "Use when the owner tells you to set or change something in the radio plan, by name; no need to look it up first: a radio, a channel, a person's call sign or license, a check-in time, or a listen-only station. Something not there yet is added. Kinds can be everyday words, like walkie-talkie.",
+      "log_message": "Use when someone says a radio message came in or went out: adds it to the radio message log with the time, who it was from and to, the channel, the words, and whether it was acted on.",
+      "list_messages": "Use to read back the radio message log: the latest messages, or those from or to one person, or on one channel, newest first.",
+      "log_radio_practice": "Use when the household did a radio drill or test: logs the date, what was practiced and what to fix.",
+      "remove_radio_item": "Use when the owner asks to take something out of the radio plan, by its name as they said it; no need to look it up or show the plan first, the app finds it: a radio, a channel, a person's radio details, a check-in, a listen-only station, a message or a practice entry. It deletes it."
+    },
+    "examples": {
+      "show_radio_plan": [
+        "read me our radio plan",
+        "what does our radio plan say about the radios we have"
+      ],
+      "next_check_in": [
+        "when is our next radio check-in",
+        "what time do we check in on the radio next"
+      ],
+      "which_channel": [
+        "which radio channel do we use to reach the neighbors",
+        "what radio channel is Sam on"
+      ],
+      "update_radio_plan": [
+        "set Sam's call sign in the radio plan to Bluebird",
+        "add Jo's walkie-talkie to the radio plan, kept in the hall closet"
+      ],
+      "log_message": [
+        "log a radio message from Jo to Alex on Family 1: home safe, the bridge is flooded"
+      ],
+      "list_messages": [
+        "read me the radio messages from Jo",
+        "what radio messages came in on Family 2"
+      ],
+      "log_radio_practice": [
+        "we did a radio drill this morning; Sam's handheld battery was flat"
+      ],
+      "remove_radio_item": [
+        "remove the scanner from the radio plan"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Radio Plan",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Radio Plan",
+        "icon": "icons/radio.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Radio Plan keeps your household's radio plan, with the call signs, channels and messages you type, in its own folder on this computer (radio.json); it uses no internet and does not use the brain. The bot can read and change the plan when you ask it in chat, and the file is not encrypted by this app."
+}

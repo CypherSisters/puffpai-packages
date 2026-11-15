@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<!-- Radio Plan page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radio Plan</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small,h3 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+h3{font-size:.95rem;font-weight:700;margin:4px 0}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.item{border-top:1px solid var(--p-line);padding:8px 0}
+.item:first-child{border-top:0;padding-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 10px}
+.grid label{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--p-text2)}
+.grid label.wide{grid-column:1/-1}
+input,select,textarea{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 8px;min-height:40px;width:100%}
+textarea{min-height:58px;resize:vertical}
+input[type=checkbox]{width:22px;height:22px;min-height:22px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input,.row select{width:auto;flex:1 1 140px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:1px 7px;font-size:.78rem;background:var(--p-chip);color:var(--p-text2);margin-left:6px}
+.note{color:var(--p-text2);font-size:.85rem}
+.warn{border-left:4px solid var(--p-warn);padding:8px 12px;background:var(--p-card);margin-top:8px}
+.now{border-left:4px solid var(--p-accent);font-size:1rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 14px}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#printArea{display:none}
+@media print{
+  @page{margin:12mm}
+  body{background:#fff;color:#000;padding:0;font:10.5pt/1.35 Arial,Helvetica,sans-serif}
+  .screen{display:none!important}
+  #printArea{display:block}
+  #printArea h1{font:bold 15pt Arial,Helvetica,sans-serif;margin-bottom:4pt}
+  #printArea h2{font:bold 12pt Arial,Helvetica,sans-serif;margin:10pt 0 3pt;border-bottom:1px solid #000}
+  #printArea p,#printArea li{margin:1pt 0;break-inside:avoid}
+  #printArea ul{padding-left:14pt}
+  .cards{display:flex;flex-wrap:wrap;gap:0}
+  .pocket{width:3.375in;height:2.125in;border:1px dashed #000;padding:.08in .1in;font-size:7.2pt;line-height:1.25;overflow:hidden;break-inside:avoid;color:#000}
+  .pocket b{font-size:8.5pt}
+  .pocket p{margin:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap screen">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="16" y="20" width="32" height="38" fill="none" stroke="currentColor" stroke-width="4"/><path d="M40 20V4" stroke="currentColor" stroke-width="4"/><path d="M24 32h16M24 40h16" stroke="currentColor" stroke-width="3"/></svg>Radio Plan</h1>
+<div class="row"><button id="printPlan">Print plan</button><button id="printCards">Print pocket cards</button></div>
+</div>
+<p class="note" id="rules">Rules differ by country. Some channels need a license. Check yours before you transmit.</p>
+<p class="note">In danger right now, call your local emergency number first if you can. This plan is kept on this computer and works with no internet.</p>
+<div id="msg"></div>
+
+<h2>Now</h2>
+<div class="card now" id="now"></div>
+
+<h2>Channels <small>what each one is for</small></h2>
+<div class="card"><div id="channels"></div>
+<form class="row" data-add="channels" style="margin-top:8px"><input name="name" maxlength="60" placeholder="Label, like Family 1" aria-label="Channel label" required><select name="use" class="usePick" aria-label="Used for"></select><button class="primary">Add channel</button></form></div>
+
+<h2>Check-in times <small>when everyone listens</small></h2>
+<div class="card"><div id="checkins"></div>
+<form class="row" data-add="check_ins" style="margin-top:8px"><input name="name" type="time" aria-label="Check-in time" required><button class="primary">Add check-in</button></form></div>
+
+<h2>People and call signs <small id="peopleFrom"></small></h2>
+<div class="card"><div id="people"></div>
+<form class="row" data-add="people" style="margin-top:8px"><input name="name" maxlength="60" placeholder="Name" aria-label="Name" required><button class="primary">Add person</button></form></div>
+
+<h2>Radios</h2>
+<div class="card"><div id="radios"></div>
+<form class="row" data-add="radios" style="margin-top:8px"><input name="name" maxlength="80" placeholder="Name, like Sam's handheld" aria-label="Radio name" required><select name="kind" class="kindPick" aria-label="Kind"></select><button class="primary">Add radio</button></form></div>
+
+<h2>Listen-only stations <small>weather alerts and local broadcast, as you type them</small></h2>
+<div class="card"><div id="listen"></div>
+<form class="row" data-add="listen" style="margin-top:8px"><input name="name" maxlength="80" placeholder="Name, like Weather alert" aria-label="Station name" required><select name="kind" class="listenPick" aria-label="Kind"></select><button class="primary">Add station</button></form></div>
+
+<h2>Message log</h2>
+<div class="card">
+<form class="grid" id="messageForm">
+<label>From<input name="from" maxlength="60"></label><label>To<input name="to" maxlength="60"></label>
+<label>Channel<input name="channel" maxlength="60"></label><label>When<input name="when" maxlength="40" placeholder="now"></label>
+<label class="wide">Message<textarea name="message" maxlength="1000" required></textarea></label>
+<label class="row" style="flex-direction:row"><input type="checkbox" name="acted" value="yes">Acted on</label>
+<div><button class="primary">Log it</button></div>
+</form>
+<div id="messages" style="margin-top:8px"></div>
+</div>
+
+<h2>Practice</h2>
+<div class="card">
+<form class="grid" id="practiceForm">
+<label>Date<input type="date" name="date"></label>
+<label>What was practiced<input name="what" maxlength="300" required></label>
+<label>What to fix<input name="fix" maxlength="1000"></label>
+<div><button class="primary">Log it</button></div>
+</form>
+<div id="practice" style="margin-top:8px"></div>
+</div>
+</div>
+<div id="printArea"></div>
+
+<script>
+// Paths are relative, so the page works at /pkg/radio-plan/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let plan=null,_stamp='',_loaded=false,_waiting=false;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+const RADIO=[['carrier','Who carries it'],['kept','Where it is kept'],['battery','Battery type'],['notes','Notes',1]];
+const CHANNEL=[['service','Service'],['channel','Channel or frequency'],['tone','Tone or code'],['notes','Notes',1]];
+const PERSON=[['call_sign','Call sign or radio name'],['license','License'],['primary_channel','Their primary channel'],['backup_channel','Their backup channel'],['notes','Notes',1]];
+const CHECKIN=[['channel','Channel'],['listen_minutes','Minutes to listen','n'],['backup_after_minutes','Go to backup after (minutes)','n'],['backup_channel','Backup channel'],['no_contact','Then, if still no contact',1]];
+const LISTEN=[['frequency','Station or frequency'],['notes','Notes',1]];
+const MAX={carrier:60,kept:200,battery:80,service:80,channel:60,tone:40,call_sign:40,license:120,primary_channel:60,backup_channel:60,frequency:60,no_contact:300};
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Radio Plan sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Radio Plan could not save.');
+  return out}
+
+function editing(){const a=document.activeElement;return a&&a.dataset&&a.dataset.field!==undefined}
+// Poll the stamp; read the whole plan only when it changed (the bot may change things too). Once a minute
+// read it anyway, so the Now panel follows the clock.
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Radio Plan could not read its saved plan.',true);return}
+    const {last_updated}=await chk.json();if(_loaded&&!force&&last_updated===_stamp)return;
+    const v=await fetch(BASE+'view');if(!v.ok)return;
+    plan=await v.json();_stamp=plan.last_updated||'';_loaded=true;
+    if(editing()){_waiting=true;return}render()}
+  catch(e){if(!_loaded)say('Radio Plan is not answering. Is it running?',true)}}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(_waiting&&!editing()){_waiting=false;render()}},50));
+
+function field(sec,item,f,label,how,value){
+  const a=`data-sec="${esc(sec)}" data-item="${esc(item)}" data-field="${esc(f)}" aria-label="${esc(label)}"`;
+  if(how==='n')return `<label>${esc(label)}<input type="number" min="1" max="240" ${a} value="${esc(value||'')}" placeholder="${esc(f==='listen_minutes'?plan.numbers.listen_minutes:plan.numbers.backup_after_minutes)}"></label>`;
+  const m=MAX[f]||500;
+  return `<label class="${how?'wide':''}">${esc(label)}${how?`<textarea ${a} maxlength="${m}">${esc(value)}</textarea>`:`<input ${a} maxlength="${m}" value="${esc(value)}">`}</label>`}
+function fields(sec,item,list,row){return list.map(([f,l,h])=>field(sec,item,f,l,h,row[f])).join('')}
+function pick(sec,item,f,table,value){return `<label>Kind<select data-sec="${esc(sec)}" data-item="${esc(item)}" data-field="${esc(f)}" aria-label="${esc(f)}">${Object.entries(table).map(([k,v])=>`<option value="${esc(k)}"${k===value?' selected':''}>${esc(v)}</option>`).join('')}</select></label>`}
+function options(table){return Object.entries(table).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('')}
+function removeBtn(sec,item,name){return `<button data-remove="${esc(sec)}" data-item="${esc(item)}" data-name="${esc(name)}">Remove</button>`}
+
+function render(){
+  const p=plan,L=p.labels;
+  $('rules').textContent=p.rules;
+  $('now').textContent=p.now.text;
+  document.querySelectorAll('.usePick').forEach(s=>s.innerHTML=options(L.uses));
+  document.querySelectorAll('.kindPick').forEach(s=>s.innerHTML=options(L.radio_kinds));
+  document.querySelectorAll('.listenPick').forEach(s=>s.innerHTML=options(L.listen_kinds));
+  const uses=Object.keys(L.uses);
+  $('channels').innerHTML=[...p.channels].sort((a,b)=>uses.indexOf(a.use)-uses.indexOf(b.use)).map(c=>`<div class="item"><div class="head"><h3>${esc(c.name)}<span class="tag">${esc(L.uses[c.use])}</span></h3>${removeBtn('channels',c.id,c.name)}</div>
+    <div class="grid">${pick('channels',c.id,'use',L.uses,c.use).replace('>Kind<','>Used for<')}${fields('channels',c.id,CHANNEL,c)}</div></div>`).join('')||'<p class="note">No channels yet. Start with a primary and a backup.</p>';
+  $('checkins').innerHTML=p.schedule.map(c=>`<div class="item"><div class="head"><h3>${esc(c.name)}<span class="tag">on ${esc(c.on)}</span></h3>${removeBtn('check_ins',c.id,c.name)}</div>
+    <div class="grid"><label>Time<input type="time" data-sec="check_ins" data-item="${esc(c.id)}" data-field="name" value="${esc(c.name)}" aria-label="Time"></label>${fields('check_ins',c.id,CHECKIN,c)}</div></div>`).join('')||'<p class="note">No check-in times yet.</p>';
+  $('peopleFrom').textContent=p.people_from_core?'the household from the shared people list':'the plan\'s own list (the shared people list did not answer)';
+  $('people').innerHTML=p.household.map(x=>`<div class="item"><div class="head"><h3>${esc(x.name)}${x.from_core?'<span class="tag">shared list</span>':''}</h3>
+    ${x.id.startsWith('core:')?'':removeBtn('people',x.id,x.name)}</div><div class="grid">${fields('people',x.id,PERSON,x)}</div></div>`).join('')||'<p class="note">Nobody yet.</p>';
+  $('radios').innerHTML=p.radios.map(r=>`<div class="item"><div class="head"><h3>${esc(r.name)}<span class="tag">${esc(L.radio_kinds[r.kind])}</span></h3>${removeBtn('radios',r.id,r.name)}</div>
+    <div class="grid">${pick('radios',r.id,'kind',L.radio_kinds,r.kind)}${fields('radios',r.id,RADIO,r)}</div></div>`).join('')||'<p class="note">No radios yet.</p>';
+  $('listen').innerHTML=p.listen.map(s=>`<div class="item"><div class="head"><h3>${esc(s.name)}<span class="tag">${esc(L.listen_kinds[s.kind])}</span></h3>${removeBtn('listen',s.id,s.name)}</div>
+    <div class="grid">${pick('listen',s.id,'kind',L.listen_kinds,s.kind)}${fields('listen',s.id,LISTEN,s)}</div></div>`).join('')||'<p class="note">No stations yet. Type the weather alert channel for this area as you know it.</p>';
+  const ms=[...p.messages].sort((a,b)=>b.when.localeCompare(a.when));
+  $('messages').innerHTML=ms.length?'<table><tr><th>When</th><th>From</th><th>To</th><th>Channel</th><th>Message</th><th>Acted on</th><th></th></tr>'+ms.map(m=>`<tr><td>${esc(m.when)}</td><td>${esc(m.sender)}</td><td>${esc(m.to)}</td><td>${esc(m.channel)}</td><td>${esc(m.message)}</td>
+    <td><input type="checkbox" data-acted="${esc(m.id)}"${m.acted?' checked':''} aria-label="Acted on"></td><td>${removeBtn('messages',m.id,m.message.slice(0,40))}</td></tr>`).join('')+'</table>':'<p class="note">No messages logged yet.</p>';
+  const pr=[...p.practice].sort((a,b)=>b.date.localeCompare(a.date));
+  $('practice').innerHTML=pr.length?'<table><tr><th>Date</th><th>What</th><th>To fix</th><th></th></tr>'+pr.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.what)}</td><td>${esc(x.fix)}</td><td>${removeBtn('practice',x.id,x.what)}</td></tr>`).join('')+'</table>':'<p class="note">No practice logged yet.</p>'}
+
+document.addEventListener('change',async e=>{const t=e.target,d=t.dataset;
+  try{
+    if(d.field!==undefined){say((await post('api/update',{section:d.sec,item:d.item,fields:{[d.field]:t.value}})).text)}
+    else if(d.acted){say((await post('api/update',{section:'messages',item:d.acted,fields:{acted:t.checked}})).text)}
+    else return;
+    pull(true)}catch(err){say(err.message,true);pull(true)}});
+
+document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault();const b=Object.fromEntries(new FormData(f));
+  try{
+    if(f.id==='messageForm'){b.acted=!!b.acted;say((await post('api/message',b)).text)}
+    else if(f.id==='practiceForm'){if(!b.date)delete b.date;say((await post('api/practice',b)).text)}
+    else if(f.dataset.add){const fl={};if(b.use)fl.use=b.use;if(b.kind)fl.kind=b.kind;
+      say((await post('api/update',{section:f.dataset.add,item:b.name,fields:fl})).text)}
+    else return;
+    f.reset();pull(true)}catch(err){say(err.message,true)}});
+
+document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.remove){if(!confirm('Remove '+d.name+' from the radio plan?'))return;say((await post('api/remove',{section:d.remove,item:d.item})).text);pull(true)}
+    else if(t.id==='printPlan'){printPlan()}
+    else if(t.id==='printCards'){printCards()}
+  }catch(err){say(err.message,true)}});
+
+// Print views: plain text in plain elements, every value escaped.
+function lines(list,row){return list.filter(([f])=>row[f]).map(([f,l])=>`<li>${esc(l)}: ${esc(row[f])}</li>`).join('')}
+function printPlan(){const p=plan,L=p.labels;
+  let h=`<h1>Our radio plan</h1><p>${esc(p.rules)} Printed ${esc(p.today)}.</p>`;
+  h+='<h2>Channels</h2><ul>'+p.channels.map(c=>`<li><b>${esc(c.name)}</b> (${esc(L.uses[c.use])}): ${esc([c.service,c.channel&&'channel '+c.channel,c.tone&&'tone '+c.tone,c.notes].filter(Boolean).join('; '))}</li>`).join('')+'</ul>';
+  h+='<h2>Check-in times</h2><ul>'+p.schedule.map(c=>`<li><b>${esc(c.name)}</b>: listen ${esc(c.listen)} min on ${esc(c.on)}; no contact after ${esc(c.after)} min: go to ${esc(c.backup)}${c.no_contact?'; then: '+esc(c.no_contact):''}</li>`).join('')+'</ul>';
+  h+='<h2>People and call signs</h2>'+p.household.map(x=>`<p><b>${esc(x.name)}</b></p><ul>${lines(PERSON,x)}</ul>`).join('');
+  h+='<h2>Radios</h2><ul>'+p.radios.map(r=>`<li><b>${esc(r.name)}</b> (${esc(L.radio_kinds[r.kind])}): ${esc([r.carrier&&'carried by '+r.carrier,r.kept&&'kept '+r.kept,r.battery&&'battery '+r.battery,r.notes].filter(Boolean).join('; '))}</li>`).join('')+'</ul>';
+  h+='<h2>Listen-only stations</h2><ul>'+p.listen.map(s=>`<li><b>${esc(s.name)}</b> (${esc(L.listen_kinds[s.kind])}): ${esc([s.frequency,s.notes].filter(Boolean).join('; '))}</li>`).join('')+'</ul>';
+  h+='<h2>Message log</h2><ul>'+[...p.messages].sort((a,b)=>b.when.localeCompare(a.when)).slice(0,30).map(m=>`<li>${esc(m.when)} from ${esc(m.sender)} to ${esc(m.to)} on ${esc(m.channel)}: ${esc(m.message)}${m.acted?' (acted on)':''}</li>`).join('')+'</ul>';
+  h+='<h2>Pocket cards</h2>'+cardsHtml();
+  showPrint(h)}
+function cardsHtml(){
+  const cs=plan.cards.length?plan.cards:[{name:'Name: ____________',call_sign:'',primary:'',backup:'',check_ins:'',no_contact:''}];
+  return `<div class="cards">${cs.map(c=>`<div class="pocket"><p><b>${esc(c.name)}</b>${c.call_sign?' &middot; call sign '+esc(c.call_sign):''}</p>
+    <p><b>Primary:</b> ${esc(c.primary)}</p><p><b>Backup:</b> ${esc(c.backup)}</p><p><b>Check-ins:</b> ${esc(c.check_ins)}</p>
+    <p><b>No contact:</b> ${esc(c.no_contact)}</p><p>${esc(plan.rules)}</p></div>`).join('')}</div>`}
+function printCards(){showPrint(cardsHtml())}
+function showPrint(h){$('printArea').innerHTML=h;window.print()}
+
+pull(true);
+setInterval(pull,4000);
+setInterval(()=>pull(true),60000);
+</script>
+</body>
+</html>
