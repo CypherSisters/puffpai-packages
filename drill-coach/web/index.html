@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<!-- Drill Coach page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drill Coach</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.note{color:var(--p-text2);font-size:.85rem}
+.late{color:var(--p-bad);font-weight:600}
+.sug{border-left:4px solid var(--p-warn);padding:6px 10px;margin-top:6px;white-space:pre-wrap;font-size:.9rem}
+select,button{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-chip);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 10px;min-height:40px;touch-action:manipulation}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+.practice{border-left:4px solid var(--p-bad);padding:8px 12px;background:var(--p-card);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 32a24 24 0 1 0 48 0a24 24 0 1 0-48 0M32 16v16l10 8" fill="none" stroke="currentColor" stroke-width="4"/></svg>Drill Coach</h1>
+</div>
+<p class="practice" id="practice"></p>
+<p class="note">Ask the bot to start a drill, answer each prompt together, then finish it. This page shows what Drill Coach holds on this computer.</p>
+<div id="msg"></div>
+
+<h2>Drill going</h2>
+<div class="card" id="running"></div>
+
+<h2>Fix list <small id="fixCount"></small></h2>
+<div class="card" id="fixes"></div>
+
+<h2>Past drills <small>newest first</small></h2>
+<div class="card" id="drills"></div>
+
+<h2>Scenarios</h2>
+<div class="card" id="scenarios"></div>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/drill-coach/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let v=null,_stamp='';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Drill Coach could not read its saved file.',true);return}
+    const {last_updated}=await chk.json();if(v&&!force&&last_updated===_stamp)return;
+    const r=await fetch(BASE+'view');if(!r.ok)return;
+    v=await r.json();_stamp=v.last_updated||'';render()}
+  catch(e){if(!v)say('Drill Coach is not answering. Is it running?',true)}}
+
+function steps(d){return '<table><tr><th>When</th><th>Prompt</th><th>Answer</th><th>Rating</th></tr>'+d.steps.map(s=>
+  `<tr><td>${esc(s.at)}</td><td>${esc(s.ask)}</td><td>${esc(s.answer)}</td><td class="${s.rating==='not ready'?'late':''}">${esc(s.rating)}${s.suggested_by?' <span class="note">(suggested by the brain, not confirmed)</span>':''}${s.why?' <span class="note">('+esc(s.why)+')</span>':''}</td></tr>`).join('')+'</table>'}
+
+function render(){
+  $('practice').textContent=v.practice_line;
+  const r=v.running;
+  $('running').innerHTML=r?`<p><b>${esc(r.scenario)}</b>, ${esc(r.date)}${r.people?', with '+esc(r.people):''}</p><p>${esc(r.prompt||'Every prompt has an answer. Ask the bot to finish the drill.')}</p>${steps(r)}`
+    :'<p class="note">No drill going. Ask the bot to start one.</p>';
+  const open=v.fixes.filter(f=>!f.done);$('fixCount').textContent=open.length+' open, '+(v.fixes.length-open.length)+' fixed';
+  $('fixes').innerHTML=v.fixes.length?'<table><tr><th>What to fix</th><th>From</th><th>Done</th></tr>'+v.fixes.map(f=>
+    `<tr><td>${esc(f.what)}</td><td>${esc(f.scenario)}, ${esc(f.date)}</td><td>${f.done?esc('fixed '+f.done_date):'<span class="late">open</span>'}</td></tr>`).join('')+'</table>'
+    :'<p class="note">Nothing on the fix list yet.</p>';
+  $('drills').innerHTML=v.drills.length?v.drills.map(d=>`<p><b>${esc(d.scenario)}</b>, ${esc(d.date)}: ${esc(d.counts)}</p>${d.summary?'<p class="note">'+esc(d.summary)+'</p>':''}${steps(d)}`).join('')
+    :'<p class="note">No finished drills yet.</p>';
+  $('scenarios').innerHTML='<table>'+v.scenarios.map(s=>`<tr><td><b>${esc(s.name)}</b></td><td>${esc(s.setting)}</td><td>${esc(s.prompts)} prompts</td></tr>`).join('')+'</table>'}
+
+pull(true);
+setInterval(pull,5000);
+</script>
+</body>
+</html>

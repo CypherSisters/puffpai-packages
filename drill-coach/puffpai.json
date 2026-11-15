@@ -1,0 +1,55 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "drill-coach",
+  "kind": "agent",
+  "name": "Drill Coach",
+  "version": "1.0.0",
+  "description": "An agent that walks the household through an emergency practice and writes down what to fix. It has six practice scenarios (a winter power cut, a flood with an order to leave, a wildfire smoke week, an earthquake, a week with no running water, a medical emergency with phones down), each a set of timed what-now prompts. The household answers each prompt; the bot's own brain suggests a rating (ready, partly or not ready) that counts only once you confirm or change it, and writes a short summary at the end. What was not ready, or not confirmed, goes on a fix list. The drill runs and finishes with no brain at all if you rate it yourselves. It is practice only, and does not call or alert anyone. It checks whether your household is ready. It does not teach first aid: use a first aid course and the First Aid Basics pack for that.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/drill.svg",
+  "scope": ["drill.run", "drill.review"],
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "agent.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["start_drill", "drill_answer", "finish_drill", "mark_fixed", "remove_drill"],
+    "tools": {
+      "list_scenarios": "When the household asks which emergencies it can practise: the practice scenarios, like a winter power cut, a flood with an order to leave, or an earthquake.",
+      "start_drill": "When the household wants to practise for an emergency, start a drill by the scenario's name, no need to look it up first. It gives the first what-now prompt.",
+      "drill_answer": "When the household answers the drill's current prompt, or rates or confirms the last answer: records it, suggests a rating for the household to confirm, and gives the next prompt.",
+      "finish_drill": "When the household is done with the drill: finishes it, gives a short summary and adds what to fix to the fix list. It always finishes, with a plain summary when the brain does not answer.",
+      "fix_list": "When the household asks what is still to fix after its drills: the open items on the fix list. Marking an item fixed takes its words, so this is not needed first.",
+      "mark_fixed": "When the household has done something on its drill fix list, mark it fixed by a few of its words, no need to look it up first or show the list.",
+      "drill_history": "When the household asks how past drills went: each finished drill with its date and ratings, or one drill in full by its scenario or date. Removing a drill takes its scenario, so this is not needed first.",
+      "remove_drill": "When the household wants a past drill gone, remove it by its scenario or date, no need to look it up first: deletes that drill. Its fix list items stay."
+    },
+    "examples": {
+      "list_scenarios": ["what emergency drills can we practise", "which emergencies can we practise for"],
+      "start_drill": ["let's practise the earthquake drill", "start a power cut drill with Alex and Sam"],
+      "drill_answer": ["our answer for the drill: we grab the flashlights from the kitchen drawer", "rate that drill answer partly", "confirm the drill rating"],
+      "finish_drill": ["we are done, finish the drill", "finish the drill with no summary"],
+      "fix_list": ["what do we still need to fix from our drills", "show our drill fix list"],
+      "mark_fixed": ["mark the battery radio as fixed on our drill fix list"],
+      "drill_history": ["how did our past drills go", "show the last drill in full"],
+      "remove_drill": ["delete the earthquake drill from our drill history"]
+    }
+  },
+  "ui": {
+    "pages": [ { "id": "main", "title": "Drill Coach", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Drill Coach", "icon": "icons/drill.svg", "opens": "main" } ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "brain": { "text": true, "images": false },
+    "hardware": { "ram_gb": 0.2 }
+  },
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Drill Coach keeps your practice drills, the answers you give, who took part and the fix list in its own folder on this computer (drills.json); it uses the bot's own brain on this computer to suggest a rating for each answer and to write a short summary of each drill, and it uses no internet."
+}
