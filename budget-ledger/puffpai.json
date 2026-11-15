@@ -1,0 +1,114 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "budget-ledger",
+  "kind": "app",
+  "name": "Budget Ledger",
+  "version": "1.0.0",
+  "description": "Shows where the household's money went, from the statement files you download from your own bank and give it (CSV, OFX, QFX or QIF). It sorts each transaction into a category, finds transfers between your own accounts and repeating payments, and adds up each month by category against the budgets you set, every currency on its own. It keeps only the last four digits of any account or card number it finds in your files. It moves no money, signs in nowhere, never contacts a bank and gives no financial advice.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/ledger.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "set_category",
+      "set_budget",
+      "remove_transactions"
+    ],
+    "tools": {
+      "month_summary": "When the owner asks how a month went for money, by month in words; no need to look anything up first. Gives the income, the spending, the spending by category against each budget, and the change from the month before, each currency on its own.",
+      "find_transactions": "When the owner wants to see a list of transactions: finds them by words in the payee, a month, a category name, an account name and an amount range, with the count; no need to look anything up first.",
+      "spending_on": "When the owner asks how much went on one thing: the total spent on a category or a payee, by name, over a period; no need to look it up first.",
+      "recurring_payments": "When the owner asks about subscriptions, regular bills or other repeating payments: lists each one found in the statements with how often it comes, its usual amount and what it costs a year.",
+      "uncategorized": "When the owner asks which transactions still need sorting: lists the transactions with no category yet, newest first, each with the app's best guess.",
+      "set_category": "When the owner says which category a payment belongs in, by payee words and its date; no need to look it up first. Sets one transaction, or with every yes all from that payee; with make_rule yes, future imports from that payee get it too.",
+      "set_budget": "When the owner sets or changes a budget for a category, by category name and amount; no need to look anything up first, this one call saves it. Sets the amount for every month, or for one month only; an amount of 0 removes it.",
+      "remove_transactions": "When the owner wants transactions deleted from the ledger: one transaction by payee words and its date, or everything imported from one statement file by the file's name; no need to look it up first. This can not be undone."
+    },
+    "examples": {
+      "month_summary": [
+        "how did our money go last month",
+        "give me the budget summary for October"
+      ],
+      "find_transactions": [
+        "list every transaction over 200 dollars this month",
+        "show me the transactions on the Checking account in October"
+      ],
+      "spending_on": [
+        "how much did we spend on groceries last month",
+        "how much have we paid the electric company this year"
+      ],
+      "recurring_payments": [
+        "what subscriptions and regular bills are we paying",
+        "what do our repeating payments cost us a year"
+      ],
+      "uncategorized": [
+        "which transactions still need a category",
+        "what spending is not sorted into a category yet"
+      ],
+      "set_category": [
+        "put the Corner Cafe payment on November 3 under eating out",
+        "file everything from Corner Cafe under eating out from now on"
+      ],
+      "set_budget": [
+        "set our groceries budget in Budget Ledger to 600 a month",
+        "make the eating out budget 150 for December"
+      ],
+      "remove_transactions": [
+        "delete everything imported from the file october-checking.csv",
+        "remove the Corner Cafe transaction from November 3"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Budget Ledger",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Budget Ledger",
+        "icon": "icons/ledger.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.3
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Budget Ledger keeps the transactions from the bank statement files you give it (dates, amounts, payees, each file's name and the categories, notes and budgets you set) in its own folder on this computer (ledger.json), and it keeps only the last four digits of any account or card number it finds in your files; it uses no internet, never contacts a bank, signs in nowhere, moves no money and does not use the brain. The bot can read the ledger and change categories, budgets and transactions when you ask it in chat, and the file is not encrypted by this app."
+}

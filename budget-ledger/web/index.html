@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!-- Budget Ledger page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Budget Ledger</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:14px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1150px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px}
+input,select{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 8px;min-height:40px}
+input[type=checkbox]{width:22px;height:22px;min-height:22px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.on{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.note{color:var(--p-text2);font-size:.85rem}
+.warn{border-left:4px solid var(--p-warn);padding:8px 12px;background:var(--p-card);margin:6px 0}
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin-top:10px}
+.tabs button{border-right-width:0}.tabs button:last-child{border-right-width:1px}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:4px;border-bottom:1px solid var(--p-line);vertical-align:middle;font-size:.9rem}
+td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.neg{color:var(--p-bad)}.pos{color:var(--p-good)}
+.drop{border:2px dashed var(--p-line);padding:22px;text-align:center;background:var(--p-card)}
+.drop.over{border-color:var(--p-accent)}
+.fig{display:inline-block;margin-right:22px}.fig b{display:block;font-family:var(--font-display);font-size:1.3rem}
+section{display:none}section.show{display:block}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="6" width="44" height="52" fill="none" stroke="currentColor" stroke-width="4"/><path d="M18 18h28M18 28h28M18 38h16" stroke="currentColor" stroke-width="3"/></svg>Budget Ledger</h1>
+<div class="row"><button id="exportJson">Export all (JSON)</button><button id="exportCsv">Export transactions (CSV)</button></div>
+</div>
+<p class="note" id="fixedLine"></p>
+<p class="note">It reads the statement files you download from your own bank. It moves no money, signs in nowhere and never contacts a bank. Everything stays on this computer. It keeps only the last four digits of any account or card number it finds in your files.</p>
+<div id="msg" role="status"></div>
+<div class="tabs" id="tabs"></div>
+
+<section id="t-import">
+<h2>Import a statement <small>CSV, OFX, QFX or QIF, up to <span id="maxMb">10</span> MB</small></h2>
+<div class="card">
+<div class="row"><label>Account <select id="impAccount"></select></label>
+<span id="newAcc" class="row"><input id="newName" maxlength="60" placeholder="New account name" aria-label="New account name">
+<select id="newKind" aria-label="Kind"></select><input id="newCur" maxlength="3" size="4" placeholder="USD" aria-label="Currency"></span></div>
+<div class="drop" id="drop" style="margin-top:8px">Drop a statement file here, or <button id="pick">choose a file</button><input type="file" id="file" hidden accept=".csv,.txt,.ofx,.qfx,.qif"></div>
+<div id="preview"></div>
+</div>
+<h2>Imported files</h2>
+<div class="card scroll" id="imports"></div>
+</section>
+
+<section id="t-tx">
+<div id="pairs"></div>
+<h2>Transactions <small id="txCount"></small></h2>
+<div class="card">
+<div class="row"><input id="fq" placeholder="Search payee or description" aria-label="Search"><select id="facc" aria-label="Account"></select>
+<select id="fmonth" aria-label="Month"></select><select id="fcat" aria-label="Category"></select>
+<label class="row"><input type="checkbox" id="funcat" checked>Uncategorized first</label></div>
+<div id="ruleOffer"></div>
+<div class="scroll" id="tx" style="margin-top:8px"></div>
+</div>
+</section>
+
+<section id="t-month">
+<h2>Month <select id="mpick" aria-label="Month"></select></h2>
+<div id="monthBody"></div>
+</section>
+
+<section id="t-rec">
+<h2>Repeating payments <small>the same payee, a similar amount, a steady gap</small></h2>
+<div class="card scroll" id="rec"></div>
+</section>
+
+<section id="t-rules">
+<h2>Rules <small>if the payee has these words, use this category</small></h2>
+<div class="card"><div id="rules"></div>
+<form class="row" id="ruleForm" style="margin-top:8px"><input name="words" maxlength="80" placeholder="Payee words" aria-label="Payee words" required><select name="category" id="ruleCat" aria-label="Category"></select><button class="primary">Add rule</button></form></div>
+<h2>Categories</h2>
+<div class="card"><div id="cats"></div>
+<form class="row" id="catForm" style="margin-top:8px"><input name="name" maxlength="40" placeholder="New category" aria-label="New category" required><button class="primary">Add</button></form></div>
+</section>
+
+<section id="t-budgets">
+<h2>Budgets <small>an amount per category per month</small></h2>
+<div class="card"><div id="budgets"></div>
+<form class="row" id="budgetForm" style="margin-top:8px"><select name="category" id="budCat" aria-label="Category"></select>
+<input name="amount" inputmode="decimal" maxlength="20" placeholder="Amount" aria-label="Amount" required>
+<input name="currency" maxlength="3" size="4" placeholder="USD" aria-label="Currency">
+<input name="month" type="month" aria-label="Only this month (empty: every month)"><button class="primary">Set</button></form>
+<p class="note">Leave the month empty for every month. An amount of 0 removes a budget.</p></div>
+</section>
+
+<section id="t-acc">
+<h2>Accounts</h2>
+<div class="card scroll" id="accounts"></div>
+<div class="card"><form class="row" id="accForm"><input name="name" maxlength="60" placeholder="Account name" aria-label="Account name" required><select name="kind" id="accKind" aria-label="Kind"></select>
+<input name="last4" maxlength="4" size="5" placeholder="Last 4" aria-label="Last four"><input name="currency" maxlength="3" size="4" placeholder="USD" aria-label="Currency"><button class="primary">Add account</button></form>
+<p class="note">It keeps only the last four digits of any account or card number it finds in your files. It cannot recognise every number. Check a file's text before you import it if that matters to you.</p></div>
+<h2>Ledger currency</h2>
+<div class="card"><form class="row" id="curForm"><input name="currency" maxlength="3" size="4" id="mainCur" aria-label="Ledger currency"><button>Save</button></form>
+<p class="note">Used for new accounts and budgets unless you say otherwise. Totals are never mixed across currencies.</p></div>
+</section>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/budget-ledger/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let V=null,_stamp='',tab='t-import',pending=null;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+function opt(v,label,sel){return `<option value="${esc(v)}"${sel?' selected':''}>${esc(label)}</option>`}
+function cls(n){return n<0?'neg':n>0?'pos':''}
+const TABS=[['t-import','Import'],['t-tx','Transactions'],['t-month','Month'],['t-rec','Recurring'],['t-rules','Rules'],['t-budgets','Budgets'],['t-acc','Accounts']];
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Budget Ledger sent an answer this page could not read.'}));
+  if(!r.ok){const e=new Error(out.error||'Budget Ledger could not do that.');e.out=out;throw e}
+  return out}
+async function get(path){const r=await fetch(BASE+path);const out=await r.json().catch(()=>({}));if(!r.ok)throw new Error(out.error||'Budget Ledger could not read that.');return out}
+
+async function pull(force){
+  try{const {last_updated}=await get('updated');if(V&&!force&&last_updated===_stamp)return;
+    V=await get('view');_stamp=V.last_updated||'';render()}
+  catch(e){say(e.message||'Budget Ledger is not answering. Is it running?',true)}}
+
+function render(){
+  $('fixedLine').textContent=V.line;$('maxMb').textContent=V.max_file_mb;
+  $('tabs').innerHTML=TABS.map(([id,l])=>`<button data-tab="${id}" class="${id===tab?'on':''}">${esc(l)}${id==='t-tx'&&V.uncategorized?' ('+V.uncategorized+' to sort)':''}</button>`).join('');
+  document.querySelectorAll('section').forEach(s=>s.classList.toggle('show',s.id===tab));
+  const accOpts=V.accounts.map(a=>opt(a.name,a.name+(a.last4?' ...'+a.last4:'')+' ('+a.currency+')'));
+  const keep=$('impAccount').value;
+  $('impAccount').innerHTML=accOpts.join('')+opt('__new','A new account');
+  if(keep&&[...$('impAccount').options].some(o=>o.value===keep))$('impAccount').value=keep;
+  if(!V.accounts.length)$('impAccount').value='__new';
+  $('newAcc').style.display=$('impAccount').value==='__new'?'':'none';
+  const kinds=V.kinds.map(k=>opt(k,k)).join('');$('newKind').innerHTML=kinds;$('accKind').innerHTML=kinds;
+  $('newCur').placeholder=V.currency;$('mainCur').value=V.currency;
+  $('imports').innerHTML=V.imports.length?'<table><tr><th>File</th><th>Account</th><th>Imported</th><th class="n">Transactions</th><th></th></tr>'+V.imports.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.account_name)}</td><td>${esc(i.added.slice(0,16).replace('T',' '))}</td><td class="n">${esc(i.count)}</td><td><button data-rmimport="${esc(i.id)}" data-name="${esc(i.name)}">Remove its transactions</button></td></tr>`).join('')+'</table>':'<p class="note">Nothing imported yet. Download a statement file from your bank\'s website, then drop it above.</p>';
+  const catOpts=V.categories.map(c=>opt(c,c)).join('');
+  const f=[$('facc').value,$('fmonth').value,$('fcat').value];
+  $('facc').innerHTML=opt('','All accounts')+V.accounts.map(a=>opt(a.name,a.name)).join('');
+  $('fmonth').innerHTML=opt('','All months')+V.months.map(m=>opt(m,m)).join('');
+  $('fcat').innerHTML=opt('','All categories')+opt('uncategorized','uncategorized')+catOpts;
+  [$('facc').value,$('fmonth').value,$('fcat').value]=f;
+  $('ruleCat').innerHTML=catOpts;$('budCat').innerHTML=V.categories.filter(c=>c!=='income'&&c!=='transfers').map(c=>opt(c,c)).join('');
+  const mp=$('mpick').value,months=V.months.length?V.months:[V.today.slice(0,7)];
+  $('mpick').innerHTML=months.map(m=>opt(m,m)).join('');if(mp&&months.includes(mp))$('mpick').value=mp;
+  $('pairs').innerHTML=V.transfer_pairs.length?'<h2>Possible transfers between your own accounts</h2><div class="card scroll"><table>'+V.transfer_pairs.map(p=>`<tr><td>${esc(p.out.date)} ${esc(p.out.account_name)}</td><td class="n neg">${esc(p.out.money)}</td><td>to ${esc(p.in.date)} ${esc(p.in.account_name)}</td><td class="n pos">${esc(p.in.money)}</td><td><button class="primary" data-pair="1" data-out="${esc(p.out.id)}" data-in="${esc(p.in.id)}">It is a transfer</button> <button data-pair="0" data-out="${esc(p.out.id)}" data-in="${esc(p.in.id)}">Not a transfer</button></td></tr>`).join('')+'</table><p class="note">A confirmed transfer is left out of spending.</p></div>':'';
+  $('rules').innerHTML=V.rules.length?'<table>'+V.rules.map(r=>`<tr><td>payee has "${esc(r.words)}"</td><td>${esc(r.category)}</td><td><button data-rmrule="${esc(r.id)}">Remove</button></td></tr>`).join('')+'</table>':'<p class="note">No rules yet. When you set a category on a transaction, the page offers to make it a rule.</p>';
+  $('cats').innerHTML='<div class="row">'+V.categories.map(c=>`<span class="row" style="gap:2px"><button data-rename="${esc(c)}">${esc(c)}</button><button data-rmcat="${esc(c)}" aria-label="Remove ${esc(c)}">x</button></span>`).join('')+'</div><p class="note">Tap a category to rename it.</p>';
+  $('budgets').innerHTML=V.budgets.length?'<table><tr><th>Category</th><th>Month</th><th class="n">Amount</th><th></th></tr>'+V.budgets.map(b=>`<tr><td>${esc(b.category)}</td><td>${esc(b.month||'every month')}</td><td class="n">${esc(b.money)}</td><td><button data-rmbudget="${esc(b.category)}" data-month="${esc(b.month)}" data-cur="${esc(b.currency)}">Remove</button></td></tr>`).join('')+'</table>':'<p class="note">No budgets yet.</p>';
+  $('accounts').innerHTML=V.accounts.length?'<table><tr><th>Name</th><th>Kind</th><th>Last 4</th><th>Currency</th><th class="n">Transactions</th><th></th></tr>'+V.accounts.map(a=>`<tr><td><input data-acc="${esc(a.id)}" data-f="name" value="${esc(a.name)}" maxlength="60" aria-label="Name"></td><td><select data-acc="${esc(a.id)}" data-f="kind" aria-label="Kind">${V.kinds.map(k=>opt(k,k,k===a.kind)).join('')}</select></td><td><input data-acc="${esc(a.id)}" data-f="last4" value="${esc(a.last4)}" maxlength="4" size="5" aria-label="Last four"></td><td>${esc(a.currency)}</td><td class="n">${esc(a.transactions)}</td><td>${a.transactions?'':`<button data-rmacc="${esc(a.id)}" data-name="${esc(a.name)}">Remove</button>`}</td></tr>`).join('')+'</table>':'<p class="note">No accounts yet. One is made when you import its first statement, or add one here.</p>';
+  if(tab==='t-tx')loadTx();if(tab==='t-month')loadMonth();if(tab==='t-rec')loadRec()}
+
+// ---- import
+function readFile(file){return new Promise((ok,bad)=>{if(file.size>V.max_file_mb*1048576){bad(new Error('That file is larger than '+V.max_file_mb+' MB.'));return}
+  const r=new FileReader();r.onload=()=>ok({name:file.name,data:String(r.result).split(',')[1]||''});r.onerror=()=>bad(new Error('That file could not be read.'));r.readAsDataURL(file)})}
+function target(){const a=$('impAccount').value;if(a!=='__new')return {account:a};
+  return {account:$('newName').value.trim(),new_account:{kind:$('newKind').value,currency:$('newCur').value.trim()||V.currency}}}
+async function previewFile(file){try{pending={file:await readFile(file),mapping:null};await showPreview()}catch(e){say(e.message,true)}}
+async function showPreview(){
+  const p=await post('api/preview',{file:pending.file,mapping:pending.mapping,...target()});pending.p=p;
+  let h=`<h2>${esc(p.name)} <small>${esc(p.kind.toUpperCase())}: ${esc(p.count)} rows read, ${esc(p.new)} new, ${esc(p.duplicates)} already here${p.skipped_count?', '+esc(p.skipped_count)+' did not read':''}</small></h2>`;
+  if(p.imported_before.length)h+=`<div class="warn">This same file was imported on ${esc(p.imported_before.join(', '))}. Rows already here are not added again.</div>`;
+  if(p.account_guess&&p.account_guess.last4)h+=`<p class="note">The file is for an account ending ${esc(p.account_guess.last4)}${p.account_guess.kind?' ('+esc(p.account_guess.kind)+')':''}${p.account_guess.currency?' in '+esc(p.account_guess.currency):''}.</p>`;
+  if(!p.certain)h+='<div class="warn">'+p.why.map(esc).join('<br>')+'</div>';
+  if(p.kind==='csv'&&p.csv){const c=p.csv,heads=c.sample[0]||[],n=Math.max(...c.sample.map(r=>r.length),0);
+    const colOpts=sel=>opt('','(none)',sel==null)+Array.from({length:n},(_,i)=>opt(i,'column '+(i+1)+(c.header_row>=0&&heads[i]?': '+heads[i]:''),sel===i)).join('');
+    h+='<div class="row" style="margin:6px 0">'+['date','description','memo','amount','debit','credit','category','type'].map(r=>`<label>${esc({debit:'money out',credit:'money in',type:'debit/credit word'}[r]||r)} <select data-role="${esc(r)}">${colOpts(c.columns[r])}</select></label>`).join('')
+      +`<label>first row is a header <input type="checkbox" id="hasHead"${c.header_row>=0?' checked':''}></label>`
+      +`<label class="row"><input type="checkbox" id="flip"${c.flip?' checked':''}>flip signs (spending shows as positive in this file)</label></div>`;
+    h+='<div class="scroll"><table>'+c.sample.map((r,i)=>`<tr>${r.map(x=>i===0&&c.header_row>=0?`<th>${esc(x)}</th>`:`<td>${esc(x)}</td>`).join('')}</tr>`).join('')+'</table></div>'}
+  if(p.date_orders&&p.date_orders.length>1||(!p.certain&&p.date_orders))h+=`<label>Date order <select id="dorder">${opt('','pick one',!p.date_order)}${Object.entries(V.date_orders).map(([k,l])=>opt(k,l,k===p.date_order)).join('')}</select></label>`;
+  if(p.rows.length)h+='<h2>First rows as Budget Ledger reads them</h2><div class="scroll"><table><tr><th>Date</th><th class="n">Amount</th><th>Payee</th><th>Description</th><th>Category</th></tr>'+p.rows.map(r=>`<tr><td>${esc(r.date)}</td><td class="n ${cls(r.amount)}">${esc(r.money)}</td><td>${esc(r.payee)}</td><td>${esc(r.description)}</td><td>${esc(r.category||'uncategorized')}</td></tr>`).join('')+'</table></div>';
+  h+=`<div class="row" style="margin-top:8px">${p.kind==='csv'||p.date_orders.length>1?'<button id="recheck">Read again with these choices</button>':''}<button class="primary" id="doImport"${p.certain?'':' disabled'}>Import ${esc(p.new)} new</button><button id="cancelImport">Cancel</button></div>`;
+  $('preview').innerHTML=h}
+function choices(){const m={};const roles={};document.querySelectorAll('[data-role]').forEach(s=>{if(s.value!=='')roles[s.dataset.role]=Number(s.value)});
+  if(document.querySelector('[data-role]')){m.columns=roles;m.header_row=$('hasHead').checked?Math.max(pending.p.csv.header_row,0):-1;m.flip=$('flip').checked;m.delimiter=pending.p.csv.delimiter}
+  if($('dorder')&&$('dorder').value)m.date_order=$('dorder').value;return m}
+
+// ---- transactions
+async function loadTx(){
+  const q=new URLSearchParams({q:$('fq').value,account:$('facc').value,month:$('fmonth').value,category:$('fcat').value,uncat:$('funcat').checked?'1':'0',limit:'300'});
+  try{const out=await get('transactions?'+q);$('txCount').textContent=out.total+' found'+(out.total>out.rows.length?', the first '+out.rows.length+' shown':'');
+    const cats=V.categories;
+    $('tx').innerHTML=out.rows.length?'<table><tr><th>Date</th><th>Account</th><th>Payee</th><th class="n">Amount</th><th>Category</th><th>Note</th><th>Transfer</th><th></th></tr>'+out.rows.map(t=>`<tr><td>${esc(t.date)}</td><td>${esc(t.account_name)}</td><td title="${esc(t.description)}">${esc(t.payee)}<div class="note">${esc(t.description)}</div></td><td class="n ${cls(t.amount)}">${esc(t.money)}</td>
+      <td><select data-tx="${esc(t.id)}" data-f="category" aria-label="Category">${opt('','uncategorized',!t.category)}${cats.map(c=>opt(c,c,c===t.category)).join('')}</select></td>
+      <td><input data-tx="${esc(t.id)}" data-f="note" value="${esc(t.note)}" maxlength="300" aria-label="Note"></td>
+      <td><input type="checkbox" data-tx="${esc(t.id)}" data-f="transfer"${t.transfer?' checked':''} aria-label="Transfer"></td>
+      <td><button data-rmtx="${esc(t.id)}" data-name="${esc(t.date+' '+t.payee)}">Remove</button></td></tr>`).join('')+'</table>':'<p class="note">No transactions match.</p>'}
+  catch(e){say(e.message,true)}}
+
+// ---- month
+function bars(cats,cur){const max=Math.max(1,...cats.map(c=>Math.max(c.spent,c.budget||0)));const W=300,H=16;
+  return '<table>'+cats.map(c=>{const w=Math.max(0,Math.round(c.spent/max*W)),b=c.budget!=null?Math.round(c.budget/max*W):null;
+    return `<tr><td>${esc(c.category)}</td><td><svg width="${W+4}" height="${H}" role="img" aria-label="${esc(c.category)}"><rect x="0" y="2" width="${w}" height="${H-4}" fill="${c.over?'var(--p-bad)':'var(--p-accent)'}"/>${b!=null?`<line x1="${b}" x2="${b}" y1="0" y2="${H}" stroke="var(--p-text)" stroke-width="2"/>`:''}</svg></td>
+      <td class="n">${esc(c.money.spent)}</td><td class="n">${c.budget!=null?'budget '+esc(c.money.budget):''}</td><td class="n ${c.over?'neg':''}">${c.budget!=null?(c.over?'over by '+esc(c.money.over):esc(c.money.left)+' left'):''}</td><td class="n note">before: ${esc(c.money.before)}</td></tr>`}).join('')+'</table>'}
+async function loadMonth(){try{const m=await get('month?month='+encodeURIComponent($('mpick').value||''));
+  const curs=Object.entries(m.currencies);
+  let h=curs.length?'':'<div class="card"><p class="note">No transactions in this month.</p></div>';
+  for(const [cur,f] of curs){h+=`<div class="card"><h2>${esc(m.label)} <small>${esc(cur)}</small></h2>
+    <div><span class="fig">Income<b class="pos">${esc(f.money.income)}</b></span><span class="fig">Spending<b class="neg">${esc(f.money.spending)}</b></span><span class="fig">${f.net>=0?'Left over':'Spent more than came in'}<b>${esc(f.money.net)}</b></span><span class="fig">Spending the month before<b>${esc(f.money.prev_spending)}</b></span></div>
+    ${f.uncategorized?`<p class="warn">${esc(f.uncategorized)} transactions have no category yet.</p>`:''}
+    <h2>By category <small>bar: spent; line: budget</small></h2>${bars(f.categories,cur)}
+    <h2>Largest payees</h2><table>${f.top_payees.map(([p,v])=>`<tr><td>${esc(p)}</td><td class="n">${esc(v)}</td></tr>`).join('')}</table></div>`}
+  h+='<div class="card scroll"><h2>By month</h2><table><tr><th>Month</th><th>Currency</th><th class="n">Income</th><th class="n">Spending</th></tr>'+m.by_month.flatMap(r=>Object.entries(r.currencies).map(([cur,f])=>`<tr><td>${esc(r.month)}</td><td>${esc(cur)}</td><td class="n">${esc(f.money.income)}</td><td class="n">${esc(f.money.spending)}</td></tr>`)).join('')+'</table></div>';
+  $('monthBody').innerHTML=h}catch(e){say(e.message,true)}}
+async function loadRec(){try{const r=await get('recurring');
+  $('rec').innerHTML=r.recurring.length?'<table><tr><th>Payee</th><th>How often</th><th class="n">Usually</th><th class="n">A year</th><th>Last</th><th>Next about</th><th>Category</th></tr>'+r.recurring.map(x=>`<tr><td>${esc(x.payee)}</td><td>${esc(x.cadence)}</td><td class="n">${esc(x.money.usual)}</td><td class="n">${esc(x.money.yearly)}</td><td>${esc(x.last)}</td><td>${x.maybe_stopped?'not seen lately':esc(x.next)}</td><td>${esc(x.category||'uncategorized')}</td></tr>`).join('')+'</table>':'<p class="note">None found yet. A payment shows here once the same payee is paid a similar amount at a steady gap at least 3 times (twice for yearly ones).</p>'}
+  catch(e){say(e.message,true)}}
+
+// ---- events
+document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.tab){tab=d.tab;render();return}
+    if(t.id==='pick'){$('file').click();return}
+    if(t.id==='recheck'){pending.mapping=choices();await showPreview();return}
+    if(t.id==='cancelImport'){pending=null;$('preview').innerHTML='';return}
+    if(t.id==='doImport'){const out=await post('api/import',{file:pending.file,mapping:pending.mapping,...target()});say(out.text);pending=null;$('preview').innerHTML='';pull(true);return}
+    if(d.rmimport){if(!confirm('Remove every transaction imported from '+d.name+'? This can not be undone.'))return;say((await post('api/remove',{import:d.rmimport,confirm:true})).text)}
+    else if(d.rmtx){if(!confirm('Remove '+d.name+'?'))return;say((await post('api/remove',{id:d.rmtx})).text)}
+    else if(d.pair){say((await post('api/pair',{out:d.out,in:d.in,confirm:d.pair==='1'})).text)}
+    else if(d.rmrule){say((await post('api/rule-remove',{id:d.rmrule})).text)}
+    else if(d.mkrule){say((await post('api/rule',{words:d.words,category:d.mkrule})).text);$('ruleOffer').innerHTML=''}
+    else if(d.rename){const n=prompt('New name for '+d.rename);if(!n)return;say((await post('api/category',{name:d.rename,rename:n})).text)}
+    else if(d.rmcat){if(!confirm('Remove the category '+d.rmcat+'? Its transactions become uncategorized.'))return;say((await post('api/category-remove',{name:d.rmcat})).text)}
+    else if(d.rmbudget){say((await post('api/budget',{category:d.rmbudget,amount:0,month:d.month||null,currency:d.cur})).text)}
+    else if(d.rmacc){if(!confirm('Remove the account '+d.name+'?'))return;say((await post('api/account-remove',{id:d.rmacc})).text)}
+    else if(t.id==='exportJson'||t.id==='exportCsv'){const csv=t.id==='exportCsv',r=await fetch(BASE+(csv?'export.csv':'export'));if(!r.ok)throw new Error('Budget Ledger could not export.');
+      const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='budget-ledger-'+(csv?'transactions-':'')+V.today+(csv?'.csv':'.json');
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);say('Exported.');return}
+    else return;
+    pull(true)}catch(err){say(err.message,true)}});
+
+document.addEventListener('change',async e=>{const t=e.target,d=t.dataset;
+  try{
+    if(t.id==='impAccount'){$('newAcc').style.display=t.value==='__new'?'':'none';if(pending)await showPreview();return}
+    if(t.id==='file'){const f=t.files[0];t.value='';if(f)previewFile(f);return}
+    if(['facc','fmonth','fcat','funcat'].includes(t.id)){loadTx();return}
+    if(t.id==='mpick'){loadMonth();return}
+    if(d.tx){const body={id:d.tx};body[d.f]=d.f==='transfer'?t.checked:t.value;const out=await post('api/transaction',body);say(out.text);
+      $('ruleOffer').innerHTML=out.offer_rule?`<div class="warn">Always put payees with "${esc(out.offer_rule.words)}" in ${esc(out.offer_rule.category)}? <button data-mkrule="${esc(out.offer_rule.category)}" data-words="${esc(out.offer_rule.words)}">Make it a rule</button></div>`:'';pull(true);return}
+    if(d.acc){say((await post('api/account',{id:d.acc,[d.f]:t.value})).text);pull(true)}
+  }catch(err){say(err.message,true);pull(true)}});
+let _typing=null;$('fq').addEventListener('input',()=>{clearTimeout(_typing);_typing=setTimeout(loadTx,300)});
+
+document.addEventListener('submit',async e=>{const f=e.target;e.preventDefault();const b=Object.fromEntries(new FormData(f));
+  try{
+    if(f.id==='ruleForm')say((await post('api/rule',b)).text);
+    else if(f.id==='catForm')say((await post('api/category',b)).text);
+    else if(f.id==='budgetForm'){if(!b.month)delete b.month;if(!b.currency)delete b.currency;say((await post('api/budget',b)).text)}
+    else if(f.id==='accForm')say((await post('api/account',b)).text);
+    else if(f.id==='curForm')say((await post('api/settings',b)).text);
+    f.reset();pull(true)}catch(err){say(err.message,true)}});
+
+const drop=$('drop');
+drop.addEventListener('dragover',e=>{e.preventDefault();drop.classList.add('over')});
+drop.addEventListener('dragleave',()=>drop.classList.remove('over'));
+drop.addEventListener('drop',e=>{e.preventDefault();drop.classList.remove('over');const f=e.dataTransfer.files[0];if(f)previewFile(f)});
+
+pull(true);
+setInterval(pull,5000);
+</script>
+</body>
+</html>
