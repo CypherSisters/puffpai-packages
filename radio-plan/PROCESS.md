@@ -11,7 +11,7 @@ All of these are in one table, `NUMBERS`, in `server.py`.
 
 ## A check-in's channels
 
-1. The check-in's channel is the channel whose label matches what is written (the same words first, then one label that holds the words).
+1. The check-in's channel is the channel whose label matches what is written, by the name rule below.
 2. When nothing is written, it is the first channel kept for primary.
 3. The backup is worked out the same way, from the check-in's backup channel, or the first channel kept for backup.
 4. Words that match no channel are shown as they are written.
@@ -29,8 +29,14 @@ All of these are in one table, `NUMBERS`, in `server.py`.
 1. A channel's exact label: that channel.
 2. Otherwise a person's name or call sign: their call sign, primary and backup channel (their own if written, else the household's), the check-in times and what to do if there is no contact.
 3. Otherwise words for a purpose (like neighbors, emergency, backup, weather): the channels kept for it. Listen only and weather also list the listen-only stations.
-4. Otherwise one channel whose label holds the words.
+4. Otherwise one channel found by the name rule below.
 5. Nothing matches: the answer lists the channels and the people. Several match: it lists them and asks which.
+
+## Finding an item by name
+
+1. An exact name always wins, with accents, case and a leading "the" ignored ("cafe luna" is "Café Luna").
+2. Otherwise every word said of 3 letters or more must be a whole word of the name or the start of one, never letters inside a word; shorter words are ignored, so "hub" finds "Hubert Bay" but "ub", "i" or "über" find nothing. One match is used and the answer says which; several change nothing and are listed.
+3. update_radio_plan adds or changes by name: it changes an item only on its exact name, and any other name is a new item, so "Zoë" never changes "Zoey Park".
 
 ## A pocket card
 

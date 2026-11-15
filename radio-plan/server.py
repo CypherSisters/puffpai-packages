@@ -38,6 +38,7 @@ import socket
 import tempfile
 import threading
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -46,7 +47,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "radio-plan"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "radio.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 256 * 1024
@@ -154,9 +155,16 @@ def _key(word) -> str:
     return "_".join(str(word).lower().replace("-", " ").split())
 
 
+def _fold(text) -> str:
+    """Lower case with accents folded away (é is e, ü is u); letters of every script stay letters."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(c for c in text if not unicodedata.combining(c)).casefold()
+
+
 def _words(text) -> str:
-    """Lower-case words with single spaces around them, so ' frs ' can be looked for."""
-    return " " + " ".join(re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).split()) + " "
+    """Lower-case words with single spaces around them, so ' frs ' can be looked for. Accents are folded;
+    a letter of any script is a letter, so 'Amélie' is the one word 'amelie', never 'am' and 'lie'."""
+    return " " + " ".join("".join(c if c.isalnum() else " " for c in _fold(text)).split()) + " "
 
 
 # ---------------------------------------------------------------- checked input
@@ -576,9 +584,18 @@ def _unchunk(body: bytes) -> bytes:
 
 # ------------------------------------------------------------- the logic
 
-def _find(rows: list[dict], ident, what: str, key: str = "name", also: tuple = ()) -> dict | None:
-    """An exact id or name (or one of *also*), then one unambiguous part of a name. None when nothing matches;
-    more than one partial match is refused with the candidates, and nothing changes."""
+def _whole(text) -> str:
+    """A whole name for comparing: accents and case folded, spaces squeezed, a leading 'the' dropped."""
+    words = _words(text).split()
+    return " ".join(words[1:] if len(words) > 1 and words[0] == "the" else words)
+
+
+def _find(rows: list[dict], ident, what: str, key: str = "name", also: tuple = (), exact: bool = False,
+          said: list | None = None) -> dict | None:
+    """An exact id, name or one of *also* (accents, case and a leading 'the' ignored) always wins. Otherwise,
+    unless *exact*, the one name where every word given of 3 letters or more is a whole word or the start of one,
+    never letters inside a word; shorter words are ignored. A match that is not exact adds "Using '<name>'." to
+    *said*. None when nothing matches; several are refused with the candidates, and nothing changes."""
     text = _text(ident, what, 1000)
     if not text:
         raise ValueError(f"say which {what}")
@@ -587,10 +604,18 @@ def _find(rows: list[dict], ident, what: str, key: str = "name", also: tuple = (
         if r.get("id") == text or str(r.get(key, "")).lower() == low or \
                 any(str(r.get(a, "")).lower() == low and r.get(a) for a in also):
             return r
-    hits = [r for r in rows if low in str(r.get(key, "")).lower()]
+    whole = _whole(text)
+    hits = [r for r in rows if whole and (_whole(r.get(key, "")) == whole
+                                          or any(r.get(a) and _whole(r.get(a)) == whole for a in also))]
+    if not hits and not exact:
+        given = [w for w in whole.split() if len(w) >= 3]
+        hits = [r for r in rows if given and all(any(n == w or n.startswith(w) for n in _words(r.get(key, "")).split())
+                                                 for w in given)]
+        if len(hits) == 1 and said is not None:
+            said.append(f"Using {str(hits[0].get(key))[:80]!r}.")
     if len(hits) > 1:
         raise ValueError(f"more than one {what} matches {text!r}: " + "; ".join(str(r.get(key))[:60] for r in hits)
-                         + ". Say which one.")
+                         + ". Say which one; nothing was changed.")
     return hits[0] if hits else None
 
 
@@ -822,7 +847,7 @@ class Plan:
         if ch:
             return f"{self.channel_text(ch)}: used for {USES[ch['use']]}" + \
                 (f"; {ch['notes']}" if ch["notes"] else "") + ".\n" + RULES_LINE
-        person = next((p for p in rows if p["name"].lower() in _words(need).strip().split()
+        person = next((p for p in rows if _words(p["name"]).strip() in _words(need).split()
                        or p["name"].lower() == low or (p.get("call_sign") and p["call_sign"].lower() == low)), None)
         if person:
             card = next(c for c in self.cards(doc, rows) if c["name"] == person["name"])
@@ -859,6 +884,7 @@ class Plan:
             raise ValueError("fields holds at most 20 names")
         now = self.now()
         core = self.core.list() if sec == "people" else []       # asked before the lock, never while holding it
+        using: list[str] = []
         with self.store.lock:
             doc = self.store.load()
             got = {}
@@ -885,7 +911,7 @@ class Plan:
                 raise ValueError(f"say which item in {sec}, by its {'time' if sec == 'check_ins' else key}")
             if sec == "people":
                 rows, _ = self.household(doc, core)
-                row = _find(rows, name, "person", also=("call_sign",))
+                row = _find(rows, name, "person", also=("call_sign",), exact=True)   # else a new person
                 own = next((p for p in doc["people"] if row and p["id"] == row["id"]), None)
                 if row and not own:                           # a Core person with no radio details here yet
                     own = {"id": secrets.token_hex(4), "name": row["name"], "core_id": row.get("core_id", ""),
@@ -893,7 +919,8 @@ class Plan:
                     doc["people"].append(own)
                 target = own
             else:
-                target = _find(doc[sec], name, ONE[sec], key)
+                # a section that adds by name changes an item only on its exact name; any other name is a new one
+                target = _find(doc[sec], name, ONE[sec], key, exact=sec not in ("messages", "practice"), said=using)
             added = target is None
             if added:
                 if sec in ("messages", "practice"):
@@ -922,7 +949,7 @@ class Plan:
             target.update(clean)
             self.store.save(doc)
         what = ", ".join(FIELDS[sec][k][0] for k in clean) or ("added" if added else "name")
-        said = f"Saved in {SECTION_TITLES[sec]}: {'added ' if added else ''}{str(target.get(key))[:80]} ({what})."
+        said = " ".join(using + [""]) + f"Saved in {SECTION_TITLES[sec]}: {'added ' if added else ''}{str(target.get(key))[:80]} ({what})."
         if notes:
             note = "; ".join(notes)
             said += " " + note[0].upper() + note[1:] + "."
@@ -995,11 +1022,12 @@ class Plan:
                 item = _clock(item)
             except ValueError:
                 pass
+        using: list[str] = []
         with self.store.lock:
             doc = self.store.load()                                # read first: a file that will not read stops here
             if sec == "people":
                 rows, _ = self.household(doc, core)
-                row = _find(rows, item, "person", also=("call_sign",))
+                row = _find(rows, item, "person", also=("call_sign",), said=using)
                 own = next((p for p in doc["people"] if row and p["id"] == row["id"]), None)
                 if own is None:
                     raise ValueError(f"no person called {item!r} has radio details in the plan; the people with "
@@ -1008,14 +1036,14 @@ class Plan:
                 said = f"removed {own['name']}'s radio details" + (" (they stay in the Core's people list)"
                                                                    if row.get("from_core") else "")
             else:
-                x = _find(doc[sec], item, ONE[sec], key)
+                x = _find(doc[sec], item, ONE[sec], key, said=using)
                 if x is None:
                     raise ValueError(f"{SECTION_TITLES[sec]} has nothing called {item!r}. It has: "
                                      f"{_names(doc[sec], key)}. Nothing was removed.")
                 doc[sec] = [y for y in doc[sec] if y is not x]
                 said = f"removed {str(x.get(key))[:80]}"
             self.store.save(doc)
-        return f"{SECTION_TITLES[sec]}: {said}."
+        return " ".join(using + [f"{SECTION_TITLES[sec]}: {said}."])
 
 
 # --------------------------------------------------------------- MCP tools

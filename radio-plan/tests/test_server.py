@@ -248,11 +248,12 @@ def test_name_finding_exact_partial_several_none(base, data):
         tool(base, "update_radio_plan", section="radios", item=n)
     tool(base, "update_radio_plan", section="radios", item="base", fields={"kept": "desk"})     # exact beats partial
     assert next(r for r in doc(data)["radios"] if r["name"] == "Base")["kept"] == "desk"
-    tool(base, "update_radio_plan", section="radios", item="upstairs", fields={"battery": "mains"})   # one partial
-    assert next(r for r in doc(data)["radios"] if r["name"] == "Base station upstairs")["battery"] == "mains"
+    # updating by name changes only the exact name; a part of a name is a new radio, never a change to another
+    out = tool(base, "update_radio_plan", section="radios", item="upstairs", fields={"battery": "mains"})
+    assert out.startswith("Saved in Radios: added upstairs")
+    assert next(r for r in doc(data)["radios"] if r["name"] == "Base station upstairs")["battery"] == ""
+    tool(base, "remove_radio_item", section="radios", item="upstairs")
     before = (data / "radio.json").read_text(encoding="utf-8")
-    err = tool_error(base, "update_radio_plan", section="radios", item="handheld", fields={"kept": "x"})
-    assert "more than one radio matches 'handheld': Sam's handheld; Alex's handheld" in err
     err = tool_error(base, "remove_radio_item", section="radios", item="handheld")
     assert "Sam's handheld; Alex's handheld" in err
     err = tool_error(base, "remove_radio_item", section="radios", item="scanner")
@@ -604,6 +605,57 @@ def answered(base, name, args):
         assert code == 200 and "result" in out, out
     return fn
 
+
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for n in ("Pesto Park", "Sliders Lane", "Berry Clinic", "José Alvarez", "Café Luna"):
+        tool(base, "update_radio_plan", section="radios", item=n, fields={})
+    # an accented letter is never a gap, so the pieces of a word find nothing else
+    for typed in ("crêpes", "müsli", "über"):
+        assert "nothing called" in tool_error(base, "remove_radio_item", section="radios", item=typed)
+    assert "removed José Alvarez" in tool(base, "remove_radio_item", section="radios", item="Jose Alvarez")
+    assert "removed Café Luna" in tool(base, "remove_radio_item", section="radios", item="cafe")
+    assert [r["name"] for r in doc(data)["radios"]] == ["Pesto Park", "Sliders Lane", "Berry Clinic"]
+    # a person is named by a whole word of the need, never by the pieces of one
+    tool(base, "update_radio_plan", section="people", item="Jo", fields={"call_sign": "Wren"})
+    assert "Nothing in the radio plan matches" in tool(base, "which_channel", need="Joël")
+    tool(base, "update_radio_plan", section="people", item="Zoë", fields={"call_sign": "Finch"})
+    assert tool(base, "which_channel", need="Zoe's channel").startswith("Zoë (call sign Finch)")
+    assert "added" not in tool(base, "update_radio_plan", section="people", item="ZOE", fields={"call_sign": "Hawk"})
+    assert [p["call_sign"] for p in doc(data)["people"]] == ["Wren", "Hawk"]
+    # a kind is never read from the pieces of a word: "Amélie" holds no "am", "Mainé" no "main"
+    assert "Kind: other" in tool(base, "update_radio_plan", section="listen", item="Amélie", fields={"kind": "Amélie"})
+    assert "Used for: other" in tool(base, "update_radio_plan", section="channels", item="Ch 9", fields={"use": "Mainé"})
+
+
+def test_a_name_is_found_by_whole_words_or_their_start_never_by_letters_inside_a_word(base, data):
+    for n in ("Hubert Bay", "Sliders Lane", "Café Luna", "Ch 9"):
+        tool(base, "update_radio_plan", section="radios", item=n, fields={})
+    before = (data / "radio.json").read_text(encoding="utf-8")
+    # letters inside a word, single letters (plain or accented) and two-letter words never remove anything
+    for typed in ("über", "uber", "bërt", "bert", "İ", "i", "ç", "c", "a", "ub", "Ch", "9", "e l"):
+        assert "has nothing called" in tool_error(base, "remove_radio_item", section="radios", item=typed), typed
+    assert (data / "radio.json").read_text(encoding="utf-8") == before
+    # an exact name wins, short words and all, with or without accents, case or a leading "the"
+    assert tool(base, "remove_radio_item", section="radios", item="ch 9") == "Radios: removed Ch 9."
+    assert tool(base, "remove_radio_item", section="radios", item="the cafe luna") == "Radios: removed Café Luna."
+    # a word of 3 letters or more that starts a word of one name: that one, and the answer says which
+    assert tool(base, "remove_radio_item", section="radios", item="hub") ==         "Using 'Hubert Bay'. Radios: removed Hubert Bay."
+    tool(base, "update_radio_plan", section="radios", item="Hubert Bay", fields={})
+    tool(base, "update_radio_plan", section="radios", item="Hubert's handheld", fields={})
+    before = (data / "radio.json").read_text(encoding="utf-8")
+    err = tool_error(base, "remove_radio_item", section="radios", item="hub")                     # several
+    assert "more than one radio matches 'hub': Hubert Bay; Hubert's handheld" in err and "nothing was changed" in err
+    assert (data / "radio.json").read_text(encoding="utf-8") == before
+    # adding or changing by name changes only the exact name; anything else is a new item
+    out = tool(base, "update_radio_plan", section="radios", item="Über", fields={"kept": "desk"})
+    assert out.startswith("Saved in Radios: added Über")
+    assert [r["kept"] for r in doc(data)["radios"] if r["name"].startswith("Hubert")] == ["", ""]
+    tool(base, "update_radio_plan", section="people", item="Zoey Park", fields={"call_sign": "Oak"})
+    out = tool(base, "update_radio_plan", section="people", item="Zoë", fields={"call_sign": "Finch"})
+    assert "added Zoë" in out
+    assert [(p["name"], p["call_sign"]) for p in doc(data)["people"]] == [("Zoey Park", "Oak"), ("Zoë", "Finch")]
+    assert "added" not in tool(base, "update_radio_plan", section="people", item="zoe", fields={"call_sign": "Hawk"})
+    assert [p["call_sign"] for p in doc(data)["people"]] == ["Oak", "Hawk"]
 
 def test_a_200000_character_value_in_any_argument_answers_fast(base):
     a_plan(base)

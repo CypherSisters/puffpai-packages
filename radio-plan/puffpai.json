@@ -3,7 +3,7 @@
   "id": "radio-plan",
   "kind": "app",
   "name": "Radio Plan",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The household's plan for staying in touch by radio when phones fail, kept on this computer: the radios you own, the channels and what each is for, each person's call sign, the check-in times and what to do if no one answers, the weather alert and broadcast stations to listen to, a message log and a practice log. It prints the plan and a pocket card for each person, shows when the next check-in is, and the bot can answer from it with no internet. It stores what you type: it ships no frequency lists, does not say what is legal to transmit where you live, and does not control a radio.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
