@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<!-- Chore Board page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chore Board</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1000px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 14px}
+input,select{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:7px 8px;min-height:40px}
+input[type=number]{width:80px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--p-line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+th{font-size:.8rem;color:var(--p-text2);font-weight:600}
+td.act{text-align:right;white-space:nowrap}
+td.act select{min-width:90px;max-width:130px}
+.who{color:var(--p-text2);font-size:.9rem}
+.flag{display:inline-block;padding:1px 7px;font-size:.8rem;font-weight:600;margin-left:6px}
+.flag.late{background:var(--p-bad);color:#fff}
+.flag.day{background:var(--p-chip);color:var(--p-text)}
+.empty{color:var(--p-text2);padding:6px 0}
+form.add{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;align-items:end}
+form.add label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-text2)}
+.picks{display:flex;flex-wrap:wrap;gap:6px;grid-column:1/-1}
+form.add .picks label{flex-direction:row;align-items:center;gap:6px;border:1px solid var(--p-line);padding:6px 10px;min-height:40px;color:var(--p-text);font-size:.95rem}
+.picks input{min-height:auto}
+.note{color:var(--p-text2);font-size:.85rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="10" y="8" width="44" height="50" fill="none" stroke="currentColor" stroke-width="4"/><rect x="24" y="4" width="16" height="9" fill="currentColor"/><path d="M18 26l5 5 9-10M18 44l5 5 9-10" fill="none" stroke="currentColor" stroke-width="4"/><path d="M38 28h9M38 46h9" stroke="currentColor" stroke-width="4"/></svg>Chore Board</h1>
+<div id="msg"></div>
+
+<div class="cols">
+<div>
+<h2>Today <small id="todayDate"></small></h2>
+<div class="card" id="today"></div>
+<h2>This week <small id="weekSpan"></small></h2>
+<div class="card" id="week"></div>
+</div>
+<div>
+<h2>People <small>done in the last 7 and 30 days</small></h2>
+<div class="card"><div id="people"></div>
+<form class="row" id="personForm"><input id="p_name" maxlength="60" placeholder="Name" required aria-label="Name"><button class="primary" type="submit">Add person</button></form></div>
+</div>
+</div>
+
+<h2 id="formTitle">Add a chore</h2>
+<div class="card">
+<form class="add" id="form">
+  <label>Chore<input id="f_name" required maxlength="80" placeholder="Take out the trash"></label>
+  <label>Repeats<select id="f_repeat"><option value="once">Once</option><option value="daily">Daily</option>
+    <option value="weekly">Weekly</option><option value="every">Every N days</option></select></label>
+  <label id="everyBox" hidden>Every how many days<input id="f_every" type="number" min="1" max="365" step="1" value="3"></label>
+  <label>Due on<input id="f_due" type="date"></label>
+  <label>Notes<input id="f_notes" maxlength="300" placeholder="optional"></label>
+  <div class="picks" id="picks"></div>
+  <div class="note" style="grid-column:1/-1">Tick one person, or several for a rotation that moves to the next person (in the order shown) each time it is done. Tick nobody to leave it open.</div>
+  <div><button class="primary" type="submit" id="saveBtn">Add</button> <button type="button" id="cancelBtn" hidden>Cancel</button></div>
+</form>
+</div>
+
+<h2>All chores</h2>
+<div class="card" id="all"></div>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/chore-board/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let board={chores:[],people:[]},_stamp='',_loaded=false,editing=null,editingWho='';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+function dayName(iso){const d=new Date(iso+'T00:00:00');return d.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'})}
+function who(c){if(!c.rotation_names.length)return 'nobody yet';
+  return c.rotation_names.length>1?`${c.on_name}'s turn (${c.rotation_names.join(', ')})`:c.on_name}
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Chore Board sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Chore Board could not save.');
+  return out}
+
+// Poll the stamp; read the whole board only when it changed (the brain may change things too).
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){if(!_loaded)say('Chore Board could not read its saved board.',true);return}
+    const {last_updated}=await chk.json();if(_loaded&&!force&&last_updated===_stamp)return;
+    const b=await fetch(BASE+'board');if(!b.ok)return;
+    board=await b.json();_stamp=board.last_updated||'';_loaded=true;render()}
+  catch(e){if(!_loaded)say('Chore Board is not answering. Is it running?',true)}}
+
+function byPick(c){
+  const opts=board.people.map(p=>`<option value="${esc(p.id)}"${p.id===c.on?' selected':''}>${esc(p.name)}</option>`).join('');
+  return `<select data-by="${esc(c.id)}" aria-label="Done by">${c.on?'':'<option value="">Who?</option>'}${opts}</select>`}
+
+function dueRows(list,showDay){
+  if(!list.length)return '';
+  return '<table>'+list.map(c=>{
+    const flag=c.late>0?`<span class="flag late">${c.late} day${c.late===1?'':'s'} late</span>`:
+      showDay?`<span class="flag day">${esc(dayName(c.due))}</span>`:'';
+    return `<tr><td>${esc(c.name)}${flag}<div class="who">${esc(who(c))}, ${esc(c.repeat_words)}${c.notes?'. '+esc(c.notes):''}</div></td>
+      <td class="act">${board.people.length?byPick(c):''} <button class="primary" data-done="${esc(c.id)}">Done</button></td></tr>`}).join('')+'</table>'}
+
+function render(){
+  $('todayDate').textContent=dayName(board.today);
+  $('weekSpan').textContent='through '+dayName(board.week_end);
+  const ch=board.chores||[];
+  $('today').innerHTML=dueRows(ch.filter(c=>c.when==='today'),false)||'<p class="empty">Nothing due today.</p>';
+  $('week').innerHTML=dueRows(ch.filter(c=>c.when==='week'),true)||'<p class="empty">Nothing else due this week.</p>';
+  $('people').innerHTML=board.people.length?'<table><tr><th>Name</th><th>On now</th><th>7 d</th><th>30 d</th><th></th></tr>'+
+    board.people.map(p=>`<tr><td>${esc(p.name)}</td><td class="who">${esc(p.on.join(', ')||'nothing')}</td><td>${p.done_7}</td><td>${p.done_30}</td>
+      <td class="act"><button data-rename="${esc(p.id)}">Rename</button> <button data-pdel="${esc(p.id)}">Remove</button></td></tr>`).join('')+'</table>'
+    :'<p class="empty">Nobody yet. Add the people in the household first.</p>';
+  $('all').innerHTML=ch.length?'<table><tr><th>Chore</th><th>Repeats</th><th>Next due</th><th></th></tr>'+
+    ch.map(c=>`<tr><td>${esc(c.name)}<div class="who">${esc(who(c))}</div></td><td>${esc(c.repeat_words)}</td>
+      <td>${c.when==='finished'?'done '+esc(c.finished):esc(c.due)}</td>
+      <td class="act"><button data-edit="${esc(c.id)}">Edit</button> <button data-del="${esc(c.id)}">Remove</button></td></tr>`).join('')+'</table>'
+    :'<p class="empty">No chores yet. Add the first one above.</p>';
+  if(!editing)drawPicks([])}
+
+function drawPicks(ids){
+  const order=board.people.map(p=>p.id),chosen=new Set(ids);
+  $('picks').innerHTML=board.people.map(p=>`<label><input type="checkbox" value="${esc(p.id)}" aria-label="${esc(p.name)}"${chosen.has(p.id)?' checked':''}><span>${esc(p.name)}</span></label>`).join('')
+    ||'<span class="note">Add people to assign chores.</span>';
+  return order}
+
+function picked(){return [...$('picks').querySelectorAll('input:checked')].map(i=>i.value)}
+function pickedNames(){const ids=picked();return ids.map(id=>(board.people.find(p=>p.id===id)||{}).name).filter(Boolean)}
+
+function showEvery(){$('everyBox').hidden=$('f_repeat').value!=='every'}
+$('f_repeat').addEventListener('change',showEvery);
+
+function resetForm(){editing=null;editingWho='';$('form').reset();$('formTitle').textContent='Add a chore';
+  $('saveBtn').textContent='Add';$('cancelBtn').hidden=true;showEvery();drawPicks([])}
+
+$('form').addEventListener('submit',async e=>{e.preventDefault();
+  const rep=$('f_repeat').value;
+  const body={name:$('f_name').value,repeat:rep,notes:$('f_notes').value};
+  if(rep==='every')body.every_days=$('f_every').value;
+  if($('f_due').value)body.due_on=$('f_due').value;
+  const names=pickedNames();
+  if(!editing||names.join(',')!==editingWho)body.assign_to=names.length?names.join(', '):'nobody';
+  try{const out=editing?await post('api/update',{id:editing,...body}):await post('api/add',body);
+    say(out.text);resetForm();pull(true)}catch(err){say(err.message,true)}});
+$('cancelBtn').addEventListener('click',()=>{resetForm();say('')});
+
+$('personForm').addEventListener('submit',async e=>{e.preventDefault();
+  try{say((await post('api/person/add',{name:$('p_name').value})).text);$('p_name').value='';pull(true)}catch(err){say(err.message,true)}});
+
+document.addEventListener('click',async e=>{
+  const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.done){const sel=document.querySelector(`select[data-by="${CSS.escape(d.done)}"]`);
+      say((await post('api/done',{id:d.done,by:sel&&sel.value?sel.value:undefined})).text);pull(true)}
+    else if(d.edit){const c=board.chores.find(x=>x.id===d.edit);if(!c)return;editing=c.id;
+      $('f_name').value=c.name||'';$('f_repeat').value=c.repeat||'once';$('f_every').value=c.every_days||3;showEvery();
+      $('f_due').value=c.finished?'':(c.due||'');$('f_notes').value=c.notes||'';
+      const ids=(c.assigned||[]).filter(id=>board.people.some(p=>p.id===id));drawPicks(ids);
+      editingWho=pickedNames().join(',');
+      $('formTitle').textContent='Edit '+c.name;$('saveBtn').textContent='Save';$('cancelBtn').hidden=false;
+      $('form').scrollIntoView({behavior:'smooth'})}
+    else if(d.del){const c=board.chores.find(x=>x.id===d.del);if(!c||!confirm('Remove the chore '+c.name+'?'))return;
+      say((await post('api/remove',{id:d.del})).text);if(editing===d.del)resetForm();pull(true)}
+    else if(d.pdel){const p=board.people.find(x=>x.id===d.pdel);if(!p||!confirm('Remove '+p.name+' from the household and from every chore?'))return;
+      say((await post('api/person/remove',{id:d.pdel})).text);pull(true)}
+    else if(d.rename){const p=board.people.find(x=>x.id===d.rename);if(!p)return;const name=prompt('New name for '+p.name,p.name);
+      if(!name||name===p.name)return;say((await post('api/person/rename',{id:d.rename,name})).text);pull(true)}
+  }catch(err){say(err.message,true)}});
+
+pull(true);
+setInterval(pull,4000);
+</script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "chore-board",
+  "kind": "app",
+  "name": "Chore Board",
+  "version": "1.0.0",
+  "description": "A household chore board: the people in the household, chores that repeat once, daily, weekly or every few days, each assigned to one person or to a rotation that moves to the next person when it is done, what is due today and this week, and a tally of who did what in the last 7 and 30 days. It does not remind anyone on its own and does not send messages; you ask, or look at the page.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/clipboard.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_chore", "change_chore", "mark_done", "add_person", "remove_chore_or_person"],
+    "tools": {
+      "list_due": "Use only to see what is due: the chores due today (with any that are late) or in the next 7 days, and who each one is on.",
+      "add_chore": "Add a household chore: its name, how often it repeats (once, daily, weekly or every N days), when it is first due, and the person or rotation of people it is assigned to.",
+      "change_chore": "Change a chore by its name, no need to look it up first: its name, how often it repeats, its next due date, its notes, or who it is on (one person, a rotation, or nobody).",
+      "mark_done": "Mark a chore done by its name when someone did it, no need to look it up first. It sets the next due date and moves a rotation to the next person.",
+      "list_people": "Use only to see the household: the people, the chores each one is on now, and how many each did in the last 7 days.",
+      "add_person": "Add a person to the household so chores can be assigned to them.",
+      "show_tally": "Show who did which chores in the last 7 days and in the last 30 days.",
+      "remove_chore_or_person": "Remove a chore or a person by name, no need to look it up first. A person comes off every chore and rotation; the done tally keeps what was already done."
+    },
+    "examples": {
+      "list_due": ["what chores are due today", "what chores does Sam have this week"],
+      "add_chore": ["add a weekly chore to take out the trash, rotating between Alex, Sam and Jo"],
+      "change_chore": ["change the trash chore to every 3 days", "move the dishes chore to Saturday", "put Jo on the dishes chore from now on"],
+      "mark_done": ["mark the dishes done", "I just took out the trash, mark it done", "Sam watered the plants yesterday"],
+      "list_people": ["who is on which chores right now", "who is in our household"],
+      "add_person": ["add Jo to the chore board"],
+      "show_tally": ["who did the most chores this month"],
+      "remove_chore_or_person": ["take the window washing chore off the chore board", "remove Jo from the chore board"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "Chore Board", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Chore Board", "icon": "icons/clipboard.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Chore Board keeps your household's people, chores and done tally in its own data folder on this computer (chores.json). It reads the household list from PuffPAI on this computer. It uses no internet and does not use the brain."
+}
