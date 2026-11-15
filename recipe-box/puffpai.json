@@ -1,0 +1,115 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "recipe-box",
+  "kind": "app",
+  "name": "Recipe Box",
+  "version": "1.0.0",
+  "description": "The household's own recipes, kept on this computer. It finds them by words, tag or ingredient, scales them to any number of servings, converts kitchen units and oven temperatures, says what you can make from what is on hand, and reads a recipe out one step at a time for cooking along, with a large-text cook mode on the page. It imports recipes you paste in (written out, or the JSON-LD a recipe web page carries) and exports them. It never fetches a web page, never turns cups into grams (that depends on the ingredient), and does not plan meals or keep a pantry.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/recipe-box.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "add_recipe",
+      "change_recipe",
+      "mark_made",
+      "remove_recipe"
+    ],
+    "tools": {
+      "find_recipes": "Use only when the owner asks which recipes there are: search the recipe box by words, a tag (like dessert, vegetarian or summer), an ingredient, or favorites.",
+      "read_recipe": "Use to read out one recipe, by name; no need to look it up first. It can scale the recipe to a number of servings, and give one step at a time by its number for cooking along.",
+      "what_can_i_make": "Use when the owner says what food is on hand and asks what to cook: it ranks the recipes by how many of their ingredients are on hand and lists what is missing.",
+      "add_recipe": "Use to save a new recipe the owner gives: a title with ingredients and steps, or one block of pasted text (a recipe written out, or a recipe web page's JSON-LD the owner pasted).",
+      "change_recipe": "Use to change a saved recipe, by name; no need to look it up first: rename it, set its servings, times, source, ingredients, steps, tags, notes, or make it a favorite.",
+      "scale_or_convert": "Use for a kitchen sum with no recipe named: turn an amount into another unit (cups, tablespoons, teaspoons, fluid ounces, milliliters, liters; ounces, pounds, grams, kilograms), an oven temperature between Fahrenheit and Celsius, or multiply an amount by a factor. It never turns volume into weight.",
+      "mark_made": "Use when the owner says they made or cooked a recipe: by name; no need to look it up first. It notes the day it was made (default today) and can rate it 1 to 5 stars.",
+      "remove_recipe": "Use only when the owner asks to delete a recipe, by name; no need to look it up first. It removes the recipe from this computer for good."
+    },
+    "examples": {
+      "find_recipes": [
+        "show me our vegetarian recipes",
+        "which of our recipes are tagged dessert"
+      ],
+      "read_recipe": [
+        "read me the banana bread recipe",
+        "read me step 3 of the lasagna recipe",
+        "read me the chili recipe for 8 people"
+      ],
+      "what_can_i_make": [
+        "what can I make with eggs, spinach and cheese",
+        "I have rice, chicken and onions, what can I cook"
+      ],
+      "add_recipe": [
+        "save a recipe for Jo's pancakes: 2 cups flour, 2 eggs, 1 1/2 cups milk; mix it all and fry spoonfuls in a hot pan",
+        "add a recipe called tomato soup to the recipe box"
+      ],
+      "change_recipe": [
+        "rename the banana bread recipe to Grandma's banana bread",
+        "make the lasagna recipe a favorite"
+      ],
+      "scale_or_convert": [
+        "how many grams is 8 ounces",
+        "what is 350 Fahrenheit in Celsius"
+      ],
+      "mark_made": [
+        "mark the chili as made tonight and give it 4 stars",
+        "we had the pancakes for breakfast today"
+      ],
+      "remove_recipe": [
+        "delete the tuna casserole recipe"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Recipe Box",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Recipe Box",
+        "icon": "icons/recipe-box.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Recipe Box keeps the recipes you add, with their notes, ratings and the days you made them, in its own folder on this computer (recipes.json); it uses no internet and does not use the brain. The bot can find, read and change your recipes when you ask it in chat."
+}
