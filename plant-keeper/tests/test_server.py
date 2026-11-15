@@ -258,6 +258,47 @@ def test_names_exact_partial_several_none(base, data):
     assert saved(data) == before
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for n in ("Pesto Park basil", "Sliders Lane fern", "Berry Clinic ivy", "Joseph's palm", "José Alvarez cactus",
+              "Café Luna mint"):
+        tool(base, "add_plant", name=n, suggest=False)
+    before = saved(data)
+    # "crêpes" was "cr" + "pes" and removed Pesto Park basil; an accented letter is never a gap
+    for typed in ("crêpes", "müsli", "über", "Renée"):
+        assert f"no plant is called {typed!r}" in tool_error(base, "remove_plant", plant=typed)
+    out = tool_error(base, "remove_plant", plant="Jose")                          # never just Joseph's palm
+    assert "more than one plant matches 'Jose': Joseph's palm, José Alvarez cactus" in out
+    assert saved(data) == before
+    # a name kept with accents is found typed with them or without them
+    assert "Logged: José Alvarez cactus," in tool(base, "log_care", plant="José Alvarez cactus")
+    assert "Logged: José Alvarez cactus," in tool(base, "log_care", plant="jose alvarez")
+    assert "Removed Café Luna mint" in tool(base, "remove_plant", plant="CAFE LUNA")
+    assert [p["name"] for p in saved(data)["plants"]] == ["Pesto Park basil", "Sliders Lane fern", "Berry Clinic ivy",
+                                                         "Joseph's palm", "José Alvarez cactus"]
+
+
+def test_a_plant_is_found_by_whole_words_or_their_start_never_by_letters_inside_a_word(base, data):
+    for n in ("Hubert Bay fern", "Sliders Lane ivy", "Café Luna mint", "Ox eye"):
+        tool(base, "add_plant", name=n, suggest=False)
+    before = saved(data)
+    # letters inside a word, single letters (plain or accented) and two-letter words never find a plant
+    for typed in ("über", "uber", "bërt", "bert", "İ", "i", "ç", "c", "ub", "ox", "e l"):
+        assert f"no plant is called {typed!r}" in tool_error(base, "remove_plant", plant=typed), typed
+        assert f"no plant is called {typed!r}" in tool_error(base, "change_plant", plant=typed, place="hall"), typed
+        assert f"no plant is called {typed!r}" in tool_error(base, "log_care", plant=typed), typed
+    assert saved(data) == before
+    # an exact name wins, short words and all, with or without accents, case or "the"
+    assert "Removed Ox eye" in tool(base, "remove_plant", plant="ox EYE")
+    assert "Logged: Café Luna mint," in tool(base, "log_care", plant="the cafe luna mint")
+    # a word of 3 letters or more that starts a word of one name: that plant
+    assert tool(base, "change_plant", plant="hub", place="hall").startswith("Changed Hubert Bay fern")
+    tool(base, "add_plant", name="Hubert's palm", suggest=False)
+    before = saved(data)
+    out = tool_error(base, "remove_plant", plant="hub")                              # several
+    assert "more than one plant matches 'hub': Hubert Bay fern, Hubert's palm" in out and "Nothing was changed" in out
+    assert saved(data) == before
+
+
 # ------------------------------------------------------------------ the brain: down, slow, huge, hostile
 
 @pytest.mark.parametrize("how", ["503", "gone"])

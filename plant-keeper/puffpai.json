@@ -3,7 +3,7 @@
   "id": "plant-keeper",
   "kind": "agent",
   "name": "Plant Keeper",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An agent that knows the household's plants and tells you what needs doing. It keeps each plant (kind, where it lives, pot, light, how often to water and feed) and a care log, and works out what is due today or this week from your own intervals. The bot's own brain suggests a starting care plan for a new plant, which you can accept or ignore, and answers questions about one plant from your description and its log. It does not identify plants from photos, does not send reminders on its own, and its advice is not checked by anyone.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
