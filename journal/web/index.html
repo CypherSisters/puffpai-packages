@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<!-- Journal page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. The Markdown renderer below is adapted from snarkdown (MIT); see NOTICE.md. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Journal</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.9rem}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:14px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:900px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+input,select,textarea{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:7px 8px;min-height:40px}
+textarea{width:100%;min-height:180px;resize:vertical;line-height:1.45}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary,button.on{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.bad{color:var(--p-bad)}
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin:10px 0 0}
+.tabs button{border-right-width:0}.tabs button:last-child{border-right-width:1px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.row label{display:flex;align-items:center;gap:6px;color:var(--p-text2);font-size:.9rem}
+.grow{flex:1 1 200px}
+.note{color:var(--p-text2);font-size:.85rem}
+.empty{color:var(--p-text2);padding:6px 0}
+#prompt{margin-top:8px;padding:8px 10px;border-left:4px solid var(--p-warn);background:var(--p-chip)}
+.entry{border-bottom:1px solid var(--p-line);padding:10px 0}
+.entry:last-child{border-bottom:0}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;color:var(--p-text2);font-size:.85rem}
+.meta b{color:var(--p-text);font-size:1rem}
+.chip{display:inline-block;padding:1px 8px;background:var(--p-chip);border:1px solid var(--p-line);font-size:.8rem;color:var(--p-text);min-height:auto}
+.star{color:var(--p-warn);font-weight:700}
+.md{margin-top:6px;line-height:1.5;overflow-wrap:anywhere}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{font-size:1.05rem;margin:6px 0 2px}
+.md ul,.md ol{padding-left:22px}.md blockquote{border-left:3px solid var(--p-line);padding-left:8px;color:var(--p-text2)}
+.md pre{background:var(--p-chip);padding:6px;overflow:auto}.md a{color:var(--p-accent)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal div.h{font-size:.8rem;color:var(--p-text2);text-align:center;padding:4px 0}
+.cal button{min-height:48px;padding:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--p-card)}
+.cal button.today{outline:2px solid var(--p-accent);outline-offset:-2px}
+.cal button.pick{background:var(--p-chip)}
+.cal .dot{width:7px;height:7px;background:var(--p-accent);margin-top:3px}
+.cal .nodot{width:7px;height:7px;margin-top:3px}
+#msg{min-height:1.4em;margin-top:6px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><rect x="12" y="6" width="42" height="52" fill="none" stroke="currentColor" stroke-width="4"/><rect x="12" y="6" width="9" height="52" fill="currentColor"/><path d="M28 20h18M28 30h18M28 40h12" stroke="currentColor" stroke-width="4"/></svg>Journal <small id="counts"></small></h1>
+<div class="tabs" role="tablist">
+<button data-tab="today" class="on">Today</button><button data-tab="timeline">Timeline</button><button data-tab="calendar">Calendar</button><button data-tab="search">Search</button><button data-tab="data">Your data</button>
+</div>
+<div id="msg"></div>
+
+<section id="t_today">
+<h2 id="formTitle">Write <small id="todayDate"></small></h2>
+<div class="card">
+<form id="form">
+<input id="f_title" class="grow" maxlength="200" placeholder="Title (optional)" aria-label="Title" style="width:100%">
+<div class="row"><textarea id="f_body" maxlength="100000" placeholder="What is on your mind? Markdown is fine. Words like #family become tags." aria-label="Entry"></textarea></div>
+<div id="prompt" hidden></div>
+<div class="row" id="moods" aria-label="Mood"></div>
+<div class="row"><input id="f_tags" class="grow" maxlength="400" placeholder="Tags, separated by commas" aria-label="Tags">
+<label><input type="checkbox" id="f_star" style="min-height:auto"> Star</label></div>
+<div class="row"><button class="primary" type="submit" id="saveBtn">Save entry</button><button type="button" id="promptBtn">Give me a prompt</button><button type="button" id="cancelBtn" hidden>Cancel</button></div>
+</form>
+</div>
+<h2>On this day <small>in earlier years</small></h2>
+<div class="card" id="otd"></div>
+<h2>Written today</h2>
+<div class="card" id="todayList"></div>
+</section>
+
+<section id="t_timeline" hidden>
+<h2>Timeline <small id="tlCount"></small></h2>
+<div class="card">
+<div class="row" style="margin-top:0">
+<select id="tl_tag" aria-label="Tag"><option value="">Any tag</option></select>
+<select id="tl_mood" aria-label="Mood"><option value="">Any mood</option><option value="5">5 Great</option><option value="4">4 Good</option><option value="3">3 Okay</option><option value="2">2 Low</option><option value="1">1 Awful</option></select>
+<input type="month" id="tl_month" aria-label="Month">
+<label><input type="checkbox" id="tl_star" style="min-height:auto"> Starred only</label>
+<button type="button" id="tl_clear">Clear</button>
+</div>
+<div id="tl"></div>
+<div class="row"><button type="button" id="tl_more" hidden>Show more</button></div>
+</div>
+</section>
+
+<section id="t_calendar" hidden>
+<h2><button type="button" id="calPrev" aria-label="Earlier month">&lt;</button> <span id="calTitle"></span> <button type="button" id="calNext" aria-label="Later month">&gt;</button></h2>
+<div class="card"><div class="cal" id="cal"></div></div>
+<h2 id="calDayTitle"></h2>
+<div class="card" id="calDay" hidden></div>
+</section>
+
+<section id="t_search" hidden>
+<h2>Search <small>words in the title, text and tags</small></h2>
+<div class="card">
+<form class="row" id="searchForm" style="margin-top:0"><input id="q" class="grow" maxlength="200" placeholder="Search words" aria-label="Search words"><button class="primary" type="submit">Search</button></form>
+<div id="results"></div>
+</div>
+</section>
+
+<section id="t_data" hidden>
+<h2>Take your journal with you</h2>
+<div class="card">
+<div class="row" style="margin-top:0"><a id="exJson" download="journal-export.json"><button type="button">Export all as JSON</button></a><a id="exZip" download="journal-markdown.zip"><button type="button">Export as Markdown files (zip)</button></a></div>
+<p class="note" style="margin-top:6px">Each entry is also a plain file in this app's data folder, under entries/year/month.</p>
+</div>
+<h2>Bring your entries in</h2>
+<div class="card">
+<p class="note">A JSON export from this Journal, from jrnl (jrnl --export json), or from Day One (JSON). Import never writes over an entry already here.</p>
+<div class="row"><input type="file" id="imFile" accept=".json,application/json" aria-label="Import file"><button type="button" class="primary" id="imBtn">Import</button></div>
+</div>
+<div id="unreadable"></div>
+</section>
+</div>
+
+<script>
+/* md-start: a small Markdown renderer adapted from snarkdown (MIT, see NOTICE.md).
+   Changes: the text is escaped first, so no tag in an entry can reach the page; a link keeps its address only
+   when it is a web address (http or https); a picture shows as its words, never loads. */
+const MD_TAGS={'':['<em>','</em>'],_:['<strong>','</strong>'],'*':['<strong>','</strong>'],'~':['<s>','</s>'],'\n':['<br />'],' ':['<br />'],'-':['<hr />']};
+function mdOutdent(str){return str.replace(RegExp('^'+(str.match(/^(\t| )+/)||'')[0],'gm'),'')}
+function mdAttr(str){return (str+'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function mdUrl(u){u=String(u||'').trim();return /^https?:\/\/[^\s"<>]+$/i.test(u)?u:''}
+function mdParse(md,prevLinks){
+  let tokenizer=/((?:^|\n+)(?:\n---+|\* \*(?: \*)+)\n)|(?:^``` *(\w*)\n([\s\S]*?)\n```$)|((?:(?:^|\n+)(?:\t|  {2,}).+)+\n*)|((?:(?:^|\n)([>*+-]|\d+\.)\s+.*)+)|(?:!\[([^\]]*?)\]\(([^)]+?)\))|(\[)|(\](?:\(([^)]+?)\))?)|(?:(?:^|\n+)([^\s].*)\n(-{3,}|={3,})(?:\n+|$))|(?:(?:^|\n+)(#{1,6})\s*(.+)(?:\n+|$))|(?:`([^`].*?)`)|(  \n\n*|\n{2,}|__|\*\*|[_*]|~~)/gm,
+    context=[],out='',links=prevLinks||Object.create(null),last=0,chunk,prev,token,inner,t;
+  function tag(token){let desc=MD_TAGS[token[1]||''];let end=context[context.length-1]==token;
+    if(!desc)return token;if(!desc[1])return desc[0];if(end)context.pop();else context.push(token);return desc[end|0]}
+  function flush(){let str='';while(context.length)str+=tag(context[context.length-1]);return str}
+  md=md.replace(/^\[(.+?)\]:\s*(.+)$/gm,(s,name,url)=>{links[name.toLowerCase()]=url;return ''}).replace(/^\n+|\n+$/g,'');
+  while((token=tokenizer.exec(md))){
+    prev=md.substring(last,token.index);last=tokenizer.lastIndex;chunk=token[0];
+    if(prev.match(/[^\\](\\\\)*\\$/)){/* escaped */}
+    else if(t=(token[3]||token[4])){
+      chunk='<pre class="code"><code>'+mdOutdent(mdAttr(t).replace(/^\n+|\n+$/g,''))+'</code></pre>'}
+    else if(t=token[6]){
+      if(t.match(/\./))token[5]=token[5].replace(/^\d+/gm,'');
+      inner=mdParse(mdOutdent(token[5].replace(/^\s*[>*+.-]/gm,'')));
+      if(t=='>')t='blockquote';else{t=t.match(/\./)?'ol':'ul';inner=inner.replace(/^(.*)(\n|$)/gm,'<li>$1</li>')}
+      chunk='<'+t+'>'+inner+'</'+t+'>'}
+    else if(token[8]){chunk='[picture: '+mdAttr(token[7])+']'}
+    else if(token[10]){
+      const url=mdUrl(token[11]||(Object.prototype.hasOwnProperty.call(links,prev.toLowerCase())?links[prev.toLowerCase()]:''));
+      out=out.replace('<a>',url?'<a href="'+mdAttr(url)+'" target="_blank" rel="noopener noreferrer">':'<a>');
+      chunk=flush()+'</a>'}
+    else if(token[9]){chunk='<a>'}
+    else if(token[12]||token[14]){
+      t='h'+(token[14]?token[14].length:(token[13]>'='?1:2));chunk='<'+t+'>'+mdParse(token[12]||token[15],links)+'</'+t+'>'}
+    else if(token[16]){chunk='<code>'+mdAttr(token[16])+'</code>'}
+    else if(token[17]||token[1]){chunk=tag(token[17]||'--')}
+    out+=prev;out+=chunk}
+  return (out+md.substring(last)+flush()).replace(/^\n+|\n+$/g,'')}
+/* Escape first: & < and " become entities, so the text itself can never open a tag or leave an address. */
+function renderMd(text){return mdParse(String(text??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'))}
+/* md-end */
+
+// A second guard in the page: only these tags and these attributes are kept, whatever the renderer made.
+const OK_TAGS=new Set(['EM','STRONG','S','BR','HR','PRE','CODE','BLOCKQUOTE','UL','OL','LI','A','H1','H2','H3','H4','H5','H6']);
+function safeNodes(html){
+  const tpl=document.createElement('template');tpl.innerHTML=html;
+  for(const el of [...tpl.content.querySelectorAll('*')]){
+    if(!OK_TAGS.has(el.tagName)){el.replaceWith(document.createTextNode(el.textContent));continue}
+    for(const a of [...el.attributes]){
+      const keep=(el.tagName==='A'&&(a.name==='href'&&mdUrl(a.value)||a.name==='rel'||a.name==='target'))||(a.name==='class'&&el.tagName==='PRE');
+      if(!keep)el.removeAttribute(a.name)}
+    if(el.tagName==='A'&&el.hasAttribute('href')){el.setAttribute('target','_blank');el.setAttribute('rel','noopener noreferrer')}}
+  return tpl.content}
+
+// Paths are relative, so the page works at /pkg/journal/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+const $=id=>document.getElementById(id);
+const MOODS={1:'Awful',2:'Low',3:'Okay',4:'Good',5:'Great'};
+const PROMPTS=[
+'What made you smile today, even a little?','What is one thing you want to remember about this week?',
+'Who did you talk to today, and how did it go?','What is taking up most of your thinking right now?',
+'What did you do today that you are glad you did?','What would you tell yourself from one year ago?',
+'What is something small that went better than you expected?','Where did your energy go today?',
+'What are you looking forward to in the next few days?','What is a worry you can put down for tonight?',
+'Describe the place you are sitting in right now.','What did you eat today, and who did you share it with?',
+'What is one thing you learned this week?','What did you see outside today?',
+'Write about a conversation you keep thinking about.','What would make tomorrow a good day?',
+'What are three things you are thankful for right now?','What is something you have been putting off, and why?',
+'Write about a song, book or show that stuck with you lately.','What did your body need today?',
+'When did you feel most like yourself this week?','What surprised you today?',
+'Write a short letter to someone you miss.','What is a habit you want to start, or stop?',
+'What did you say no to, or wish you had?','What is a memory from when you were young that came back to you lately?',
+'Who helped you recently, and how?','What would you do with a free afternoon tomorrow?',
+'What is something hard you got through?','Write about the weather and how it shaped your day.',
+'What are you proud of this month?','What is a question you do not have an answer to yet?',
+'What made today different from yesterday?','Write about a place you would like to go back to.',
+'What is something kind you did, or someone did for you?','How are you sleeping, and what is on your mind at night?',
+'What is one thing you would change about today if you could?','Write about a friend you have not seen in a while.',
+'What is something you are curious about right now?','If today had a title, what would it be, and why?'];
+let st={},idx=[],mood=0,prompt='',editing=null,tlOffset=0,calMonth=null,calPick='',_stamp='',_loaded=false,tab='today';
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+function iso(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function nice(created){const d=new Date(created);return isNaN(d)?created:d.toLocaleString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}
+async function getJ(path){const r=await fetch(BASE+path);const o=await r.json().catch(()=>({error:'Journal sent an answer this page could not read.'}));if(!r.ok)throw new Error(o.error||'Journal could not answer.');return o}
+async function post(path,body,raw){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:raw?body:JSON.stringify(body)});
+  const o=await r.json().catch(()=>({error:'Journal sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(o.error||'Journal could not save.');return o}
+
+// One entry, every piece of data escaped; the body goes through the renderer and the allow-list.
+function entryEl(e){
+  const div=document.createElement('div');div.className='entry';
+  const tags=e.tags.map(t=>`<button class="chip" data-tag="${esc(t)}">#${esc(t)}</button>`).join(' ');
+  div.innerHTML=`<div class="meta">${e.starred?'<span class="star" title="Starred">&#9733;</span>':''}<b>${esc(e.title||'')}</b>
+    <span>${esc(nice(e.created))}</span>${e.mood?`<span class="chip">mood ${e.mood} ${esc(MOODS[e.mood])}</span>`:''}${tags}</div>
+    ${e.prompt?`<div class="note">Prompt: ${esc(e.prompt)}</div>`:''}<div class="md"></div>
+    <div class="acts"><button data-star="${esc(e.id)}">${e.starred?'Take star off':'Star'}</button><button data-edit="${esc(e.id)}">Edit</button><button class="bad" data-del="${esc(e.id)}">Delete</button></div>`;
+  div.querySelector('.md').appendChild(safeNodes(renderMd(e.body)));
+  div._entry=e;return div}
+let shown={};
+function fill(box,list,empty,append){
+  if(!append)box.replaceChildren();
+  for(const e of list){shown[e.id]=e;box.appendChild(entryEl(e))}
+  if(!box.children.length)box.innerHTML=`<p class="empty">${esc(empty)}</p>`}
+
+async function refresh(){
+  try{st=await getJ('stats');idx=(await getJ('index')).entries;_stamp=st.last_updated;_loaded=true}
+  catch(err){say(err.message,true);return}
+  $('counts').textContent=`${st.count} ${st.count===1?'entry':'entries'}, writing streak ${st.streak} ${st.streak===1?'day':'days'} (longest ${st.longest})`;
+  $('todayDate').textContent=new Date(st.today+'T00:00:00').toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  fill($('otd'),st.on_this_day,'Nothing from this date in earlier years yet.');
+  try{fill($('todayList'),(await getJ('list?day=today&limit=50')).entries,'Nothing written today yet.')}catch(err){say(err.message,true)}
+  const cur=$('tl_tag').value;
+  $('tl_tag').innerHTML='<option value="">Any tag</option>'+st.tags.map(([t,n])=>`<option value="${esc(t)}">#${esc(t)} (${n})</option>`).join('');
+  $('tl_tag').value=st.tags.some(([t])=>t===cur)?cur:'';
+  $('unreadable').innerHTML=st.unreadable.length?`<h2>Files that will not read</h2><div class="card"><p class="note">These files are left exactly as they are. Fix or move them, then restart Journal.</p>${st.unreadable.map(u=>`<div>${esc(u)}</div>`).join('')}</div>`:'';
+  if(tab==='timeline')timeline(false);if(tab==='calendar')drawCal();if(tab==='search'&&$('q').value)search()}
+
+async function pull(){try{const {last_updated}=await getJ('updated');if(_loaded&&last_updated===_stamp)return;refresh()}catch(e){if(!_loaded)say('Journal is not answering. Is it running?',true)}}
+
+function drawMoods(){$('moods').innerHTML='<span class="note">Mood</span>'+[1,2,3,4,5].map(n=>`<button type="button" data-mood="${n}" class="${mood===n?'on':''}">${n} ${MOODS[n]}</button>`).join('')}
+function resetForm(){editing=null;mood=0;prompt='';$('form').reset();$('prompt').hidden=true;$('formTitle').firstChild.textContent='Write ';
+  $('saveBtn').textContent='Save entry';$('cancelBtn').hidden=true;drawMoods()}
+function tagList(){return $('f_tags').value.split(',').map(t=>t.trim()).filter(Boolean)}
+
+$('form').addEventListener('submit',async ev=>{ev.preventDefault();
+  const body={title:$('f_title').value,body:$('f_body').value,tags:tagList(),starred:$('f_star').checked};
+  try{let out;
+    if(editing){out=await post('api/change',{id:editing,...body,mood:mood||0})}
+    else{if(mood)body.mood=mood;if(prompt)body.prompt=prompt;out=await post('api/add',body)}
+    say(out.text);resetForm();refresh()}catch(err){say(err.message,true)}});
+$('cancelBtn').addEventListener('click',()=>{resetForm();say('')});
+$('promptBtn').addEventListener('click',()=>{let p;do{p=PROMPTS[Math.floor(Math.random()*PROMPTS.length)]}while(p===prompt&&PROMPTS.length>1);
+  prompt=p;$('prompt').textContent=p;$('prompt').hidden=false;$('f_body').focus()});
+
+function show(name){tab=name;for(const b of document.querySelectorAll('[data-tab]'))b.classList.toggle('on',b.dataset.tab===name);
+  for(const s of document.querySelectorAll('section'))s.hidden=s.id!=='t_'+name;
+  if(name==='timeline')timeline(false);if(name==='calendar')drawCal()}
+
+async function timeline(more){
+  tlOffset=more?tlOffset+30:0;
+  const q=new URLSearchParams({offset:tlOffset,limit:30});
+  if($('tl_tag').value)q.set('tag',$('tl_tag').value);if($('tl_mood').value)q.set('mood',$('tl_mood').value);
+  if($('tl_month').value)q.set('month',$('tl_month').value);if($('tl_star').checked)q.set('starred','true');
+  try{const o=await getJ('list?'+q);fill($('tl'),o.entries,'No entries match.',more);
+    $('tlCount').textContent=`${o.total} ${o.total===1?'entry':'entries'}, newest first`;$('tl_more').hidden=tlOffset+30>=o.total}
+  catch(err){say(err.message,true)}}
+for(const id of ['tl_tag','tl_mood','tl_month','tl_star'])$(id).addEventListener('change',()=>timeline(false));
+$('tl_clear').addEventListener('click',()=>{$('tl_tag').value='';$('tl_mood').value='';$('tl_month').value='';$('tl_star').checked=false;timeline(false)});
+$('tl_more').addEventListener('click',()=>timeline(true));
+
+function drawCal(){
+  if(!calMonth){const t=new Date(st.today?st.today+'T00:00:00':Date.now());calMonth=new Date(t.getFullYear(),t.getMonth(),1)}
+  $('calTitle').textContent=calMonth.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+  const days=new Set(idx.map(e=>e.created.slice(0,10)));
+  const first=(calMonth.getDay()+6)%7,n=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,0).getDate();
+  let h=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d=>`<div class="h">${d}</div>`).join('')+'<div></div>'.repeat(first);
+  for(let d=1;d<=n;d++){const day=iso(new Date(calMonth.getFullYear(),calMonth.getMonth(),d));
+    h+=`<button type="button" data-day="${day}" class="${day===st.today?'today':''} ${day===calPick?'pick':''}" aria-label="${day}${days.has(day)?', has entries':''}">${d}<span class="${days.has(day)?'dot':'nodot'}"></span></button>`}
+  $('cal').innerHTML=h}
+async function calDay(day){calPick=day;drawCal();
+  try{const o=await getJ('list?limit=200&day='+encodeURIComponent(day));$('calDayTitle').textContent=new Date(day+'T00:00:00').toLocaleDateString(undefined,{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    $('calDay').hidden=false;fill($('calDay'),o.entries,'Nothing written on this day.')}catch(err){say(err.message,true)}}
+$('calPrev').addEventListener('click',()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()-1,1);drawCal()});
+$('calNext').addEventListener('click',()=>{calMonth=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,1);drawCal()});
+
+async function search(){const q=$('q').value.trim();if(!q){$('results').replaceChildren();return}
+  try{const o=await getJ('list?limit=100&words='+encodeURIComponent(q));fill($('results'),o.entries,'Nothing matches those words.');
+    if(o.total>100)say(`Showing the newest 100 of ${o.total}.`)}catch(err){say(err.message,true)}}
+$('searchForm').addEventListener('submit',ev=>{ev.preventDefault();search()});
+
+$('imBtn').addEventListener('click',async()=>{const f=$('imFile').files[0];if(!f){say('Choose a JSON file first.',true);return}
+  if(f.size>16*1024*1024){say('That file is over 16 MB. Split it and import the parts.',true);return}
+  try{const out=await post('api/import',await f.text(),true);say(out.text);$('imFile').value='';refresh()}catch(err){say(err.message,true)}});
+
+document.addEventListener('click',async ev=>{
+  const t=ev.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.tab)show(d.tab);
+    else if(d.mood){const n=+d.mood;mood=mood===n?0:n;drawMoods()}
+    else if(d.day)calDay(d.day);
+    else if(d.tag){show('timeline');$('tl_tag').value=d.tag;timeline(false)}
+    else if(d.star){const e=shown[d.star];if(!e)return;say((await post('api/change',{id:e.id,starred:!e.starred})).text);refresh()}
+    else if(d.edit){const e=shown[d.edit];if(!e)return;editing=e.id;show('today');
+      $('f_title').value=e.title||'';$('f_body').value=e.body||'';$('f_tags').value=e.tags.join(', ');$('f_star').checked=!!e.starred;
+      mood=e.mood||0;drawMoods();$('prompt').hidden=!e.prompt;$('prompt').textContent=e.prompt||'';
+      $('formTitle').firstChild.textContent='Edit the entry from '+nice(e.created)+' ';$('saveBtn').textContent='Save changes';$('cancelBtn').hidden=false;
+      $('form').scrollIntoView({behavior:'smooth'})}
+    else if(d.del){const e=shown[d.del];if(!e||!confirm('Delete the entry from '+nice(e.created)+'? This can not be undone.'))return;
+      say((await post('api/remove',{id:e.id})).text);if(editing===e.id)resetForm();refresh()}
+  }catch(err){say(err.message,true)}});
+
+$('exJson').href=BASE+'export.json';$('exZip').href=BASE+'export.zip';
+drawMoods();refresh();setInterval(pull,4000);
+</script>
+</body>
+</html>

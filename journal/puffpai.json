@@ -1,0 +1,115 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "journal",
+  "kind": "app",
+  "name": "Journal",
+  "version": "1.0.0",
+  "description": "A private journal that stays on this computer: write an entry with a mood, tags and a star, get a writing prompt when you are stuck, look back by timeline, calendar, search and \"on this day\", and see your writing streak. Each entry is a plain JSON file in its own folder, and you can import from jrnl or Day One and export to JSON or Markdown files. The files are not encrypted, and it does not remind you to write.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/journal.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "add_entry",
+      "change_entry",
+      "remove_entry"
+    ],
+    "tools": {
+      "add_entry": "Write a new journal entry: the text, and if wanted a title, a mood from 1 (awful) to 5 (great), tags and a star. Words written as #word in the text become tags too.",
+      "search_entries": "Use only to find entries when the owner asks what they wrote: search the journal by words in the title, text or tags, by tag, by a date range, by mood or by star, newest first.",
+      "read_entry": "Use only when the owner asks to hear or see an entry's words, never as a first step before starring, changing or deleting one: read a journal entry in full by its date, words in its title, or latest. A date reads every entry written that day.",
+      "list_recent": "Use only when the owner asks to see a list, never as a first step before starring, changing or deleting an entry: list the newest journal entries with their date, title, mood, tags and first words.",
+      "on_this_day": "Show the journal entries written on this same date in earlier years.",
+      "journal_stats": "Show the writing streak (days in a row with an entry), how many entries there are, and the moods and tags over a period.",
+      "change_entry": "Star, unstar or change a journal entry in one step. Name the entry by latest, its date, or words in its title; this tool finds it itself, so call it straight away. It changes the title, the text (replace it or add to the end), the tags, the mood or the star.",
+      "remove_entry": "Delete a journal entry for good in one step. Name the entry by latest, its date, or words in its title; this tool finds it itself, so call it straight away. Its file is removed from this computer."
+    },
+    "examples": {
+      "add_entry": [
+        "write in my journal that Sam and I walked by the river today and I felt calm",
+        "add a journal entry about the job interview, mood 4, tag work"
+      ],
+      "search_entries": [
+        "find my journal entries about the garden",
+        "what did I write in March tagged family"
+      ],
+      "read_entry": [
+        "read me what I wrote yesterday in my journal",
+        "read me my journal entry about the river walk"
+      ],
+      "list_recent": [
+        "show my last five journal entries",
+        "list my recent journal entries"
+      ],
+      "on_this_day": [
+        "what did I write on this day in earlier years"
+      ],
+      "journal_stats": [
+        "what is my journal writing streak",
+        "how has my mood been this month"
+      ],
+      "change_entry": [
+        "star my latest journal entry",
+        "change the mood on my journal entry about the river walk to 4",
+        "add to yesterday's journal entry that Jo called later"
+      ],
+      "remove_entry": [
+        "delete my latest journal entry",
+        "delete the journal entry about the job interview",
+        "delete my journal entry from yesterday"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Journal",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Journal",
+        "icon": "icons/journal.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Journal keeps your journal entries in its own data folder on this computer, one plain file per entry. It uses no internet and does not use the brain; the bot can read and add entries when you ask it in chat."
+}
