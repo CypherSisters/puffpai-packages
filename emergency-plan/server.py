@@ -36,6 +36,7 @@ import socket
 import tempfile
 import threading
 import time
+import unicodedata
 from datetime import date, datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -44,7 +45,7 @@ from urllib.parse import urlsplit
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "emergency-plan"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "plan.json"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_BODY = 256 * 1024
@@ -260,9 +261,15 @@ def _slot(table: dict, value, what: str) -> str:
     raise ValueError(f"{what} is one of " + ", ".join(table.values()))
 
 
+def _fold(text) -> str:
+    """Lower case with accents folded away (é is e, ü is u); letters of every script stay letters."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(c for c in text if not unicodedata.combining(c)).casefold()
+
+
 def _words(text) -> str:
     """Lower-case words with single spaces around them, so ' dr ' or ' out of area ' can be looked for."""
-    return " " + " ".join(re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).split()) + " "
+    return " " + " ".join(_name_words(text)) + " "
 
 
 def _infer_kind(*texts) -> str | None:
@@ -531,8 +538,8 @@ def _unchunk(body: bytes) -> bytes:
 # ------------------------------------------------------------- the logic
 
 def _name_words(text) -> list[str]:
-    """The lower-case words of a name: letters and digits, everything else a gap."""
-    return "".join(c if c.isalnum() else " " for c in str(text or "").lower()).split()
+    """The lower-case words of a name, accents folded: letters and digits of any script, everything else a gap."""
+    return "".join(c if c.isalnum() else " " for c in _fold(text)).split()
 
 
 def _words_fit(asked: list[str], name) -> bool:
@@ -551,6 +558,13 @@ def _find(rows: list[dict], ident, what: str, key: str = "name", partial: bool =
     for r in rows:
         if r.get("id") == text or str(r.get(key, "")).lower() == low:
             return r
+    same = " ".join(_fold(text).split())                 # the whole name typed with or without its accents
+    hits = [r for r in rows if " ".join(_fold(r.get(key, "")).split()) == same]
+    if len(hits) == 1:
+        return hits[0]
+    if len(hits) > 1:
+        raise ValueError(f"more than one {what} matches {text!r}: " + ", ".join(str(r.get(key)) for r in hits)
+                         + ". Say the whole name; nothing was changed")
     if not partial:
         return None
     asked = _name_words(text)

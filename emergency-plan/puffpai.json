@@ -3,7 +3,7 @@
   "id": "emergency-plan",
   "kind": "app",
   "name": "Emergency Plan",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The household's emergency plan, kept on this computer: who is in the household with their numbers and medical notes, an out-of-area contact and other people to call, meeting places, where the shutoffs, kit and papers are, how to leave and what to grab, pets, the hazards that apply here, and a log of drills and reviews. It scores how complete the plan is, prints the plan and wallet cards, and the bot can answer from it with no internet. It does not track supplies (Prep Supplies does that), does not send alerts or reminders, and has no maps.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",

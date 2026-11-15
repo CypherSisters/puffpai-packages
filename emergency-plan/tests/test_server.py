@@ -614,6 +614,31 @@ def test_a_partial_name_is_whole_words_only(base, data):
     assert "Ron (household)" in tool(base, "find_contact", need="ron's mobile")
 
 
+
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for who in ("Pesto Park", "Sliders Lane", "Berry Clinic", "Joseph Day", "Zo Ray", "Ren Bay", "José Alvarez",
+                "Café Luna"):
+        tool(base, "update_plan", section="pets", item=who, fields={"kind": "cat"})
+    # an accented letter is never a gap: "crêpes" is not "cr" + "pes", so nothing else is found or removed
+    for typed in ("crêpes", "müsli", "über", "Zoë", "Renée"):
+        assert "nothing called" in tool_error(base, "remove_item", section="pets", item=typed)
+    out = tool_error(base, "remove_item", section="pets", item="Jose")              # starts José and Joseph
+    assert "José Alvarez" in out and "Joseph Day" in out and "nothing was changed" in out
+    assert "removed José Alvarez" in tool(base, "remove_item", section="pets", item="jose alvarez")
+    assert "removed Café Luna" in tool(base, "remove_item", section="pets", item="CAFE")
+    left = [p["name"] for p in json.loads((data / "plan.json").read_text(encoding="utf-8"))["pets"]]
+    assert left == ["Pesto Park", "Sliders Lane", "Berry Clinic", "Joseph Day", "Zo Ray", "Ren Bay"]
+    # a contact typed without its accent is the same contact, not a second one
+    tool(base, "update_plan", section="contacts", item="José Alvarez", fields={"phone": "555-0120"})
+    assert "added" not in tool(base, "update_plan", section="contacts", item="Jose Alvarez", fields={"phone": "555-0121"})
+    contacts = json.loads((data / "plan.json").read_text(encoding="utf-8"))["contacts"]
+    assert [(c["name"], c["phone"]) for c in contacts] == [("José Alvarez", "555-0121")]
+    assert "José Alvarez" in tool(base, "find_contact", need="jose")
+    # the kind is never read from the pieces of a word: "Drôme" holds no "dr", "Révet" no "vet"
+    for name in ("Drôme Farm", "Révet Shop"):
+        assert "Kind: other (other)" in tool(base, "update_plan", section="contacts", item=name, fields={"phone": "1"})
+
+
 HOSTILE = ["1" + " " * 100000 + "x" + " " * 99998, "a" * 199999 + "!", "1/" + "1" * 199998]
 
 
