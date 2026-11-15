@@ -1,0 +1,13 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "editor",
+  "kind": "skill",
+  "name": "Editor",
+  "version": "1.0.0",
+  "description": "Teaches the brain to edit writing the owner pastes in at one of three levels (proofread, tidy, or reshape when asked), keeping the writer's own words and voice, adding no facts and no AI-sounding words, and listing each change as old -> new with the reason. It adds no tools of its own and fetches nothing.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/pencil.svg",
+  "consent": "This skill is text the brain reads. It runs nothing and uses no internet."
+}
