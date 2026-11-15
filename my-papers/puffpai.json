@@ -3,7 +3,7 @@
   "id": "my-papers",
   "kind": "app",
   "name": "My Papers",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Household paperwork filing that stays on this computer: add a paper (with its file, or just a record of where the paper copy is), find it again by its words, type, person, tag or year, and see what is coming due, expiring or renewing. It keeps real due dates, expiry dates and renewals, suggests how long to keep tax papers, and exports everything as one zip. It does not read scans or photos (no OCR) and does not encrypt the files.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
@@ -75,7 +75,7 @@
         "which papers can I shred now"
       ],
       "remove_paper": [
-        "delete the old gym contract from my papers"
+        "delete the paper called gym contract"
       ]
     }
   },

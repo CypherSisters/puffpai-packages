@@ -44,6 +44,7 @@ import sqlite3
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import zipfile
@@ -55,7 +56,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "web" / "index.html"
 NAME = "my-papers"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 
 MAX_BODY = 64 * 1024                    # page changes and MCP calls
@@ -250,8 +251,10 @@ def safe_name(name) -> str:
 
 
 def _words(text) -> list[str]:
-    """The words of a title: letters and digits, lower case; anything else separates them."""
-    return "".join(ch if ch.isalnum() else " " for ch in str(text or "").lower()).split()
+    """The words of a title: letters and digits of any script, lower case with accents folded (é is e), so
+    'Jose' finds 'José'; anything else separates them."""
+    text = unicodedata.normalize("NFKD", str(text or ""))
+    return "".join(ch if ch.isalnum() else " " for ch in text if not unicodedata.combining(ch)).casefold().split()
 
 
 def _ext(name: str) -> str:
@@ -1410,6 +1413,16 @@ _FIELDS = {
     "notes": _p("string", "Optional: notes, like what it is for."),
 }
 TOOLS = [
+    ("add_paper_record", "File a new paper record whenever the owner says to file, note or keep track of a paper, like where "
+     "a paper copy is kept. It saves the title, type, sender, dates, people, tags, amount and notes, "
+     "without a file.",
+     dict(_FIELDS), ["title"]),
+    ("change_paper", "Change a paper named by its title; it finds the paper itself, so do not look it up first. It sets "
+     "or clears its due date, its type, its tags, where the paper copy is, or its other fields.",
+     {**_PAPER, **_FIELDS, "title": _p("string", "Optional: a new title for the paper.")}, ["paper"]),
+    ("remove_paper", "Delete a paper named by its title; it finds the paper itself, so do not look it up first. Its "
+     "stored file goes too when no other paper uses that file.", dict(_PAPER),
+     ["paper"]),
     ("find_papers", "Use only to search, when the owner asks if we have a paper, where one is, or what papers there "
      "are: finds papers by words in them and by type, person, tag or year, with each one's title, type, date and "
      "the line that matched.",
@@ -1424,20 +1437,10 @@ TOOLS = [
     ("coming_up", "List papers with a due date, expiry, renewal or follow-up date in the next days (60 unless "
      "asked), and anything overdue, soonest first.",
      {"days": _p("integer", "Optional: how many days ahead, 1 to 366. Default 60.")}, []),
-    ("add_paper_record", "File a new paper record whenever the owner says to file, note or keep track of a paper, like where "
-     "a paper copy is kept. It saves the title, type, sender, dates, people, tags, amount and notes, "
-     "without a file.",
-     dict(_FIELDS), ["title"]),
-    ("change_paper", "Change a paper named by its title; it finds the paper itself, so do not look it up first. It sets "
-     "or clears its due date, its type, its tags, where the paper copy is, or its other fields.",
-     {**_PAPER, **_FIELDS, "title": _p("string", "Optional: a new title for the paper.")}, ["paper"]),
     ("list_types_and_counts", "Count the papers of each type, and say how many stored files had no text found.",
      {}, []),
     ("keep_or_shred", "List the papers that are past their keep-until date. It is a list only and deletes nothing.",
      {}, []),
-    ("remove_paper", "Delete a paper named by its title; it finds the paper itself, so do not look it up first. Its "
-     "stored file goes too when no other paper uses that file.", dict(_PAPER),
-     ["paper"]),
 ]
 CHANGES = ["add_paper_record", "change_paper", "remove_paper"]
 DELETES = ["remove_paper"]

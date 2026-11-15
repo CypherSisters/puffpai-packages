@@ -753,6 +753,24 @@ def test_partial_match_is_whole_words_only(base, data):
     assert {p: p.read_bytes() for p in (data / "papers").glob("*.json")} == before
 
 
+def test_an_accented_word_is_one_word_and_matches_with_or_without_its_accents(base, data):
+    for title in ("Pesto Park lease", "Sliders Lane deed", "Berry Clinic bill", "Joseph Day letter",
+                  "José Alvarez will", "Café Luna receipt"):
+        tool(base, "add_paper_record", title=title, type="other")
+    before = {p: p.read_bytes() for p in (data / "papers").glob("*.json")}
+    # an accented letter is never a gap, so the pieces of a word find nothing else
+    for typed in ("crêpes", "müsli", "über", "Renée"):
+        assert f"no paper called {typed!r}" in tool_error(base, "remove_paper", paper=typed)
+    out = tool_error(base, "remove_paper", paper="Jose")                             # starts José and Joseph
+    assert "More than one paper matches 'Jose'" in out and "José Alvarez will" in out and "Joseph Day letter" in out
+    assert {p: p.read_bytes() for p in (data / "papers").glob("*.json")} == before
+    # a title kept with accents is found typed with them or without them
+    assert tool(base, "read_paper", paper="José Alvarez will").startswith("Title: José Alvarez will")
+    assert tool(base, "read_paper", paper="jose alvarez").startswith("Using 'José Alvarez will'.")
+    assert tool(base, "remove_paper", paper="CAFE LUNA").startswith("Using 'Café Luna receipt'. Removed")
+    assert len(list((data / "papers").glob("*.json"))) == 5
+
+
 def test_hostile_text_answers_within_a_second_on_every_argument(base, data, clock):
     tool(base, "add_paper_record", title="Water", type="bill")
     papers = ps.Papers(data.parent / "side", clock, lambda: None, fts=False)     # the patterns, in this process

@@ -18,7 +18,7 @@ Household paperwork filing that stays on this computer: add a paper, find it aga
 | `change_paper` | Change a paper's fields, like setting or clearing a due date | yes | set the City Water bill due date to 2027-04-15 |
 | `list_types_and_counts` | How many papers of each type, and how many files had no text found | no | how many papers do I have of each kind |
 | `keep_or_shred` | Papers past their keep-until date. A list only; it deletes nothing | no | which papers can I shred now |
-| `remove_paper` | Delete a paper, and its stored file when no other paper uses it | yes | delete the old gym contract from my papers |
+| `remove_paper` | Delete a paper, and its stored file when no other paper uses it | yes | delete the paper called gym contract |
 
 **How it works things out.** See `PROCESS.md`: how text is found in a file, how a search matches, how "coming up" is worked out (renewals too), how keep-until is suggested for tax papers, and how import decides to skip. Where the ideas came from: `NOTICE.md`.
 
