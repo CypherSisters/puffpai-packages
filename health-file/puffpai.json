@@ -1,0 +1,56 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "health-file",
+  "kind": "app",
+  "name": "Health File",
+  "version": "1.0.0",
+  "description": "A household health record that stays on this computer: for each person, their conditions, medicines, allergies, test results (flagged only against the range printed on each result), doctor visits, vaccinations and the questions they want to ask at the next visit, with a one-page summary to print, and export and import as its own JSON or a standard FHIR R4 file. It keeps records; it is not a doctor and does not diagnose. It does not remind anyone on its own.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/health-file.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["add_record", "change_record", "add_question", "remove_record"],
+    "tools": {
+      "person_summary": "Use only when the owner wants the whole picture of one person on one page, not one kind of record: allergies first, then active conditions, current medicines, latest results, coming follow-ups and vaccinations, and open questions.",
+      "list_records": "Use to see one kind of record for a person, such as their medicines, allergies or visits; for test results, give a test name to see how it changed over time. With one test's name it gives every result of that test, oldest first, each flagged only from its printed range; with words that fit several tests or a lab, every result they match; without, every result. It finds the person and the test by their plain names, so do not look anything up first.",
+      "add_record": "Add a health record for one person: a condition, medicine, allergy, test result, visit, vaccination or question, with its fields. A person not in Health File yet is added by that name, and the answer says so. To add only a person, use type person with just their name.",
+      "change_record": "Change a health record named in plain words, like Alex's ibuprofen; it finds the record itself, so do not look it up first. For example mark a medicine stopped, a condition resolved or a question asked with its answer.",
+      "add_question": "Write down a question one person wants to ask at their next doctor's visit. A person not in Health File yet is added by that name, and the answer says so.",
+      "prepare_for_visit": "Get one person ready for their next doctor's visit: open questions, what changed in the file since the last visit, current medicines and allergies.",
+      "remove_record": "Delete a health record named in plain words, like Jo's flu shot; it finds the record itself, so do not look it up first. This can not be undone."
+    },
+    "examples": {
+      "person_summary": ["show Alex's health summary", "what is in Jo's health file"],
+      "list_records": ["list Alex's medicines", "show how Alex's cholesterol changed over time"],
+      "add_record": ["add a person called Alex to the health file", "add to Sam's health file that she started ibuprofen 200 mg twice a day for her knee", "Jo's cholesterol came back 5.4 mmol/L, range 3.0 to 5.0"],
+      "change_record": ["mark Alex's ibuprofen as stopped", "Sam's knee pain is resolved now, update her health file"],
+      "add_question": ["add a question for Alex's next doctor visit: is the new rash related to the cream"],
+      "prepare_for_visit": ["get Sam ready for the doctor tomorrow"],
+      "remove_record": ["delete the flu shot from Jo's health file", "remove the asthma record from Alex's health file"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "Health File", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Health File", "icon": "icons/health-file.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.2 }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "ask" },
+  "consent": "Health File keeps your household's health records in its own folder on this computer (health.json). It reads the household's names from PuffPAI's people list on this computer, uses no internet and does not use the brain. The bot can read and add records when you ask it in chat. The files are not encrypted by this app."
+}

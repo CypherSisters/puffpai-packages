@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<!-- Health File page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health File</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:14px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+.wrap{max-width:1050px;margin:0 auto}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.top .row{margin-top:0}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:0 14px}
+input,select,textarea{font:inherit;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:7px 8px;min-height:40px}
+textarea{min-height:60px;resize:vertical}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+button.danger{background:var(--p-bad);border-color:var(--p-bad);color:#fff}
+.tabs{display:flex;flex-wrap:wrap;gap:0;margin-top:10px;border-bottom:2px solid var(--p-accent)}
+.tabs button{border-bottom:0;background:var(--p-card)}
+.tabs button[aria-selected=true]{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:6px 4px;border-bottom:1px solid var(--p-line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font-size:.8rem;color:var(--p-text2);font-weight:600}
+td.act{text-align:right;white-space:nowrap}
+.sub{color:var(--p-text2);font-size:.88rem;white-space:pre-line}
+.flag{display:inline-block;padding:1px 7px;font-size:.8rem;font-weight:600;margin-left:6px;border:1px solid var(--p-line)}
+.flag.high,.flag.low,.flag.late{background:var(--p-bad);border-color:var(--p-bad);color:#fff}
+.flag.in{background:var(--p-chip)}
+.allergy{border:3px solid var(--p-bad);padding:8px 10px;margin-top:6px}
+.allergy b{color:var(--p-bad);letter-spacing:.04em}
+.empty{color:var(--p-text2);padding:4px 0}
+form.add{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px;align-items:end}
+form.add label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-text2)}
+form.add label.wide{grid-column:1/-1}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.note{color:var(--p-text2);font-size:.85rem}
+#msg{min-height:1.4em;margin-top:6px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+svg.chart{width:100%;max-width:640px;height:auto;display:block;margin:8px 0;border:1px solid var(--p-line)}
+footer{margin-top:18px;padding-top:8px;border-top:1px solid var(--p-line);color:var(--p-text2);font-size:.85rem}
+.only-print{display:none}
+@media print{
+  @page{margin:12mm}
+  body{background:#fff;color:#000;padding:0;font-size:10.5pt}
+  .no-print,.tabs,#msg,form,button,select,.act,.panel:not(#p_summary){display:none!important}
+  #p_summary{display:block!important}
+  .only-print{display:block}
+  .card{border:0;padding:0;background:#fff}
+  .cols{display:block}
+  h2{margin:8px 0 3px;font-size:11pt;color:#000}
+  td,th{padding:2px 3px;border-color:#999;color:#000}
+  .sub,.note,footer{color:#000}
+  .flag{border:1px solid #000;background:#fff!important;color:#000!important}
+  .allergy{border:2px solid #000}
+  .allergy b{color:#000}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="top">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 6h30l10 10v42H12z" fill="none" stroke="currentColor" stroke-width="4"/><rect x="27" y="22" width="10" height="26" fill="currentColor"/><rect x="19" y="30" width="26" height="10" fill="currentColor"/></svg>Health File <span class="only-print" id="printName"></span></h1>
+<div class="row no-print"><label class="note" for="who">Person</label><select id="who" aria-label="Person"></select>
+<button class="primary" id="printBtn" type="button">Print summary</button></div>
+</div>
+<div id="msg"></div>
+<div class="tabs no-print" id="tabs" role="tablist"></div>
+
+<div class="panel" id="p_summary"></div>
+<div class="panel" id="p_records" hidden></div>
+<div class="panel" id="p_files" hidden>
+  <div class="cols">
+  <div>
+  <h2>People <small id="peopleSource"></small></h2>
+  <div class="card"><div id="peopleList"></div>
+  <form class="row" id="personForm"><input id="p_name" maxlength="60" placeholder="Name" required aria-label="Name"><button class="primary" type="submit">Add person</button></form></div>
+  </div>
+  <div>
+  <h2>Export</h2>
+  <div class="card"><div class="note">A single file to keep or move: this app's own format, or a FHIR R4 file other health apps can read (questions stay in this app's own format).</div>
+  <div class="row"><button data-export="app" data-scope="one">This person</button><button data-export="app" data-scope="all">Everyone</button><span class="note">Health File format</span></div>
+  <div class="row"><button data-export="fhir" data-scope="one">This person</button><button data-export="fhir" data-scope="all">Everyone</button><span class="note">FHIR R4</span></div></div>
+  <h2>Import</h2>
+  <div class="card"><div class="note">A Health File export or a FHIR R4 Bundle. Import only adds; nothing already here changes, and records already here are skipped.</div>
+  <div class="row"><input type="file" id="importFile" accept=".json,application/json" aria-label="File to import"></div>
+  <div class="row"><label class="note"><input type="checkbox" id="importHere"> Put everything under the person chosen above</label></div>
+  <div class="row"><button class="primary" id="importBtn" type="button">Import</button></div></div>
+  </div>
+  </div>
+</div>
+
+<footer id="foot">Health File keeps your records. It is not a doctor and does not diagnose. For anything urgent, call your local emergency number.</footer>
+</div>
+
+<script>
+// Paths are relative, so the page works at /pkg/health-file/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let META=null,view=null,tab='summary',person='',_stamp='',editing=null,confirmDel=null,test='';
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+function typeOf(k){return META.types.find(t=>t.key===k)}
+
+async function getJSON(path){const r=await fetch(BASE+path);const out=await r.json().catch(()=>({error:'Health File sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Health File could not read that.');return out}
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Health File sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Health File could not save.');return out}
+
+async function load(){
+  try{view=await getJSON('view'+(person?'?person='+encodeURIComponent(person):''))}
+  catch(e){if(person){person='';return load()}say(e.message,true);return}
+  _stamp=view.last_updated||'';person=view.person?view.person.id:'';render()}
+
+async function poll(){try{const u=await getJSON('updated');if(u.last_updated!==_stamp&&!editing)load()}catch(e){}}
+
+function flagChip(f,note){if(note)return '<span class="flag">range not clear</span>';
+  if(!f||f==='none')return '<span class="flag">no range</span>';
+  return `<span class="flag ${f==='in range'?'in':esc(f)}">${esc(f)}</span>`}
+
+function line(k,r){
+  if(k==='condition')return [`<b>${esc(r.name)}</b>`,[r.status,r.since&&'since '+r.since,r.until&&'until '+r.until].filter(Boolean).join(', '),r.note];
+  if(k==='medicine')return [`<b>${esc(r.name)}</b> ${esc(r.dose)}`,[r.how_often,r.status,r.reason&&'for '+r.reason,r.since&&'since '+r.since,r.until&&'until '+r.until,r.prescriber&&'prescribed by '+r.prescriber].filter(Boolean).join(', '),r.note];
+  if(k==='allergy')return [`<b>${esc(r.what)}</b>`,[r.reaction,r.severity].filter(Boolean).join(', '),r.note];
+  if(k==='result')return [`<b>${esc(r.test)}</b> ${esc(r.value)} ${esc(r.unit)} ${flagChip(r.flag,r.flag_note)}`,[r.date,r.range?'range '+r.range:'no range given',r.flag_note,r.lab].filter(Boolean).join(', '),r.note];
+  if(k==='visit')return [`<b>${esc(r.date)}</b> ${esc(r.who)}`,[r.why,r.follow_up&&'follow-up '+r.follow_up].filter(Boolean).join(', '),r.said];
+  if(k==='vaccination')return [`<b>${esc(r.vaccine)}</b>`,[r.date,r.lot&&'lot '+r.lot,r.due_again&&'due again '+r.due_again].filter(Boolean).join(', '),''];
+  if(k==='question')return [`<b>${esc(r.text)}</b>`,r.asked?'asked':'not asked yet',r.answer?'Answer: '+r.answer:''];
+  return ['','','']}
+
+function rows(k,list,actions){
+  if(!list.length)return '';
+  return '<table>'+list.map(r=>{const [a,b,c]=line(k,r);
+    let act='';if(actions){act=confirmDel===r.id?`<span class="note">Delete this?</span> <button class="danger" data-delyes="${esc(r.id)}">Yes, delete</button> <button data-delno="1">No</button>`
+      :`<button data-edit="${esc(r.id)}">Edit</button> <button data-del="${esc(r.id)}">Delete</button>`}
+    return `<tr><td>${a}<div class="sub">${esc(b)}</div>${c?`<div class="sub">${esc(c)}</div>`:''}</td>${actions?`<td class="act">${act}</td>`:''}</tr>`}).join('')+'</table>'}
+
+function render(){
+  const sel=$('who');
+  sel.innerHTML=view.people.map(p=>`<option value="${esc(p.id)}"${p.id===person?' selected':''}>${esc(p.name)}</option>`).join('')||'<option value="">Nobody yet</option>';
+  $('tabs').innerHTML=[['summary','Summary'],...META.types.map(t=>[t.key,t.plural]),['files','People and files']]
+    .map(([k,l])=>`<button role="tab" aria-selected="${k===tab}" data-tab="${k}">${esc(l)}</button>`).join('');
+  $('p_summary').hidden=tab!=='summary';$('p_records').hidden=tab==='summary'||tab==='files';$('p_files').hidden=tab!=='files';
+  $('printName').textContent=view.person?'for '+view.person.name:'';
+  renderFiles();
+  if(!view.person){$('p_summary').innerHTML='<div class="card"><p class="empty">Nobody in the household yet. Add people under People and files.</p></div>';
+    $('p_records').innerHTML='';return}
+  renderSummary();if(tab!=='summary'&&tab!=='files')renderRecords()}
+
+function renderSummary(){
+  const s=view.summary;
+  const al=s.allergies.length?s.allergies.map(r=>{const [a,b]=line('allergy',r);return `${a}${b?' ('+esc(b)+')':''}`}).join('; '):'None recorded in Health File';
+  const sec=(title,k,list)=>`<h2>${esc(title)} <small>${list.length}</small></h2><div class="card">${rows(k,list,false)||'<p class="empty">None.</p>'}</div>`;
+  const coming=s.coming.length?'<table>'+s.coming.map(c=>`<tr><td><b>${esc(c.date)}</b> ${esc(c.what)}${c.late?' <span class="flag late">overdue</span>':''}</td></tr>`).join('')+'</table>':'<p class="empty">Nothing coming up.</p>';
+  $('p_summary').innerHTML=`<p class="only-print note">As of ${esc(s.today)}</p>
+    <div class="allergy"><b>ALLERGIES</b>: ${al}</div>
+    <div class="cols"><div>${sec('Active conditions','condition',s.conditions)}${sec('Current medicines','medicine',s.medicines)}</div>
+    <div>${sec('Latest results','result',s.results)}<h2>Coming up</h2><div class="card">${coming}</div>${sec('Open questions for the next visit','question',s.questions)}</div></div>`}
+
+function field(f,val){
+  const v=val??'';const id='f_'+f.key;
+  if(f.kind==='choice')return `<label>${esc(f.label)}<select id="${id}">${f.required?'':'<option value=""></option>'}${f.choices.map(c=>`<option${c===v?' selected':''}>${esc(c)}</option>`).join('')}</select></label>`;
+  if(f.kind==='bool')return `<label>${esc(f.label)}<select id="${id}"><option value="no">no</option><option value="yes"${v===true?' selected':''}>yes</option></select></label>`;
+  if(f.kind==='long')return `<label class="wide">${esc(f.label)}<textarea id="${id}" maxlength="2000">${esc(v)}</textarea></label>`;
+  if(f.kind==='date')return `<label>${esc(f.label)}<input id="${id}" type="date" value="${esc(v)}"${f.required?' required':''}></label>`;
+  if(f.kind==='partial')return `<label>${esc(f.label)}<input id="${id}" value="${esc(v)}" placeholder="2019, 2019-05 or 2019-05-20" maxlength="10"></label>`;
+  if(f.kind==='number')return `<label>${esc(f.label)}<input id="${id}" inputmode="decimal" value="${esc(v)}" maxlength="20"></label>`;
+  return `<label>${esc(f.label)}<input id="${id}" value="${esc(v)}"${f.required?' required':''} maxlength="300"${f.key==='test'?' list="testNames"':''}></label>`}
+
+function renderRecords(){
+  const t=typeOf(tab),list=view.records[tab]||[],r=editing?list.find(x=>x.id===editing):null;
+  let html='';
+  if(tab==='result'){
+    html+=`<h2>One test over time</h2><div class="card"><div class="row" style="margin-top:0"><select id="testPick" aria-label="Test"><option value="">Pick a test</option>${view.tests.map(n=>`<option${n===test?' selected':''}>${esc(n)}</option>`).join('')}</select></div><div id="hist"></div></div>`}
+  html+=`<h2>${esc(t.plural)} <small>${list.length}</small></h2><div class="card">${rows(tab,list,true)||'<p class="empty">None yet.</p>'}</div>
+    <h2>${r?'Edit':'Add'} ${esc(t.label.toLowerCase())}</h2><div class="card"><form class="add" id="form">${t.fields.map(f=>field(f,r?r[f.key]:'')).join('')}
+    <div><button class="primary" type="submit">${r?'Save':'Add'}</button> ${r?'<button type="button" id="cancelBtn">Cancel</button>':''}</div></form>
+    <datalist id="testNames">${view.tests.map(n=>`<option value="${esc(n)}">`).join('')}</datalist></div>`;
+  $('p_records').innerHTML=html;
+  if(tab==='result'&&test)history()}
+
+async function history(){
+  const box=$('hist');if(!box)return;if(!test){box.innerHTML='';return}
+  try{const h=await getJSON(`history?person=${encodeURIComponent(person)}&test=${encodeURIComponent(test)}`);
+    const pts=h.points;
+    box.innerHTML=chart(pts)+'<table><tr><th>Date</th><th>Value</th><th>Range as printed</th><th>Flag</th></tr>'+pts.map(p=>
+      `<tr><td>${esc(p.date)}</td><td>${esc(p.value)} ${esc(p.unit)}</td><td>${esc(p.range||'none given')}</td><td>${flagChip(p.flag,p.flag_note)}${p.flag_note?`<div class="sub">${esc(p.flag_note)}</div>`:''}</td></tr>`).join('')+'</table>'}
+  catch(e){box.innerHTML=`<p class="empty">${esc(e.message)}</p>`}}
+
+function chart(pts){
+  const num=pts.filter(p=>typeof p.number==='number');if(num.length<1)return '<p class="note">No number values to draw.</p>';
+  const W=600,H=160,L=44,R=10,T=10,B=24;
+  const withRange=[...num].reverse().find(p=>p.low!=null||p.high!=null);
+  let lo=Math.min(...num.map(p=>p.number)),hi=Math.max(...num.map(p=>p.number));
+  if(withRange){if(withRange.low!=null)lo=Math.min(lo,withRange.low);if(withRange.high!=null)hi=Math.max(hi,withRange.high)}
+  if(hi===lo){hi+=1;lo-=1}const pad=(hi-lo)*.1;lo-=pad;hi+=pad;
+  const x=i=>num.length===1?L+(W-L-R)/2:L+i*(W-L-R)/(num.length-1),y=v=>T+(hi-v)*(H-T-B)/(hi-lo);
+  let band='';if(withRange){const top=y(withRange.high!=null?withRange.high:hi),bot=y(withRange.low!=null?withRange.low:lo);
+    band=`<rect x="${L}" y="${top.toFixed(1)}" width="${W-L-R}" height="${Math.max(0,bot-top).toFixed(1)}" fill="currentColor" opacity=".12"><title>printed range</title></rect>`}
+  const path=num.map((p,i)=>`${i?'L':'M'}${x(i).toFixed(1)} ${y(p.number).toFixed(1)}`).join(' ');
+  const dots=num.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.number).toFixed(1)}" r="4" fill="${p.flag==='high'||p.flag==='low'?'var(--p-bad)':'var(--p-accent)'}"><title>${esc(p.date)}: ${esc(p.value)}</title></circle>`).join('');
+  const labels=num.map((p,i)=>(num.length<=8||i===0||i===num.length-1)?`<text x="${x(i).toFixed(1)}" y="${H-6}" font-size="10" text-anchor="middle" fill="currentColor">${esc(p.date)}</text>`:'').join('');
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Values over time">${band}
+    <text x="4" y="${T+8}" font-size="10" fill="currentColor">${esc(+hi.toPrecision(4))}</text><text x="4" y="${H-B}" font-size="10" fill="currentColor">${esc(+lo.toPrecision(4))}</text>
+    <path d="${path}" fill="none" stroke="var(--p-accent)" stroke-width="2"/>${dots}${labels}</svg>`+
+    (withRange?'<p class="note">Shaded: the range printed on the latest result that had one.</p>':'<p class="note">No range was printed on these results.</p>')}
+
+function renderFiles(){
+  $('peopleSource').textContent=view.source==='shared'?'from PuffPAI\'s shared people list':'this app\'s own list (PuffPAI\'s shared list did not answer or is empty)';
+  $('peopleList').innerHTML=view.people.length?'<table>'+view.people.map(p=>`<tr><td>${esc(p.name)}<div class="sub">${p.source==='shared'?'shared list':'Health File only'}</div></td>
+    <td class="act">${p.source==='own'?`<button data-pdel="${esc(p.id)}">Remove</button>`:''}</td></tr>`).join('')+'</table>':'<p class="empty">Nobody yet.</p>'}
+
+function readForm(){const t=typeOf(tab),out={};
+  for(const f of t.fields){const el=$('f_'+f.key);if(!el)continue;out[f.key]=f.kind==='bool'?el.value==='yes':el.value}
+  return out}
+
+document.addEventListener('submit',async e=>{
+  if(e.target.id==='form'){e.preventDefault();
+    try{const fields=readForm();
+      const out=editing?await post('api/record/change',{id:editing,fields}):await post('api/record/add',{person,type:tab,fields});
+      say(out.text);editing=null;await load()}catch(err){say(err.message,true)}}
+  else if(e.target.id==='personForm'){e.preventDefault();
+    try{const out=await post('api/person/add',{name:$('p_name').value});say(out.text);$('p_name').value='';person=out.id;await load()}catch(err){say(err.message,true)}}});
+
+document.addEventListener('change',e=>{
+  if(e.target.id==='who'){person=e.target.value;editing=null;confirmDel=null;test='';load()}
+  else if(e.target.id==='testPick'){test=e.target.value;history()}});
+
+document.addEventListener('click',async e=>{
+  const b=e.target.closest('button');if(!b)return;const d=b.dataset;
+  try{
+    if(d.tab){tab=d.tab;editing=null;confirmDel=null;render();say('')}
+    else if(d.edit){editing=d.edit;confirmDel=null;renderRecords();$('form').scrollIntoView({behavior:'smooth'})}
+    else if(b.id==='cancelBtn'){editing=null;renderRecords()}
+    else if(d.del){confirmDel=d.del;renderRecords()}
+    else if(d.delno){confirmDel=null;renderRecords()}
+    else if(d.delyes){confirmDel=null;say((await post('api/record/remove',{id:d.delyes})).text);if(editing===d.delyes)editing=null;await load()}
+    else if(d.pdel){say((await post('api/person/remove',{id:d.pdel})).text);person='';await load()}
+    else if(d.export){const q=new URLSearchParams({format:d.export});if(d.scope==='one'&&person)q.set('person',person);
+      const r=await fetch(BASE+'export?'+q);if(!r.ok)throw new Error((await r.json().catch(()=>({}))).error||'Export did not work.');
+      const blob=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(blob);
+      a.download=`health-file${d.export==='fhir'?'-fhir':''}-${new Date().toISOString().slice(0,10)}.json`;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(a.href),5000);const sk=+(r.headers.get('X-Health-File-Skipped')||0);
+      say(sk?`Exported. Skipped ${sk} record${sk===1?'':'s'} that would not read.`:'Exported.')}
+    else if(b.id==='importBtn'){const f=$('importFile').files[0];if(!f)return say('Pick a file first.',true);
+      let data;try{data=JSON.parse(await f.text())}catch(err){return say('That file is not JSON.',true)}
+      const out=await post('api/import',{data,person:$('importHere').checked?person:undefined});say(out.text);await load()}
+    else if(b.id==='printBtn'){tab='summary';editing=null;render();setTimeout(()=>window.print(),50)}
+  }catch(err){say(err.message,true)}});
+
+(async()=>{try{META=await getJSON('meta');$('foot').textContent=META.disclaimer;await load()}catch(e){say('Health File is not answering. Is it running?',true)}
+  setInterval(poll,5000)})();
+</script>
+</body>
+</html>
