@@ -1,0 +1,115 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "emergency-plan",
+  "kind": "app",
+  "name": "Emergency Plan",
+  "version": "1.0.0",
+  "description": "The household's emergency plan, kept on this computer: who is in the household with their numbers and medical notes, an out-of-area contact and other people to call, meeting places, where the shutoffs, kit and papers are, how to leave and what to grab, pets, the hazards that apply here, and a log of drills and reviews. It scores how complete the plan is, prints the plan and wallet cards, and the bot can answer from it with no internet. It does not track supplies (Prep Supplies does that), does not send alerts or reminders, and has no maps.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/CypherSisters/puffpai-packages",
+  "icon": "icons/shield.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "update_plan",
+      "grab_list",
+      "log_practice",
+      "remove_item"
+    ],
+    "tools": {
+      "show_plan": "Read out the household emergency plan: the whole plan, or one section (people, contacts, meeting places, home, leaving, grab list, pets, hazards, practice).",
+      "find_contact": "Find who to call from the emergency plan, by need: the out-of-area contact everyone checks in with, a nearby helper, the doctor, the vet, school, work, insurance, a utility, or a person in the household.",
+      "where_is": "Say where something is, from the emergency plan: the water, gas and power shutoffs and how to turn them off, fire extinguishers, first aid kit, go-bags, spare keys, important papers, safe spots, ways out, meeting places, pet carriers and routes out of the area.",
+      "update_plan": "Set or change one item in a section of the emergency plan: a person's details, a contact, a meeting place, a home detail, a leaving detail, a grab list item, a pet, or a hazard and what we do. An item that is not there yet is added. For the out-of-area contact, set kind to out_of_area.",
+      "readiness_check": "Score how complete the emergency plan is, out of 8 plain checks, and list what is missing.",
+      "grab_list": "Show the grab list of things to take when leaving home in a hurry, or tick or untick one item on it as packed.",
+      "log_practice": "Log a drill or a review of the emergency plan: the date, what was practiced and what to fix. A review also sets the plan's last reviewed date.",
+      "remove_item": "When the owner wants something taken out of the emergency plan, remove it by its name, no need to look it up first: a person's details, a contact, a meeting place, a home or leaving detail, a grab list item, a pet, a hazard note, or a practice log entry."
+    },
+    "examples": {
+      "show_plan": [
+        "read me our emergency plan",
+        "what does our emergency plan say about pets"
+      ],
+      "find_contact": [
+        "who is our out-of-area contact",
+        "what is the vet's number"
+      ],
+      "where_is": [
+        "where is the gas shutoff",
+        "where do we meet if we can't get home"
+      ],
+      "update_plan": [
+        "set Sam's mobile in the emergency plan to 555-0100",
+        "our meeting place in the neighborhood is the library on Elm Street"
+      ],
+      "readiness_check": [
+        "how ready is our emergency plan",
+        "what is our emergency plan missing"
+      ],
+      "grab_list": [
+        "what is on our grab list",
+        "tick the phone chargers on the grab list"
+      ],
+      "log_practice": [
+        "we did a fire drill today; next time Jo needs a flashlight by the bed",
+        "log a review of the emergency plan"
+      ],
+      "remove_item": [
+        "remove Biscuit from the pets in our emergency plan",
+        "take the old insurance contact out of the emergency plan"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Emergency Plan",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Emergency Plan",
+        "icon": "icons/shield.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "ask"
+  },
+  "consent": "Emergency Plan keeps your household's emergency plan, with the phone numbers and medical notes you type, in its own folder on this computer (plan.json); it uses no internet and does not use the brain. The bot can read and change the plan when you ask it in chat, and the file is not encrypted by this app."
+}

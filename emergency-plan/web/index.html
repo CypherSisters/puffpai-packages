@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<!-- Emergency Plan page. Copyright (c) 2026 Cypher Sisters. Apache-2.0 License. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Emergency Plan</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--font-display:var(--app-rounded,'Segoe UI Rounded','Nunito','Arial Rounded MT Bold','Segoe UI',system-ui,sans-serif);
+--font-body:var(--app-sans,'Segoe UI',system-ui,-apple-system,sans-serif);
+--p-bg:var(--bg,#f3f5f8);--p-card:var(--card,#ffffff);--p-line:var(--line,#dde3ea);
+--p-text:var(--text,#1f2a36);--p-text2:var(--text2,#5b6878);--p-accent:var(--accent,#2a7d9c);
+--p-on-accent:var(--on-primary,#ffffff);--p-warn:var(--lemon,#d99a1e);--p-bad:var(--red,#d9534f);
+--p-good:var(--green,#2a9c5b);--p-chip:var(--chip,#eef2f6);--radius:0;
+}
+html{font-size:15px}
+body{font-family:var(--font-body);background:var(--p-bg);color:var(--p-text);min-height:100vh;padding:14px;-webkit-font-smoothing:antialiased}
+h1{font-family:var(--font-display);font-size:1.45rem;font-weight:700;display:flex;align-items:center;gap:10px}
+h2{font-family:var(--font-display);font-size:1.05rem;font-weight:700;margin:16px 0 6px;display:flex;align-items:baseline;gap:8px}
+h2 small,h3 small{font-family:var(--font-body);font-weight:400;color:var(--p-text2);font-size:.85rem}
+h3{font-size:.95rem;font-weight:700;margin:4px 0}
+.wrap{max-width:1100px;margin:0 auto}
+.card{background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:10px 12px}
+.item{border-top:1px solid var(--p-line);padding:8px 0}
+.item:first-child{border-top:0;padding-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px 10px}
+.grid label{display:flex;flex-direction:column;gap:2px;font-size:.8rem;color:var(--p-text2)}
+.grid label.wide{grid-column:1/-1}
+input,select,textarea{font:inherit;font-size:.95rem;color:var(--p-text);background:var(--p-card);border:1px solid var(--p-line);border-radius:var(--radius);padding:6px 8px;min-height:40px;width:100%}
+textarea{min-height:58px;resize:vertical}
+input[type=checkbox]{width:22px;height:22px;min-height:22px}
+button{font:inherit;cursor:pointer;border:1px solid var(--p-line);background:var(--p-chip);color:var(--p-text);border-radius:var(--radius);padding:7px 12px;min-height:40px;touch-action:manipulation}
+button.primary{background:var(--p-accent);border-color:var(--p-accent);color:var(--p-on-accent)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input,.row select{width:auto;flex:1 1 160px}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.tag{display:inline-block;padding:1px 7px;font-size:.78rem;background:var(--p-chip);color:var(--p-text2);margin-left:6px}
+.note{color:var(--p-text2);font-size:.85rem}
+.warn{border-left:4px solid var(--p-warn);padding:8px 12px;background:var(--p-card);margin-top:8px}
+.checks{list-style:none;columns:2 260px;font-size:.92rem}
+.checks li{padding:3px 0;break-inside:avoid}
+.checks .ok::before{content:"\2713  ";color:var(--p-good);font-weight:700}
+.checks .no::before{content:"\25CB  ";color:var(--p-bad);font-weight:700}
+.score{font-family:var(--font-display);font-size:1.6rem;font-weight:700}
+.tick{display:flex;align-items:center;gap:8px;min-height:40px;padding:2px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:0 14px}
+#msg{min-height:1.4em;margin-top:8px;color:var(--p-text2)}
+#msg.bad{color:var(--p-bad)}
+table{width:100%;border-collapse:collapse}
+td,th{text-align:left;padding:5px 4px;border-bottom:1px solid var(--p-line);vertical-align:top;font-size:.92rem}
+#printArea{display:none}
+@media print{
+  @page{margin:12mm}
+  body{background:#fff;color:#000;padding:0;font:10.5pt/1.35 Arial,Helvetica,sans-serif}
+  .screen{display:none!important}
+  #printArea{display:block}
+  #printArea h1{font:bold 15pt Arial,Helvetica,sans-serif;margin-bottom:4pt}
+  #printArea h2{font:bold 12pt Arial,Helvetica,sans-serif;margin:10pt 0 3pt;border-bottom:1px solid #000}
+  #printArea p,#printArea li{margin:1pt 0;break-inside:avoid}
+  #printArea ul{padding-left:14pt}
+  .cards{display:flex;flex-wrap:wrap;gap:0}
+  .wallet{width:3.375in;height:2.125in;border:1px dashed #000;padding:.08in .1in;font-size:7.2pt;line-height:1.25;overflow:hidden;break-inside:avoid;color:#000}
+  .wallet b{font-size:8.5pt}
+  .wallet p{margin:0}
+}
+</style>
+</head>
+<body>
+<div class="wrap screen">
+<div class="head">
+<h1><svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path d="M32 6l22 9v15c0 14-9 24-22 28C19 54 10 44 10 30V15z" fill="none" stroke="currentColor" stroke-width="4"/><path d="M32 20v20M22 30h20" stroke="currentColor" stroke-width="5"/></svg>Emergency Plan</h1>
+<div class="row">
+<button id="printPlan">Print plan</button><button id="printCards">Print wallet cards</button>
+<button id="exportBtn">Export</button><button id="importBtn">Import</button>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+</div>
+</div>
+<p class="note">In danger right now, call your local emergency number first. This plan is kept on this computer and works with no internet.</p>
+<div id="msg"></div>
+<div id="reviewNote"></div>
+
+<h2>Readiness <small id="scoreText"></small></h2>
+<div class="card"><div class="row"><span class="score" id="score"></span><ul class="checks" id="checks" style="flex:1"></ul></div></div>
+
+<h2>People <small id="peopleFrom"></small></h2>
+<div class="card"><div id="people"></div>
+<form class="row" data-add="people" style="margin-top:8px"><input name="name" maxlength="60" placeholder="Name" aria-label="Name" required><button class="primary">Add person</button></form></div>
+
+<h2>Contacts <small>who to call</small></h2>
+<div class="card"><div id="contacts"></div>
+<form class="row" data-add="contacts" style="margin-top:8px"><input name="name" maxlength="120" placeholder="Name or company" aria-label="Name or company" required><select name="kind" id="kindPick" aria-label="Kind"></select><button class="primary">Add contact</button></form></div>
+
+<div class="cols">
+<div><h2>Meeting places</h2><div class="card" id="meeting"></div></div>
+<div><h2>Hazards here <small>tick each that applies, and say what we do</small></h2><div class="card" id="hazards"></div></div>
+</div>
+
+<h2>Home</h2>
+<div class="card" id="home"></div>
+
+<div class="cols">
+<div><h2>Leaving</h2><div class="card" id="leaving"></div></div>
+<div><h2>Grab list <small id="grabCount"></small></h2><div class="card"><div id="grab"></div>
+<form class="row" data-add="grab_list" style="margin-top:8px"><input name="name" maxlength="120" placeholder="Item" aria-label="Item" required><button class="primary">Add</button></form>
+<div class="row" style="margin-top:6px"><button id="untickAll">Untick all</button></div></div></div>
+</div>
+
+<h2>Pets</h2>
+<div class="card"><div id="pets"></div>
+<form class="row" data-add="pets" style="margin-top:8px"><input name="name" maxlength="60" placeholder="Pet's name" aria-label="Pet's name" required><button class="primary">Add pet</button></form></div>
+
+<h2>Practice <small id="reviewed"></small></h2>
+<div class="card">
+<form class="grid" id="practiceForm">
+<label>Date<input type="date" name="date"></label>
+<label>Kind<select name="kind"><option value="drill">Drill</option><option value="review">Review of the plan</option></select></label>
+<label>What was practiced<input name="what" maxlength="300" required></label>
+<label>What to fix<input name="fix" maxlength="1000"></label>
+<div><button class="primary">Log it</button></div>
+</form>
+<div id="practice" style="margin-top:8px"></div>
+</div>
+</div>
+<div id="printArea"></div>
+
+<script>
+// Paths are relative, so the page works at /pkg/emergency-plan/ through the Core.
+const BASE=location.pathname.replace(/\/[^/]*\.[^/]*$/,'/').replace(/([^/])$/,'$1/');
+let plan=null,_stamp='',_loaded=false,_waiting=false;
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function say(t,bad){const m=$('msg');m.textContent=t||'';m.className=bad?'bad':''}
+const PERSON=[['mobile','Mobile'],['work_school','Work or school'],['work_address','Its address'],['work_phone','Its number'],
+  ['allergies','Allergies'],['blood_type','Blood type (optional)'],['medical','Medical needs',1],['medicines','Medicines that must go with them',1],['notes','Anything a helper should know',1]];
+const CONTACT=[['phone','Number'],['address','Address'],['notes','Notes',1]];
+const INSURE=[['policy_number','Policy number'],['claims_number','Claims number']];
+const PLACE=[['place','Place'],['address','Address'],['note','Note',1]];
+const HOME=[['water_shutoff','Water shutoff is at'],['water_how','How to turn the water off',1],['gas_shutoff','Gas shutoff is at'],['gas_how','How to turn the gas off',1],
+  ['breaker','Main breaker is at'],['breaker_how','How to turn the power off',1],['extinguishers','Fire extinguishers'],['first_aid','First aid kit'],['go_bags','Go-bags'],
+  ['spare_keys','Spare keys'],['papers','Important papers'],['safe_storm','Safe spot in a storm'],['safe_quake','Safe spot in an earthquake'],['ways_out','Two ways out of each sleeping room',1]];
+const LEAVING=[['route_1','First way out of the area',1],['route_2','Second way out of the area',1],['stay','Where we would stay',1],['transport','Transport',1]];
+const PET=[['kind','Kind'],['chip','Chip number'],['vet','Vet'],['carrier','Carrier is at'],['food_meds','Food and medicine',1]];
+const MAX={mobile:40,work_school:120,work_address:200,work_phone:40,allergies:300,blood_type:10,phone:40,address:200,policy_number:60,claims_number:40,
+  place:120,kind:60,chip:60,vet:200,carrier:200,stay:500,transport:500,note:500};
+
+async function post(path,body){
+  const r=await fetch(BASE+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const out=await r.json().catch(()=>({error:'Emergency Plan sent an answer this page could not read.'}));
+  if(!r.ok)throw new Error(out.error||'Emergency Plan could not save.');
+  return out}
+
+function editing(){const a=document.activeElement;return a&&a.dataset&&a.dataset.field!==undefined}
+// Poll the stamp; read the whole plan only when it changed (the bot may change things too).
+async function pull(force){
+  try{const chk=await fetch(BASE+'updated');
+    if(!chk.ok){const e=await chk.json().catch(()=>({}));say(e.error||'Emergency Plan could not read its saved plan.',true);return}
+    const {last_updated}=await chk.json();if(_loaded&&!force&&last_updated===_stamp)return;
+    const v=await fetch(BASE+'view');if(!v.ok)return;
+    plan=await v.json();_stamp=plan.last_updated||'';_loaded=true;
+    if(editing()){_waiting=true;return}render()}
+  catch(e){if(!_loaded)say('Emergency Plan is not answering. Is it running?',true)}}
+document.addEventListener('focusout',()=>setTimeout(()=>{if(_waiting&&!editing()){_waiting=false;render()}},50));
+
+function field(sec,item,f,label,multi,value){
+  const a=`data-sec="${esc(sec)}" data-item="${esc(item)}" data-field="${esc(f)}" aria-label="${esc(label)}"`;
+  const m=MAX[f]||1000;
+  return `<label class="${multi?'wide':''}">${esc(label)}${multi?`<textarea ${a} maxlength="${m}">${esc(value)}</textarea>`:`<input ${a} maxlength="${m}" value="${esc(value)}">`}</label>`}
+function fields(sec,item,list,row){return list.map(([f,l,m])=>field(sec,item,f,l,m,row[f])).join('')}
+function removeBtn(sec,item,name){return `<button data-remove="${esc(sec)}" data-item="${esc(item)}" data-name="${esc(name)}">Remove</button>`}
+
+function render(){
+  const p=plan,L=p.labels,r=p.readiness;
+  $('score').textContent=r.score+' / '+r.out_of;
+  $('scoreText').textContent=r.score===r.out_of?'the plan has everything on the checklist':'what a complete plan has';
+  $('checks').innerHTML=r.checks.map(c=>`<li class="${c.ok?'ok':'no'}">${esc(c.check)}${c.why?` <span class="note">(${esc(c.why)})</span>`:''}</li>`).join('');
+  $('reviewNote').innerHTML=p.review_note?`<div class="warn">${esc(p.review_note)}</div>`:'';
+  $('peopleFrom').textContent=p.people_from_core?'the household from the shared people list':'the plan\'s own list (the shared people list did not answer)';
+  $('people').innerHTML=p.household.map(x=>`<div class="item"><div class="head"><h3>${esc(x.name)}${x.from_core?'<span class="tag">shared list</span>':''}</h3>
+    ${x.id.startsWith('core:')?'':removeBtn('people',x.id,x.name)}</div><div class="grid">${fields('people',x.id,PERSON,x)}</div></div>`).join('')||'<p class="note">Nobody yet. Add the people in the household.</p>';
+  $('kindPick').innerHTML=Object.entries(L.contact_kinds).map(([k,v])=>`<option value="${esc(k)}">${esc(v)}</option>`).join('');
+  const kinds=Object.keys(L.contact_kinds);
+  const cs=[...p.contacts].sort((a,b)=>kinds.indexOf(a.kind)-kinds.indexOf(b.kind));
+  $('contacts').innerHTML=cs.map(c=>`<div class="item"><div class="head"><h3>${esc(c.name)}<span class="tag">${esc(L.contact_kinds[c.kind])}</span></h3>${removeBtn('contacts',c.id,c.name)}</div>
+    <div class="grid"><label>Kind<select data-sec="contacts" data-item="${esc(c.id)}" data-field="kind">${kinds.map(k=>`<option value="${esc(k)}"${k===c.kind?' selected':''}>${esc(L.contact_kinds[k])}</option>`).join('')}</select></label>
+    ${fields('contacts',c.id,c.kind==='insurance'?[CONTACT[0],...INSURE,...CONTACT.slice(1)]:CONTACT,c)}</div></div>`).join('')
+    ||'<p class="note">No contacts yet. Start with the out-of-area contact everyone checks in with.</p>';
+  $('meeting').innerHTML=Object.entries(L.meeting).map(([k,label])=>`<div class="item"><h3>${esc(label[0].toUpperCase()+label.slice(1))}</h3><div class="grid">${fields('meeting_places',k,PLACE,p.meeting_places[k])}</div></div>`).join('');
+  $('hazards').innerHTML=Object.entries(L.hazards).map(([k,label])=>{const h=p.hazards[k];
+    return `<div class="item"><label class="tick"><input type="checkbox" data-hazard="${esc(k)}"${h.applies?' checked':''}>${esc(label)}</label>
+      ${h.applies?`<div class="grid">${field('hazards',k,'note','What we do',1,h.note)}</div>`:''}</div>`}).join('');
+  $('home').innerHTML=`<div class="grid">${fields('home','',HOME,p.home)}</div>`;
+  $('leaving').innerHTML=`<div class="grid">${fields('leaving','',LEAVING,p.leaving)}</div>`;
+  const g=p.grab_list;$('grabCount').textContent=g.filter(x=>x.done).length+' of '+g.length+' packed';
+  $('grab').innerHTML=g.map(x=>`<div class="head"><label class="tick"><input type="checkbox" data-grab="${esc(x.id)}"${x.done?' checked':''}>${esc(x.name)}</label>${removeBtn('grab_list',x.id,x.name)}</div>`).join('')||'<p class="note">The grab list is empty.</p>';
+  $('pets').innerHTML=p.pets.map(x=>`<div class="item"><div class="head"><h3>${esc(x.name)}</h3>${removeBtn('pets',x.id,x.name)}</div><div class="grid">${fields('pets',x.id,PET,x)}</div></div>`).join('')||'<p class="note">No pets in the plan.</p>';
+  $('reviewed').textContent='last reviewed '+(p.last_reviewed||'never');
+  const pr=[...p.practice].sort((a,b)=>b.date.localeCompare(a.date));
+  $('practice').innerHTML=pr.length?'<table><tr><th>Date</th><th>Kind</th><th>What</th><th>To fix</th><th></th></tr>'+pr.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.kind)}</td><td>${esc(x.what)}</td><td>${esc(x.fix)}</td><td>${removeBtn('practice',x.id,x.what)}</td></tr>`).join('')+'</table>':'<p class="note">No drills or reviews logged yet.</p>'}
+
+document.addEventListener('change',async e=>{const t=e.target,d=t.dataset;
+  try{
+    if(d.field!==undefined){const body={section:d.sec,fields:{[d.field]:t.value}};if(d.item)body.item=d.item;
+      say((await post('api/update',body)).text)}
+    else if(d.hazard){say((await post('api/update',{section:'hazards',item:d.hazard,fields:{applies:t.checked}})).text)}
+    else if(d.grab){say((await post('api/grab',{item:d.grab,done:t.checked})).text)}
+    else return;
+    pull(true)}catch(err){say(err.message,true);pull(true)}});
+
+document.addEventListener('submit',async e=>{const f=e.target;
+  if(f.id==='practiceForm'){e.preventDefault();const b=Object.fromEntries(new FormData(f));if(!b.date)delete b.date;
+    try{say((await post('api/practice',b)).text);f.reset();pull(true)}catch(err){say(err.message,true)}return}
+  if(!f.dataset.add)return;e.preventDefault();const b=Object.fromEntries(new FormData(f));
+  try{say((await post('api/update',{section:f.dataset.add,item:b.name,fields:b.kind?{kind:b.kind}:{}})).text);f.reset();pull(true)}catch(err){say(err.message,true)}});
+
+document.addEventListener('click',async e=>{const t=e.target.closest('button');if(!t)return;const d=t.dataset;
+  try{
+    if(d.remove){if(!confirm('Remove '+d.name+' from the plan?'))return;say((await post('api/remove',{section:d.remove,item:d.item})).text);pull(true)}
+    else if(t.id==='untickAll'){say((await post('api/grab',{item:'all',done:false})).text);pull(true)}
+    else if(t.id==='printPlan'){printPlan()}
+    else if(t.id==='printCards'){printCards()}
+    else if(t.id==='exportBtn'){const r=await fetch(BASE+'export');if(!r.ok)throw new Error('Emergency Plan could not export.');
+      const url=URL.createObjectURL(await r.blob()),a=document.createElement('a');a.href=url;a.download='emergency-plan-'+plan.today+'.json';
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);say('Exported the plan.')}
+    else if(t.id==='importBtn'){$('importFile').click()}
+  }catch(err){say(err.message,true)}});
+
+$('importFile').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;
+  try{const data=JSON.parse(await file.text());
+    if(!confirm('Replace the whole plan with '+file.name+'? A dated copy of the plan as it is now is kept in the data folder.'))return;
+    say((await post('api/import',{plan:data,confirm:true})).text);pull(true)}catch(err){say(err.message||'That file is not a plan.',true)}});
+
+// Print views: plain text in plain elements, every value escaped.
+function lines(list,row){return list.filter(([f])=>row[f]).map(([f,l])=>`<li>${esc(l)}: ${esc(row[f])}</li>`).join('')}
+function printPlan(){const p=plan,L=p.labels;let h=`<h1>Our emergency plan</h1><p>In danger right now, call your local emergency number. Printed ${esc(p.today)}. Last reviewed ${esc(p.last_reviewed||'never')}.</p>`;
+  h+='<h2>People</h2>'+p.household.map(x=>`<p><b>${esc(x.name)}</b></p><ul>${lines(PERSON,x)}</ul>`).join('');
+  h+='<h2>Contacts</h2><ul>'+p.contacts.map(c=>`<li><b>${esc(c.name)}</b> (${esc(L.contact_kinds[c.kind])}): ${esc([c.phone,c.address,c.policy_number&&'policy '+c.policy_number,c.claims_number&&'claims '+c.claims_number,c.notes].filter(Boolean).join('; '))}</li>`).join('')+'</ul>';
+  h+='<h2>Meeting places</h2><ul>'+Object.entries(L.meeting).map(([k,l])=>{const m=p.meeting_places[k];return m.place||m.address?`<li><b>${esc(l)}</b>: ${esc([m.place,m.address,m.note].filter(Boolean).join('; '))}</li>`:''}).join('')+'</ul>';
+  h+='<h2>Home</h2><ul>'+lines(HOME,p.home)+'</ul><h2>Leaving</h2><ul>'+lines(LEAVING,p.leaving)+'</ul>';
+  h+='<h2>Grab list</h2><ul>'+p.grab_list.map(g=>`<li>[ ] ${esc(g.name)}</li>`).join('')+'</ul>';
+  if(p.pets.length)h+='<h2>Pets</h2>'+p.pets.map(x=>`<p><b>${esc(x.name)}</b></p><ul>${lines(PET,x)}</ul>`).join('');
+  h+='<h2>Hazards here</h2><ul>'+Object.entries(L.hazards).filter(([k])=>p.hazards[k].applies).map(([k,l])=>`<li><b>${esc(l)}</b>: ${esc(p.hazards[k].note)}</li>`).join('')+'</ul>';
+  showPrint(h)}
+function printCards(){const p=plan,L=p.labels;
+  const out=p.contacts.filter(c=>c.kind==='out_of_area');
+  const key=p.contacts.filter(c=>['helper','doctor','vet','school','work'].includes(c.kind)&&c.phone).slice(0,4);
+  const places=Object.entries(L.meeting).map(([k,l])=>[l,p.meeting_places[k]]).filter(([,m])=>m.place||m.address);
+  const card=x=>`<div class="wallet"><p><b>${esc(x.name)}</b>${x.blood_type?' &middot; blood '+esc(x.blood_type):''}${x.allergies?' &middot; allergies: '+esc(x.allergies):''}</p>
+    <p><b>Out-of-area contact:</b> ${esc(out.map(c=>c.name+' '+c.phone).join(', ')||'not set')}</p>
+    <p><b>Meet:</b> ${esc(places.map(([l,m])=>l+': '+[m.place,m.address].filter(Boolean).join(', ')).join('; ')||'not set')}</p>
+    <p><b>Numbers:</b> ${esc(key.map(c=>c.name+' '+c.phone).join('; ')||'none')}</p>
+    <p>In danger, call your local emergency number.</p></div>`;
+  showPrint(`<div class="cards">${(p.household.length?p.household:[{name:'Name: ____________'}]).map(card).join('')}</div>`)}
+function showPrint(h){$('printArea').innerHTML=h;window.print()}
+
+pull(true);
+setInterval(pull,4000);
+</script>
+</body>
+</html>
