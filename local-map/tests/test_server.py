@@ -139,6 +139,7 @@ class Stub:
 
     def __init__(self):
         self.hits, self.overpass_code, self.delay, self.lock = [], 200, 0.0, threading.Lock()
+        self.overpass_fails = []                 # error codes for the next places requests, one each, then overpass_code
         self.archive, self.builds, self.overpass = ARCHIVE, BUILDS, json.dumps(OVERPASS).encode()
         self.drip, self.agents, self.stop = set(), [], threading.Event()
         stub = self
@@ -194,8 +195,9 @@ class Stub:
                 body = self.rfile.read(n).decode()
                 with stub.lock:
                     stub.hits.append(("POST", self.path, body))
-                if stub.overpass_code != 200:
-                    return self._out(stub.overpass_code, b"busy", "text/plain")
+                    code = stub.overpass_fails.pop(0) if stub.overpass_fails else stub.overpass_code
+                if code != 200:
+                    return self._out(code, b"busy", "text/plain")
                 self._out(200, stub.overpass, "application/json")
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), H)
@@ -389,9 +391,13 @@ def test_download_into_sqlite_tiles_route_and_resume(srv, stub):
     for side, value in server_box(5).items():                # the box sent is the snapped one
         assert f"{value:.5f}" in posts[0][2], side
     assert set(stub.agents) == {"local-map/1.0"}
-    # Download again (a refresh): nothing new in the partial file, so every tile is fetched again into it
+    # Download again, same build, box and detail: it starts from a copy of the map in place, so no tile is
+    # fetched again; the places are fetched again
+    ranges = len([h for h in stub.hits if h[0] == "GET" and h[1] == "/20260102.pmtiles"])
     j = download(base, app)
-    assert j["state"] == "done" and "0 were already here" in j["message"]
+    assert j["state"] == "done" and f"({len(in_region())} were already here)" in j["message"], j
+    assert len([h for h in stub.hits if h[0] == "GET" and h[1] == "/20260102.pmtiles"]) == ranges
+    assert len([h for h in stub.hits if h[0] == "POST"]) == 2
 
 
 def test_cancel_keeps_the_old_map_and_resume_skips_stored_tiles(srv, stub, monkeypatch):
@@ -401,8 +407,8 @@ def test_cancel_keeps_the_old_map_and_resume_skips_stored_tiles(srv, stub, monke
     before = (app.store.folder / "tiles.sqlite").read_bytes()
     stub.delay = 0.4
     call(base + "/api/settings", "POST", {"cap_mb": 250})
-    # a different region: a new partial file
-    assert call(base + "/api/download", "POST", {**REGION, "radius": 6})[0] == 200
+    # a different box (radius 4 snaps to a smaller box; radius 6 snaps to the same box as 5): a new partial file
+    assert call(base + "/api/download", "POST", {**REGION, "radius": 4})[0] == 200
     end = time.time() + 10
     while time.time() < end:
         if app.job.view()["state"] == "downloading" and app.job.view()["done_bytes"] > 0:
@@ -415,23 +421,368 @@ def test_cancel_keeps_the_old_map_and_resume_skips_stored_tiles(srv, stub, monke
     assert (app.store.folder / "tiles-partial.sqlite").exists()
     assert call(base + "/api/state")[1]["region"]["radius"] == 5
     stub.delay = 0
-    j = download(base, app, radius=6)
+    j = download(base, app, radius=4)
     assert j["state"] == "done", j
     skipped = int(re.search(r"\((\d+) were already here\)", j["message"]).group(1))
     assert skipped > 0
 
 
-def test_a_busy_overpass_leaves_the_old_map_and_is_not_retried(srv, stub):
+def posts(stub):
+    return len([h for h in stub.hits if h[0] == "POST"])
+
+
+@pytest.fixture
+def quick(monkeypatch):
+    """No waits between places tries, so the suite stays fast."""
+    assert lm.PLACES_TRIES == 3 and lm.PLACES_WAITS_S == (15, 45)
+    monkeypatch.setattr(lm, "PLACES_WAITS_S", (0, 0))
+
+
+def saved(app):
+    return json.loads((app.store.folder / "map.json").read_text(encoding="utf-8"))
+
+
+def test_a_busy_overpass_is_tried_three_times_and_the_new_street_map_is_kept(srv, stub, quick):
     base, app = srv
     assert download(base, app)["state"] == "done"
     stub.overpass_code = 429
-    before = len([h for h in stub.hits if h[0] == "POST"])
+    before = posts(stub)
     j = download(base, app, radius=4)
-    assert j["state"] == "failed" and "busy" in j["message"] and "Try again later" in j["message"]
-    assert len([h for h in stub.hits if h[0] == "POST"]) == before + 1
-    assert call(base + "/api/state")[1]["region"]["radius"] == 5
-    stub.overpass_code = 406
+    assert j["state"] == "places_missing" and "says it is busy" in j["message"], j
+    assert posts(stub) == before + 3
+    assert call(base + "/api/state")[1]["region"]["radius"] == 4          # the new street map is in place
+    stub.overpass_code = 406                                              # 406 is not a passing answer
+    before = posts(stub)
     assert "turned the request down" in download(base, app, radius=4)["message"]
+    assert posts(stub) == before + 1
+
+
+def test_places_host_502_three_times_still_puts_the_street_map_in_place(srv, stub, quick):
+    base, app = srv
+    stub.overpass_code = 502
+    j = download(base, app)
+    assert j["state"] == "places_missing", j
+    assert posts(stub) == 3
+    m = j["message"]
+    assert m.startswith(f"The street map is in ({len(in_region())} tiles) and works with no internet.")
+    assert m.count("could not be fetched") == 1 and m.count("error 502") == 1, m
+    assert "Nothing was changed" not in m and "unchanged" not in m and "Try again later" not in m
+    assert "Press Fetch places to try again; the street map will not be downloaded again." in m
+    assert (app.store.folder / "tiles.sqlite").exists() and not (app.store.folder / "tiles-partial.sqlite").exists()
+    z11 = (11, *fx.lonlat_to_tile(CENTER[1], CENTER[0], 11))
+    code, body, _ = call(base + "/tiles/%d/%d/%d.mvt" % z11)
+    assert code == 200 and body == TILE_BYTES[z11]
+    doc = saved(app)
+    assert doc["points"] == [] and "error 502" in doc["region"]["places_missing"]["reason"]
+    assert doc["region"]["places_missing"]["tried_on"]
+    st = call(base + "/api/state")[1]
+    assert st["region"]["places_missing"] and st["job"]["state"] == "places_missing"
+    assert "could not be fetched (127.0.0.1 turned the request down for now (error 502))" in tool(base, "map_status")
+
+
+def test_places_come_on_the_second_try(srv, stub, quick):
+    base, app = srv
+    said = []
+    plain_set = app.job.set
+
+    def spy(**kw):
+        if "message" in kw:
+            said.append(kw["message"])
+        plain_set(**kw)
+    app.job.set = spy
+    stub.overpass_fails = [503]
+    j = download(base, app)
+    assert j["state"] == "done" and "4 emergency points" in j["message"], j
+    assert posts(stub) == 2
+    assert "127.0.0.1 is busy. Trying again in 0 seconds (try 2 of 3)..." in said
+    assert any("try 2 of 3" in x and x.startswith("Fetching emergency points") for x in said)
+    assert "places_missing" not in saved(app)["region"]
+
+
+def test_a_failure_that_will_not_pass_is_not_retried(srv, stub, quick):
+    base, app = srv
+    stub.overpass_code = 403
+    j = download(base, app)
+    assert j["state"] == "places_missing" and "answered with error 403" in j["message"], j
+    assert posts(stub) == 1
+    stub.overpass_code = 200
+    stub.overpass = b"[1, 2]"                                            # JSON, but not a list of places
+    j = download(base, app)
+    assert j["state"] == "places_missing" and "not a list of places" in j["message"], j
+    assert posts(stub) == 2
+    assert fx._http_trouble("https://h/x", urllib.error.HTTPError("https://h/x", 504, "", {}, None)).passing
+    assert not fx._http_trouble("https://h/x", urllib.error.HTTPError("https://h/x", 404, "", {}, None)).passing
+
+
+def test_cancel_during_the_wait_ends_at_once_and_keeps_the_old_map(srv, stub, monkeypatch):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    before = (app.store.folder / "tiles.sqlite").read_bytes()
+    doc = saved(app)
+    monkeypatch.setattr(lm, "PLACES_WAITS_S", (60, 60))
+    stub.overpass_code = 502
+    assert call(base + "/api/download", "POST", {**REGION, "radius": 4})[0] == 200
+    assert wait_for(lambda: "Trying again in 60 seconds (try 2 of 3)" in app.job.view()["message"])
+    t0 = time.monotonic()
+    assert call(base + "/api/cancel", "POST", {})[0] == 200
+    j = wait(app, 5)
+    assert time.monotonic() - t0 < 2 and j["state"] == "cancelled", j
+    assert "The map you had is unchanged" in j["message"]
+    assert (app.store.folder / "tiles.sqlite").read_bytes() == before
+    after = saved(app)
+    assert after["region"] == doc["region"] and after["points"] == doc["points"]
+
+
+def test_same_box_keeps_the_old_places_and_a_different_box_saves_none(srv, stub, quick):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    old = saved(app)["points"]
+    stub.overpass_code = 502
+    assert server_box(6) == server_box(5) and server_box(4) != server_box(5)
+    j = download(base, app, radius=6)
+    assert j["state"] == "places_missing", j
+    assert "The 4 emergency points saved before for this same area are kept." in j["message"], j
+    doc = saved(app)
+    assert doc["points"] == old and doc["region"]["radius"] == 6 and doc["region"]["places_missing"]
+    out = tool(base, "nearest", kind="hospital")
+    assert "Coast Hospital" in out and "Note: the emergency places for this map could not be fetched" in out
+    j = download(base, app, radius=4)
+    assert j["state"] == "places_missing" and "saved before" not in j["message"], j
+    doc = saved(app)
+    assert doc["points"] == [] and doc["region"]["radius"] == 4
+
+
+def test_fetch_places_after_a_failure_fetches_only_the_places(srv, stub, quick):
+    base, app = srv
+    stub.overpass_code = 502
+    assert download(base, app)["state"] == "places_missing"
+    tiles = (app.store.folder / "tiles.sqlite").read_bytes()
+    gets, before = len([h for h in stub.hits if h[0] == "GET"]), posts(stub)
+    stub.overpass_code = 200
+    code, out, _ = call(base + "/api/places/fetch", "POST", {})
+    assert code == 200 and "not downloaded again" in out["text"]
+    j = wait(app)
+    assert j["state"] == "done" and "4 emergency points" in j["message"], j
+    assert len([h for h in stub.hits if h[0] == "GET"]) == gets            # no tile, no list of builds
+    assert posts(stub) == before + 1
+    for side, value in server_box(5).items():                             # the saved box, and only its corners
+        assert f"{value:.5f}" in stub.hits[-1][2], side
+    doc = saved(app)
+    assert "places_missing" not in doc["region"] and len(doc["points"]) == 4
+    assert (app.store.folder / "tiles.sqlite").read_bytes() == tiles
+    assert "Coast Hospital" in tool(base, "nearest", kind="hospital") and "Note:" not in tool(base, "nearest")
+
+
+def test_fetch_places_that_fails_leaves_everything_as_it_was(srv, stub, quick):
+    base, app = srv
+    assert call(base + "/api/places/fetch", "POST", {})[1]["error"].startswith("There is no region downloaded yet")
+    assert download(base, app)["state"] == "done"
+    tiles, doc = (app.store.folder / "tiles.sqlite").read_bytes(), saved(app)
+    stub.overpass_code = 504
+    before = posts(stub)
+    assert call(base + "/api/places/fetch", "POST", {})[0] == 200
+    j = wait(app)
+    assert j["state"] == "failed" and posts(stub) == before + 3, j
+    assert "could not be fetched: 127.0.0.1 turned the request down for now (error 504)." in j["message"]
+    assert "The street map and the places you had are unchanged." in j["message"]
+    after = saved(app)
+    assert after["points"] == doc["points"] and after["region"] == doc["region"]
+    assert (app.store.folder / "tiles.sqlite").read_bytes() == tiles
+    stub.overpass_code = 200
+    stub.drip = {"/api/interpreter"}                                      # one running job at a time
+    assert call(base + "/api/places/fetch", "POST", {})[0] == 200
+    assert call(base + "/api/places/fetch", "POST", {})[1]["error"].startswith("Fetch places is already running")
+    assert call(base + "/api/cancel", "POST", {})[1]["text"].startswith("Stopping. The map and the places")
+    assert wait(app, 6)["state"] == "cancelled" and saved(app)["points"] == doc["points"]
+
+
+def test_the_tools_say_plainly_when_the_places_are_missing(srv, stub, quick):
+    base, app = srv
+    stub.overpass_code = 502
+    assert download(base, app)["state"] == "places_missing"
+    honest = "the emergency places for this map have not been fetched yet. The owner can press Fetch places"
+    out = tool(base, "nearest", kind="hospital")
+    assert out.startswith("I can not say where the nearest hospital is: ") and honest in out
+    assert "no hospital" not in out.lower()
+    assert honest in tool(base, "list_points", kind="pharmacy")
+    assert honest in tool(base, "where_is", name="Coast Hospital")
+    # the owner's own points and home keep working
+    tool(base, "save_my_point", name="Meet", kind="meeting place", where="37.47, -122.43")
+    out = tool(base, "nearest", kind="meeting place")
+    assert "Meet (Meeting place)" in out and "Fetch places" not in out
+    assert "Meet (Meeting place)" in tool(base, "where_is", name="Meet")
+    out = tool(base, "nearest")
+    assert "Meet (Meeting place)" in out and "Note: the emergency places" in out
+
+
+def test_an_older_file_without_the_missing_mark_means_the_places_are_there(data, stub):
+    data.mkdir(parents=True)
+    older = {"app": "local-map", "region": {"label": "Test town", "lat": 37.46, "lon": -122.43, "radius": 5,
+                                            "unit": "km", "radius_km": 5, "detail": "small", "max_zoom": 12,
+                                            "box": server_box(5), "build": "20260102.pmtiles", "tiles": 20,
+                                            "fetched_on": "2026-11-01T10:00:00"},
+             "points": [{"id": "osm-node-1", "name": "Coast Hospital", "kind": "Hospital", "lat": 37.462,
+                         "lon": -122.431, "source": "OpenStreetMap", "fetched": "2026-11-01"}],
+             "mine": [], "home": {"lat": 37.46, "lon": -122.43, "label": "Home"}, "cap_mb": 250,
+             "last_updated": "2026-11-01T10:00:00.ab12"}
+    (data / "map.json").write_text(json.dumps(older), encoding="utf-8")
+    with running(lm.make_server(0, data, TOKEN, stub.sources())) as base:
+        out = tool(base, "nearest", kind="hospital")
+        assert "1. Coast Hospital (Hospital)" in out and "Fetch places" not in out
+        assert "There is no shelter in the downloaded region" in tool(base, "nearest", kind="shelter")
+        assert "could not be fetched" not in tool(base, "map_status")
+        assert call(base + "/api/state")[1]["region"].get("places_missing") is None
+    assert stub.hits == []
+
+
+def test_a_failing_tiles_step_behaves_as_before(srv, stub, quick, monkeypatch):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    tiles, doc, before = (app.store.folder / "tiles.sqlite").read_bytes(), saved(app), posts(stub)
+
+    def trouble(*a, **k):
+        raise fx.FetchError("build.protomaps.com turned the request down for now (error 502). Nothing was "
+                            "changed. Try again later.", passing=True)
+    monkeypatch.setattr(fx, "download_tiles", trouble)
+    j = download(base, app, radius=4)
+    assert j["state"] == "failed" and j["message"].endswith("Try again later. The map you had is unchanged."), j
+    assert posts(stub) == before                                          # the places were never asked for
+    assert (app.store.folder / "tiles.sqlite").read_bytes() == tiles and saved(app)["region"] == doc["region"]
+
+
+def test_the_page_shows_a_job_message_once_and_has_fetch_places(srv):
+    base, _ = srv
+    page = call(base + "/")[1].decode()
+    assert "say(j.message" not in page                                   # only #jobInfo shows the job's message
+    assert page.count("j.message") == 2                                  # set once, and once with the MB count
+    assert "api/places/fetch" in page and "'Fetch places'" in page and "'Refresh places'" in page
+    manifest = json.loads((PKG / "puffpai.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == lm.VERSION == "1.0.1"
+
+
+def test_water_and_every_emergency_kind_say_the_places_are_missing(srv, stub, quick):
+    base, app = srv
+    stub.overpass_code = 502
+    assert download(base, app)["state"] == "places_missing"
+    honest = "the emergency places for this map have not been fetched yet. The owner can press Fetch places"
+    for kind in ("water", "drinking water", "hospital", "shelter", None):
+        args = {"count": 5} if kind is None else {"kind": kind, "count": 5}
+        out = tool(base, "nearest", **args)
+        assert out.startswith("I can not say where the nearest ") and honest in out, (kind, out)
+        assert "There is no" not in out and "may not list" not in out
+        assert honest in tool(base, "list_points", **({} if kind is None else {"kind": kind}))
+    out = tool(base, "nearest", kind="meeting place")                   # the owner's own kind: as before
+    assert out.startswith("There is no meeting place in the downloaded region") and "Fetch places" not in out
+    tool(base, "save_my_point", name="Meet", kind="meeting place", where="37.47, -122.43")
+    out = tool(base, "nearest", kind="meeting place")
+    assert "Meet (Meeting place)" in out and "Note:" not in out
+    out = tool(base, "nearest", kind="water")                          # the owner's own Water goes with Drinking water
+    assert out.startswith("I can not say where the nearest water is")
+    # the places from before are kept for the same box: the same questions carry the "from before" note
+    stub.overpass_code = 200
+    assert download(base, app)["state"] == "done"
+    stub.overpass_code = 502
+    assert download(base, app, radius=6)["state"] == "places_missing"
+    before = "could not be fetched with the latest download; the ones kept are from before"
+    for kind in ("water", "drinking water", "hospital"):
+        out = tool(base, "nearest", kind=kind, count=5)
+        assert out.startswith("Nearest ") and "Note: the emergency places" in out and before in out, (kind, out)
+    out = tool(base, "nearest", kind="shelter", count=5)
+    assert out.startswith("I can not say where the nearest shelter is") and before in out
+    assert before in tool(base, "nearest", count=5)
+    assert "Note:" not in tool(base, "nearest", kind="meeting place")
+
+
+@pytest.mark.parametrize("mark", ["502", "", 5, 0, None, True, False, [], {}, {"reason": 5}, {"reason": None},
+                                  {"reason": "far too long " * 100}, ["x"]])
+def test_any_stored_shape_of_the_missing_mark_is_read_one_way(srv, stub, quick, mark):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    doc = saved(app)
+    doc["points"] = []
+    doc["region"]["places_missing"] = mark
+    (app.store.folder / "map.json").write_text(json.dumps(doc), encoding="utf-8")
+    missing = mark is not None and mark is not False
+    status = tool(base, "map_status")                                   # never an error on a stored value
+    assert ("could not be fetched" in status) == missing
+    if isinstance(mark, dict) and isinstance(mark.get("reason"), str):
+        assert "..." in status and len(status) < 1500
+    st = call(base + "/api/state")[1]
+    assert st["places_missing"] is missing
+    assert ("Fetch places" in tool(base, "nearest", kind="shelter")) == missing
+    assert ("Fetch places" in tool(base, "list_points", kind="shelter")) == missing
+
+
+def test_no_try_starts_once_the_job_deadline_is_too_near(srv, stub, monkeypatch):
+    base, app = srv
+    monkeypatch.setattr(fx, "JOB_DEADLINE_S", 20)
+    monkeypatch.setattr(lm, "PLACES_WAITS_S", (60, 60))                 # longer than the time left
+    stub.overpass_code = 502
+    t0 = time.monotonic()
+    j = download(base, app)
+    assert time.monotonic() - t0 < 15 and posts(stub) == 1, j
+    assert j["state"] == "places_missing" and "(error 502)" in j["message"], j
+    assert "press Download to go on" not in j["message"]
+    late = fx.FetchError("This took longer than 30 minutes, so Local Map stopped. Tiles already fetched are kept; "
+                         "press Download to go on.")
+    assert lm._places_why(late) == "This took longer than 30 minutes, so Local Map stopped."
+
+
+def test_a_seeded_copy_is_removed_when_download_again_ends_with_nothing_new(srv, stub, quick, monkeypatch):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    folder = app.store.folder
+    tiles = (folder / "tiles.sqlite").read_bytes()
+    plain = fx.download_tiles
+
+    def trouble(*a, **k):
+        raise fx.FetchError("build.protomaps.com took too long to answer. Nothing was changed. Try again later.")
+    monkeypatch.setattr(fx, "download_tiles", trouble)
+    assert download(base, app)["state"] == "failed"                     # failed after the copy, nothing new in it
+    assert not (folder / "tiles-partial.sqlite").exists()
+
+    def one_new_then_trouble(sources, pl, store, run=None, progress=None):
+        store.put_many([(5, 0, 0, b"a new tile")])
+        trouble()
+    monkeypatch.setattr(fx, "download_tiles", one_new_then_trouble)
+    assert download(base, app)["state"] == "failed"
+    assert (folder / "tiles-partial.sqlite").exists()                   # a new tile in it: kept, as resume does
+    (folder / "tiles-partial.sqlite").unlink()
+    monkeypatch.setattr(fx, "download_tiles", plain)
+    stub.drip = {"/api/interpreter"}                                     # cancelled while the places are fetched
+    asked = posts(stub)
+    assert call(base + "/api/download", "POST", REGION)[0] == 200
+    assert wait_for(lambda: posts(stub) > asked)
+    assert call(base + "/api/cancel", "POST", {})[0] == 200
+    assert wait(app, 6)["state"] == "cancelled"
+    assert not (folder / "tiles-partial.sqlite").exists()
+    stub.drip = set()
+    before = posts(stub)
+    monkeypatch.setattr(lm.shutil, "disk_usage", lambda p: type("U", (), {"free": 1000})())
+    j = download(base, app)
+    assert j["state"] == "failed" and "not enough free disk space" in j["message"], j
+    assert "0.0 MB is free" in j["message"] and "Nothing was downloaded" in j["message"]
+    assert not (folder / "tiles-partial.sqlite").exists() and posts(stub) == before
+    assert (folder / "tiles.sqlite").read_bytes() == tiles
+
+
+def test_fetch_places_refusals_say_what_is_wrong(srv, stub, quick):
+    base, app = srv
+    assert download(base, app)["state"] == "done"
+    doc = saved(app)
+    stub.drip = {"/api/interpreter"}
+    assert call(base + "/api/places/fetch", "POST", {})[0] == 200
+    busy = "Fetch places is already running (the emergency places are being fetched)."
+    assert call(base + "/api/places/fetch", "POST", {})[1]["error"].startswith(busy)
+    assert call(base + "/api/download", "POST", REGION)[1]["error"].startswith(busy)
+    assert call(base + "/api/check", "POST", REGION)[1]["error"].startswith(busy)
+    assert call(base + "/api/cancel", "POST", {})[0] == 200
+    assert wait(app, 6)["state"] == "cancelled"
+    stub.drip = set()
+    doc["region"]["box"] = {"west": "far", "south": 1}
+    (app.store.folder / "map.json").write_text(json.dumps(doc), encoding="utf-8")
+    err = call(base + "/api/places/fetch", "POST", {})[1]["error"]
+    assert err.startswith("The saved region can not be read") and "Press Download again" in err
 
 
 def test_own_points_survive_a_refresh(srv):
@@ -694,7 +1045,8 @@ def test_the_page_escapes_every_value_and_names_no_outside_address(srv):
 @pytest.mark.parametrize("method,path", [
     ("GET", "/"), ("GET", "/health"), ("GET", "/api/state"), ("GET", "/tiles/0/0/0.mvt"),
     ("GET", "/vendor/leaflet.js"), ("GET", "/vendor/protomaps-leaflet.js"), ("GET", "/api/places?q=paris"),
-    ("POST", "/mcp"), ("POST", "/api/download"), ("POST", "/api/mine/add"), ("PUT", "/api/state"),
+    ("POST", "/mcp"), ("POST", "/api/download"), ("POST", "/api/places/fetch"), ("POST", "/api/mine/add"),
+    ("PUT", "/api/state"),
     ("DELETE", "/api/state")])
 def test_every_route_needs_the_token(srv, stub, method, path):
     base, _ = srv

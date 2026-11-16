@@ -23,7 +23,7 @@ An offline street map of one region you choose, with its emergency places: fire 
 
 **How it picks and fetches.** See `PROCESS.md`: how a region becomes a box, how the tile list and the size are worked out, what is sent to each host, how points are sorted, and how a refresh keeps your points.
 
-**What it needs.** The internet once, for three hosts, all in `needs.hosts`, and only when you press Check size or Download on the page:
+**What it needs.** The internet once, for three hosts, all in `needs.hosts`, and only when you press Check size, Download or Fetch places on the page:
 
 - `build-metadata.protomaps.dev`: asked only for the list of map builds, to pick the newest.
 - `build.protomaps.com`: byte ranges of that one public planet file, so it can tell which map area was fetched.
@@ -45,6 +45,7 @@ All three see this computer's internet address. The box is rounded the same way 
 
 - It needs the internet once, to download. Until then there is no map.
 - The public map host has no service promise, and its addresses may change. If they do, the download fails with a plain message and the map you have stays.
+- overpass-api.de, which sends the emergency places, is often busy. Local Map tries it 3 times (waiting 15 seconds, then 45) and says so on the page. If it is still busy, the street map is put in place anyway and the page says the places are missing; press Fetch places later to get only the places (the street map is not downloaded again). Until then the bot says the places have not been fetched, rather than that there is none.
 - OpenStreetMap's coverage of shelters, food banks and public health offices is uneven. Check what is listed and add your own points.
 - No routing: every distance is straight-line, not by road.
 - Places may have closed or moved since the fetch date shown on each point. Download again to refresh; your own points are kept.

@@ -34,6 +34,7 @@ label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--p-
 .note{color:var(--p-text2);font-size:.85rem}
 #msg{min-height:1.4em;color:var(--p-text2)}
 #msg.bad,.bad{color:var(--p-bad)}
+.warn{color:var(--amber,#9e6a00);font-weight:600}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px}
 @media (max-width:900px){.layout{grid-template-columns:1fr}}
 #map{height:68vh;min-height:360px;border:1px solid var(--p-line);background:var(--p-chip)}
@@ -122,6 +123,7 @@ details summary{cursor:pointer;min-height:36px;display:flex;align-items:center}
     <button id="preview">Show the area</button>
     <button id="check">Check size</button>
     <button class="primary" id="download">Download</button>
+    <button id="places" hidden>Refresh places</button>
     <button id="cancel" hidden>Cancel</button>
   </div>
   <p id="boxInfo" class="note"></p>
@@ -185,6 +187,8 @@ function far(p){return p.far?`${p.far.km} km (${p.far.miles} mi) ${p.far.dir}`:'
 function render(){
   const r=st.region;
   $('pickTitle').textContent=r?'Change or refresh the region':'Choose your region';
+  const gone=!!(r&&st.places_missing),kept=gone&&st.points.some(p=>!p.mine);$('places').hidden=!r;$('places').textContent=gone?'Fetch places':'Refresh places';
+  $('places').className=gone?'primary':'';
   $('cap').value=st.cap_mb;$('notice').textContent=st.notice||'';$('homeNote').textContent=st.home_note||'';
   const kinds=[...st.kinds,...st.my_kinds.filter(k=>!st.kinds.includes(k))],f=$('filter').value;
   $('filter').innerHTML='<option value="">Every kind</option>'+kinds.map(k=>`<option${k===f?' selected':''}>${esc(k)}</option>`).join('');
@@ -209,16 +213,17 @@ function render(){
       ${p.note?`<div class="s">${esc(p.note)}</div>`:''}
       <div class="s">${p.mine?'Your own point':'Source '+esc(p.source)+', fetched '+esc(p.fetched)}</div>
       ${p.mine?`<div class="row" style="margin-top:4px"><button data-edit="${esc(p.id)}">Edit</button><button data-del="${esc(p.id)}">Remove</button></div>`:''}</div></div>`}).join('')
-    :`<p class="note" style="padding:10px">${r?'No points of this kind in the region. OpenStreetMap may not list them here; add your own below.':'No region yet. Choose one below and press Download.'}</p>`);
+    :`<p class="note" style="padding:10px">${kept?'None of this kind are in the places kept from before; the newest places could not be fetched. Press Fetch places below to try again.':gone?'The emergency places for this map have not been fetched yet. Press Fetch places below to get them; the street map is not downloaded again.':r?'No points of this kind in the region. OpenStreetMap may not list them here; add your own below.':'No region yet. Choose one below and press Download.'}</p>`);
   showJob(st.job)}
 
-let jobSaid=false;   // the line under the title follows the job the owner started, and clears once the map is shown
+// The job's message is shown in one place only, under the buttons (#jobInfo). The line under the title says
+// that the job started, and is cleared when that job ends, so its last message is never shown twice.
+let jobSaid=false;
 function showJob(j){
-  const running=j.state==='checking'||j.state==='downloading';
-  if(jobSaid){if(running)say(j.message);
-    else{jobSaid=false;if(j.state==='done')say('');else say(j.message,j.state==='failed'||j.state==='too_big')}}
-  $('cancel').hidden=!running;$('check').disabled=running;$('download').disabled=running;
-  $('jobInfo').textContent=j.message||'';$('jobInfo').className=(j.state==='failed'||j.state==='too_big')?'bad':'';
+  const running=j.state==='checking'||j.state==='downloading'||j.state==='fetching_places';
+  if(jobSaid&&!running){jobSaid=false;say('')}
+  $('cancel').hidden=!running;$('check').disabled=running;$('download').disabled=running;$('places').disabled=running;
+  $('jobInfo').textContent=j.message||'';$('jobInfo').className=(j.state==='failed'||j.state==='too_big')?'bad':j.state==='places_missing'?'warn':'';
   $('bar').hidden=j.state!=='downloading';
   if(j.total_bytes)$('bar').firstElementChild.style.width=Math.min(100,100*j.done_bytes/j.total_bytes)+'%';
   if(j.state==='downloading')$('jobInfo').textContent=`${j.message} ${(j.done_bytes/1048576).toFixed(1)} of ${(j.total_bytes/1048576).toFixed(1)} MB`}
@@ -239,6 +244,7 @@ $('preview').onclick=async()=>{try{const b=regionBody();const q=new URLSearchPar
   say('')}catch(e){say(e.message,true)}};
 $('check').onclick=async()=>{try{say((await post('api/check',regionBody())).text);jobSaid=true;pull(true)}catch(e){say(e.message,true)}};
 $('download').onclick=async()=>{try{say((await post('api/download',regionBody())).text);jobSaid=true;pull(true)}catch(e){say(e.message,true)}};
+$('places').onclick=async()=>{try{say((await post('api/places/fetch')).text);jobSaid=true;pull(true)}catch(e){say(e.message,true)}};
 $('cancel').onclick=async()=>{try{say((await post('api/cancel')).text)}catch(e){say(e.message,true)}};
 $('capSave').onclick=async()=>{try{say((await post('api/settings',{cap_mb:$('cap').value})).text);pull(true)}catch(e){say(e.message,true)}};
 $('homeTap').onclick=()=>{tapFor=tapFor==='home'?'':'home';$('homeTap').textContent=tapFor?'Now tap the map':'Tap the map to set home'};

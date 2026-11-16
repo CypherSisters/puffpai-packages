@@ -6,17 +6,17 @@ One small server, Python standard library only, bound to 127.0.0.1:
 - ``/tiles/{z}/{x}/{y}.mvt``   the stored street map tiles
 - ``/health``                  "ok"
 - ``/api/state``, ``/api/updated``, ``/api/job``, ``/api/box``, ``/api/places``   what the page reads (GET)
-- ``/api/check``, ``/api/download``, ``/api/cancel``, ``/api/home``, ``/api/settings``,
+- ``/api/check``, ``/api/download``, ``/api/places/fetch``, ``/api/cancel``, ``/api/home``, ``/api/settings``,
   ``/api/mine/add``, ``/api/mine/update``, ``/api/mine/remove``                    the page's changes (POST)
 - ``/mcp``                     the MCP server (JSON-RPC over HTTP)
 
 Every route refuses a request without this package's PUFFPAI_TOKEN (D48d). The Desktop reaches
 the page through the Core's /pkg/local-map/, which adds it.
 
-Nothing is fetched from the internet at start-up or by any tool. Only the owner's Check size and
-Download buttons on the page (POST /api/check, /api/download) contact the three hosts in
-``needs.hosts``, through the Bridge proxy the Core sets in HTTPS_PROXY. How a region becomes a box,
-which tiles are fetched and how points are sorted: PROCESS.md.
+Nothing is fetched from the internet at start-up or by any tool. Only the owner's Check size,
+Download and Fetch places buttons on the page (POST /api/check, /api/download, /api/places/fetch)
+contact the hosts in ``needs.hosts``, through the Bridge proxy the Core sets in HTTPS_PROXY. How a
+region becomes a box, which tiles are fetched and how points are sorted: PROCESS.md.
 
 Saved in PUFFPAI_DATA: ``map.json`` (the region, the fetched points, the owner's own points, home,
 the size cap), ``tiles.sqlite`` (the street map) and, while a download is unfinished,
@@ -39,6 +39,7 @@ import math
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -63,7 +64,7 @@ PLACES = HERE / "data" / "places.tsv.gz"
 REGIONS = HERE / "data" / "regions.tsv.gz"
 MAX_PLACE_HITS = 20
 NAME = "local-map"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DOC = "map.json"
 TILES = "tiles.sqlite"
 PARTIAL = "tiles-partial.sqlite"
@@ -80,6 +81,9 @@ DETAILS = {"small": 12, "standard": 14, "detailed": 15}
 DETAIL_WORDS = {12: "Small", 14: "Standard", 15: "Detailed"}
 DEFAULT_CAP_MB = 250
 ROUGH_TILE_KB = 30                      # a rough guess per tile, before the real dry run
+PLACES_TRIES = 3                        # the places query, in all, when the host is busy or slow
+PLACES_WAITS_S = (15, 45)               # seconds before the second and the third try (Cancel ends a wait at once)
+RUNNING = ("checking", "downloading", "fetching_places")
 KM_PER_MILE = 1.609344
 EARTH_KM = 6371.0088
 MY_KINDS = ("Meeting place", "Water", "Neighbor who can help", "Supplies", "Shelter", "Medical", "Other")
@@ -510,6 +514,58 @@ class Job:
             return dict(self.state)
 
 
+def _places_why(exc: Exception) -> str:
+    """Why the places could not be fetched, in the host's own plain sentence, without "Nothing was changed" or
+    "Try again later" (said where those are not true, or are said another way)."""
+    parts = re.split(r"(?<=\.)\s+", str(exc).strip())
+    keep = [p for p in parts if not p.startswith(("Nothing was changed", "Try again later", "Tiles already fetched"))]
+    return " ".join(keep) or "the places host did not answer."
+
+
+def _places_missing(doc: dict) -> bool:
+    """The region is there but its emergency places could not be fetched: the mark is there and is not null and
+    not false (any other value, {} and [] included, means missing). A file without the mark (one saved before
+    version 1.0.1 included) means the places are there. The tools and the page both use this."""
+    r = doc.get("region")
+    if not isinstance(r, dict) or "places_missing" not in r:
+        return False
+    mark = r["places_missing"]
+    return mark is not None and mark is not False
+
+
+def _places_reason(doc: dict) -> str:
+    """The saved reason the places are missing, as short plain words; "" when none can be read. Never raises."""
+    r = doc.get("region")
+    mark = r.get("places_missing") if isinstance(r, dict) else None
+    why = mark.get("reason") if isinstance(mark, dict) else mark
+    if not isinstance(why, str):
+        return ""
+    why = " ".join(why.split())
+    return why if len(why) <= 300 else why[:297].rstrip() + "..."
+
+
+def _emergency_kind(kind: str) -> bool:
+    """No kind, an emergency kind, or a kind grouped with one (the owner's Water goes with Drinking water)."""
+    return not kind or kind in fetcher.KINDS or any(kind in g and g & set(fetcher.KINDS) for g in SAME_KIND)
+
+
+def _box_ok(box) -> bool:
+    return isinstance(box, dict) and all(
+        _coord(box.get(k), most) is not None and not isinstance(box.get(k), str)
+        for k, most in (("west", 180), ("south", 90), ("east", 180), ("north", 90)))
+
+
+def _places_not_fetched(doc: dict) -> str:
+    """The honest sentence when the region's places are missing (end of an answer)."""
+    if doc["points"]:
+        what = ("the emergency places for this map could not be fetched with the latest download; the ones kept "
+                "are from before and may be out of date.")
+    else:
+        what = "the emergency places for this map have not been fetched yet."
+    return (what + " The owner can press Fetch places on the Local Map page to get them; your own points and home "
+                   "still work.")
+
+
 def _region_request(body: dict, cap_mb: float) -> dict:
     """lat, lon, radius, unit, detail and a label, checked; plus the box and the tile counts."""
     lat = _number(body.get("lat"), "latitude", -84, 84)
@@ -705,11 +761,15 @@ class LocalMap:
         pool = [p for p in pool if not (from_point and p.get("lat") == origin["lat"] and p.get("lon") == origin["lon"])]
         if not pool:
             what = kind.lower() if kind else "point"
+            if _places_missing(doc) and _emergency_kind(kind):
+                return using + f"I can not say where the nearest {what} is: " + _places_not_fetched(doc)
             return using + (f"There is no {what} on the map yet." if not doc.get("region") else
                             f"There is no {what} in the downloaded region. OpenStreetMap may not list one there; "
                             f"you can add your own.")
         pool.sort(key=lambda p: distance_km(origin["lat"], origin["lon"], p["lat"], p["lon"]))
         lines = [f"{i}. {self._describe(p, origin)}" for i, p in enumerate(pool[:count], 1)]
+        if _places_missing(doc) and _emergency_kind(kind):
+            lines.append("Note: " + _places_not_fetched(doc))
         return f"{using}Nearest {kind.lower() if kind else 'points'} {where} (straight-line distance, not by road):\n" \
             + "\n".join(lines)
 
@@ -720,7 +780,10 @@ class LocalMap:
         doc = self.store.load()
         pool = [p for p in self._all_points(doc) if _kind_is(p.get("kind"), kind)
                 and (not words or words in (str(p.get("name", "")) + " " + str(p.get("note", ""))).lower())]
+        missing = _places_missing(doc) and _emergency_kind(kind)
         if not pool:
+            if missing:
+                return "No points match: " + _places_not_fetched(doc)
             return "No points match." if doc.get("region") or doc["mine"] else "There is no region downloaded yet."
         home = self._home(doc)
         if home:
@@ -729,6 +792,8 @@ class LocalMap:
             pool.sort(key=lambda p: (str(p.get("kind")), str(p.get("name", "")).lower()))
         head = f"{_plural(len(pool), 'point')}" + (f", nearest home first" if home else ", by kind (home is not set)")
         more = f"\n...and {len(pool) - limit} more." if len(pool) > limit else ""
+        if missing:
+            more += "\nNote: " + _places_not_fetched(doc)
         return head + ":\n" + "\n".join(f"- {self._describe(p, home)}" for p in pool[:limit]) + more
 
     def where_is(self, name) -> str:
@@ -756,6 +821,9 @@ class LocalMap:
             town = key.split(",")[0]
             hits = [h for h in self.places.search(key) if h["exact"] or _words_fit(town, h["name"])]
             if not hits:
+                if _places_missing(doc):
+                    return f"I could not find {key!r} among the map's points or the towns list: " \
+                        + _places_not_fetched(doc)
                 return f"I could not find {key!r} among the map's points or the towns list."
             same = [h for h in hits if h["exact"]] or hits
             if len(same) > 1:
@@ -920,6 +988,11 @@ class LocalMap:
                 kinds[p.get("kind")] = kinds.get(p.get("kind"), 0) + 1
             lines.append(f"{_plural(len(doc['points']), 'emergency point')} from OpenStreetMap"
                          + (": " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())) if kinds else "") + ".")
+            if _places_missing(doc):
+                why = _places_reason(doc)
+                why = why if why.endswith("...") else why.rstrip(".")
+                lines.append("The emergency places could not be fetched" + (f" ({why})" if why else "")
+                             + ": " + _places_not_fetched(doc))
         lines.append(f"{_plural(len(doc['mine']), 'point')} of your own.")
         if doc["_held"]:
             lines.append(f"{_plural(len(doc['_held']), 'more point')} of yours need fixing: their position in the "
@@ -929,7 +1002,7 @@ class LocalMap:
                                                                                   else "")) if home else
                      "Home is not set.")
         job = self.job.view()
-        if job["state"] in ("checking", "downloading"):
+        if job["state"] in RUNNING:
             lines.append(f"A download is running: {job['message']}")
         if self.notice:
             lines.append(self.notice)
@@ -951,6 +1024,7 @@ class LocalMap:
                 "kinds": list(fetcher.KINDS), "my_kinds": list(MY_KINDS), "tiles_mb": round(self.tiles_size() / MB, 2),
                 "job": self.job.view(), "last_updated": doc["last_updated"], "details": DETAILS,
                 "needs_fixing": [_held_view(h) for h in doc["_held"]], "notice": self.notice,
+                "places_missing": _places_missing(doc), "places_reason": _places_reason(doc),
                 "home_note": HOME_NOTE if home and home.get("auto") else ""}
 
     def set_cap(self, cap_mb) -> str:
@@ -970,7 +1044,7 @@ class LocalMap:
         doc = self.store.load()
         req = _region_request(body, doc.get("cap_mb", DEFAULT_CAP_MB))
         if self.job.busy():
-            raise ValueError("a download or size check is already running")
+            raise ValueError(self._running_words())
         self.job.cancel = threading.Event()
         run = fetcher.Run(self.job.cancel, fetcher.job_limit(req["cap_mb"]), req["cap_mb"])
         self.job.set(state="checking", message="Asking which map build is newest...", done_bytes=0, total_bytes=0)
@@ -979,11 +1053,104 @@ class LocalMap:
         t.start()
         return "Download started." if download else "Size check started."
 
+    def start_places(self) -> str:
+        """The page's Fetch places button: the emergency places for the saved region's box, never the tiles."""
+        doc = self.store.load()
+        r = doc.get("region")
+        if not isinstance(r, dict):
+            raise ValueError("There is no region downloaded yet. Choose one and press Download first.")
+        if not _box_ok(r.get("box")):
+            raise ValueError("The saved region can not be read (its area is not in the form Local Map knows), so "
+                             "its places can not be fetched. Press Download again to get the region.")
+        if self.job.busy():
+            raise ValueError(self._running_words())
+        box = {k: float(r["box"][k]) for k in ("west", "south", "east", "north")}
+        lat, lon = _coord(r.get("lat"), 90), _coord(r.get("lon"), 180)
+        centre = (lat, lon) if lat is not None and lon is not None else None
+        cap = doc.get("cap_mb", DEFAULT_CAP_MB)
+        cap = cap if isinstance(cap, (int, float)) and not isinstance(cap, bool) and 5 <= cap <= 5000 \
+            else DEFAULT_CAP_MB
+        self.job.cancel = threading.Event()
+        run = fetcher.Run(self.job.cancel, fetcher.job_limit(cap), cap)
+        host = fetcher._host(self.sources.overpass_url)
+        self.job.set(state="fetching_places", message=f"Fetching emergency points from {host} (this can take a "
+                                                      f"minute)...", done_bytes=0, total_bytes=0, plan=None)
+        t = threading.Thread(target=self._run_places, args=(r["box"], box, centre, run), daemon=True)
+        self.job.thread = t
+        t.start()
+        return "Fetching the emergency places. The street map is not downloaded again."
+
+    def _running_words(self) -> str:
+        state = self.job.view()["state"]
+        if state == "fetching_places":
+            return "Fetch places is already running (the emergency places are being fetched). Wait or press Cancel."
+        if state == "downloading":
+            return "a download is already running. Wait or press Cancel."
+        return "a download or size check is already running. Wait or press Cancel."
+
     def cancel(self) -> str:
         if not self.job.busy():
             return "Nothing is running."
         self.job.cancel.set()
+        if self.job.view()["state"] == "fetching_places":
+            return "Stopping. The map and the places you had are unchanged."
         return "Stopping. Tiles already stored are kept for next time."
+
+    def _fetch_places(self, box: dict, run: fetcher.Run, centre) -> tuple[list, int]:
+        """fetch_points, tried again up to PLACES_TRIES in all when the trouble may pass (busy, slow). Each wait
+        ends at once on Cancel and never runs past the job's deadline; the byte budget is shared by every try."""
+        host = fetcher._host(self.sources.overpass_url)
+        for n in range(1, PLACES_TRIES + 1):
+            try:
+                return fetcher.fetch_points(self.sources, box, run, centre)
+            except fetcher.FetchError as exc:
+                if not getattr(exc, "passing", False) or n >= PLACES_TRIES:
+                    raise
+                wait_s = PLACES_WAITS_S[min(n, len(PLACES_WAITS_S)) - 1]
+                self.job.set(message=f"{host} is busy. Trying again in {_plural(wait_s, 'second')} "
+                                     f"(try {n + 1} of {PLACES_TRIES})...")
+                if wait_s >= run.ends - time.monotonic():
+                    raise                            # no time for another try: the last real reason stands
+                if run.cancel.wait(wait_s):
+                    raise fetcher.Cancelled() from None
+                if run.late():
+                    raise
+                self.job.set(message=f"Fetching emergency points from {host}, try {n + 1} of {PLACES_TRIES} "
+                                     f"(this can take a minute)...")
+        raise AssertionError("not reached")
+
+    def _run_places(self, saved_box: dict, box: dict, centre, run: fetcher.Run) -> None:
+        kept = "The street map and the places you had are unchanged."
+        try:
+            pts, left_out = self._fetch_places(box, run, centre)
+            if run.cancel.is_set():
+                raise fetcher.Cancelled()
+            with self.store.lock:
+                doc = self.store.load()
+                r = doc.get("region")
+                if not isinstance(r, dict) or r.get("box") != saved_box:
+                    self.job.set(state="failed", message=f"The region changed while the places were fetched, so "
+                                                         f"they were not saved. {kept}")
+                    return
+                doc["points"] = pts
+                r.pop("places_missing", None)
+                self.store.save(doc)
+            more = ""
+            if left_out:
+                more = (f" {_plural(left_out, 'more place')} {'was' if left_out == 1 else 'were'} left out: Local "
+                        f"Map keeps the {fetcher.MAX_POINTS} nearest the middle of the region.")
+            self.job.set(state="done", message=f"Done: {_plural(len(pts), 'emergency point')} for the map. The "
+                                               f"street map was not downloaded again.{more}")
+        except fetcher.Cancelled:
+            self.job.set(state="cancelled", message=f"Cancelled. {kept}")
+        except fetcher.FetchError as exc:
+            self.job.set(state="failed", message=f"The emergency places could not be fetched: {_places_why(exc)} "
+                                                 f"{kept} Press Fetch places to try again later.")
+        except Unreadable as exc:
+            self.job.set(state="failed", message=str(exc))
+        except Exception as exc:  # noqa: BLE001 - said plainly on the page, never a crash
+            self.job.set(state="failed", message=f"Fetching the places stopped with an error "
+                                                 f"({type(exc).__name__}). {kept}")
 
     def _plan_summary(self, req: dict, pl: dict) -> dict:
         return {"key": [req["box"], req["max_zoom"], pl["build"]["key"]], "label": req["label"],
@@ -1033,9 +1200,7 @@ class LocalMap:
                                                  f"The map you had is unchanged.")
 
     def _download(self, req: dict, pl: dict, summary: dict, run: fetcher.Run) -> None:
-        cancel = run.cancel
-        folder = self.store.folder
-        partial = folder / PARTIAL
+        partial = self.store.folder / PARTIAL
         want = {"build": pl["build"]["key"], "box": req["box"], "max_zoom": req["max_zoom"]}
         if partial.exists():
             st = None
@@ -1050,6 +1215,38 @@ class LocalMap:
                     st.close()
             if not same:
                 partial.unlink()
+        seeded = None
+        if not partial.exists():
+            seeded = self._seed_partial(partial, want, pl["bytes"])
+        try:
+            self._download_into(req, pl, summary, run, partial, want)
+        except BaseException:
+            if seeded is not None:
+                self._drop_seed(partial, seeded)
+            raise
+
+    def _drop_seed(self, partial: Path, seeded: int) -> None:
+        """After a job that did not finish: a seeded copy that holds no tile beyond the map in place is removed.
+        One with newly fetched tiles is kept, so Download picks up where it stopped."""
+        st = None
+        try:
+            st = fetcher.TileStore(partial)
+            more = st.counts()[0] > seeded
+        except sqlite3.DatabaseError:
+            more = False
+        finally:
+            if st is not None:
+                st.close()
+        if not more:
+            try:
+                partial.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _download_into(self, req: dict, pl: dict, summary: dict, run: fetcher.Run, partial: Path,
+                       want: dict) -> None:
+        cancel = run.cancel
+        folder = self.store.folder
         store = fetcher.TileStore(partial)
         try:
             store.set_meta(**want, tile_compression=pl["tile_compression"])
@@ -1060,8 +1257,13 @@ class LocalMap:
             tiles = store.counts()[0]
         finally:
             store.close()
-        self.job.set(message="Fetching emergency points from overpass-api.de (this can take a minute)...")
-        pts, left_out = fetcher.fetch_points(self.sources, req["box"], run, (req["lat"], req["lon"]))
+        self.job.set(message=f"Fetching emergency points from {fetcher._host(self.sources.overpass_url)} (this can "
+                             f"take a minute)...")
+        failed = None
+        try:
+            pts, left_out = self._fetch_places(req["box"], run, (req["lat"], req["lon"]))
+        except fetcher.FetchError as exc:           # the street map is put in place anyway, below; Cancel is not this
+            pts, left_out, failed = [], 0, exc
         if cancel.is_set():
             raise fetcher.Cancelled()
         with self.store.lock:
@@ -1070,12 +1272,18 @@ class LocalMap:
                 self._open_tiles()                  # a tile file that will not read is moved aside, not written over
                 self._close_tiles()
                 os.replace(partial, folder / TILES)
+            old = doc.get("region")
             doc["region"] = {"label": req["label"], "lat": req["lat"], "lon": req["lon"], "radius": req["radius"],
                              "unit": req["unit"], "radius_km": req["radius_km"], "detail": req["detail"],
                              "max_zoom": req["max_zoom"], "box": req["box"], "build": pl["build"]["key"],
                              "build_version": pl["build"]["version"], "tiles": tiles, "bytes": pl["bytes"],
                              "tile_compression": pl["tile_compression"], "fetched_on": _now()}
-            doc["points"] = pts
+            if failed is None:
+                doc["points"] = pts
+            else:                                   # the places saved before stay only when they cover this same box
+                if not (isinstance(old, dict) and old.get("box") == req["box"]):
+                    doc["points"] = []
+                doc["region"]["places_missing"] = {"reason": _places_why(failed)[:300], "tried_on": _now()}
             home_set = not self._home(doc)
             if home_set:                            # a convenience, said plainly; stays on this computer
                 doc["home"] = {"lat": req["lat"], "lon": req["lon"], "label": "Middle of the map", "auto": True}
@@ -1090,9 +1298,50 @@ class LocalMap:
                      f"keeps the {fetcher.MAX_POINTS} nearest the middle of the region.")
         if home_set:
             more += " " + HOME_NOTE
+        if failed is not None:
+            n = len(doc["points"])
+            before = (f" The {_plural(n, 'emergency point')} saved before for this same area "
+                      f"{'is' if n == 1 else 'are'} kept." if n else "")
+            self.job.set(state="places_missing", done_bytes=got["bytes"],
+                         message=f"The street map is in ({_plural(tiles, 'tile')}) and works with no internet. The "
+                                 f"emergency places could not be fetched: {_places_why(failed)}{before} Press Fetch "
+                                 f"places to try again; the street map will not be downloaded again.{more}")
+            return
         self.job.set(state="done", done_bytes=got["bytes"],
                      message=f"Done: {_plural(tiles, 'tile')} ({got['skipped']} were already here) and "
                              f"{_plural(len(pts), 'emergency point')}. The map now works with no internet.{more}")
+
+    def _seed_partial(self, partial: Path, want: dict, planned: int) -> int | None:
+        """When the street map in place is this same build, box and detail, start the new download from a copy
+        of it, so Download again fetches only the tiles it lacks. Anything else: start empty, as before.
+        Returns how many tiles the copy holds, or None when there is no copy."""
+        with self.tiles_lock:
+            if not self._open_tiles():
+                return None
+            try:
+                meta = {k: json.loads(v) for k, v in self._tiles_db.execute("SELECT key, value FROM meta")}
+                have = self._tiles_db.execute("SELECT COUNT(*) FROM tiles").fetchone()[0]
+            except (sqlite3.DatabaseError, ValueError, TypeError):
+                return None
+            if not all(meta.get(k) == v for k, v in want.items()):
+                return None
+            size = self.tiles_size()
+            try:
+                free = shutil.disk_usage(self.store.folder).free
+            except OSError:
+                free = None
+            if free is not None and free < size + planned:
+                raise fetcher.FetchError(
+                    f"There is not enough free disk space to download the map again: it needs about "
+                    f"{(size + planned) / MB:.1f} MB (a copy of the map in place, {size / MB:.1f} MB, plus the new "
+                    f"tiles) and {free / MB:.1f} MB is free. Nothing was downloaded. Free some space and press "
+                    f"Download again.")
+            try:
+                shutil.copyfile(self.store.folder / TILES, partial)
+            except OSError:
+                partial.unlink(missing_ok=True)
+                return None
+            return have
 
 
 # --------------------------------------------------------------- MCP tools
@@ -1204,7 +1453,7 @@ def mcp_answer(app: LocalMap, msg) -> dict | None:
 # --------------------------------------------------------------- HTTP
 
 TILE_PATH = re.compile(r"^/tiles/(\d{1,2})/(\d{1,8})/(\d{1,8})\.mvt$")
-PAGE_ROUTES = ("/api/check", "/api/download", "/api/cancel", "/api/home", "/api/settings",
+PAGE_ROUTES = ("/api/check", "/api/download", "/api/places/fetch", "/api/cancel", "/api/home", "/api/settings",
                "/api/mine/add", "/api/mine/update", "/api/mine/remove")
 MINE_FIELDS = ("name", "kind", "latitude", "longitude", "at_home", "note")
 
@@ -1405,6 +1654,8 @@ class Handler(BaseHTTPRequestHandler):
             app = self.app
             if path in ("/api/check", "/api/download"):
                 out = {"text": app.start(body, download=path == "/api/download")}
+            elif path == "/api/places/fetch":
+                out = {"text": app.start_places()}
             elif path == "/api/cancel":
                 out = {"text": app.cancel()}
             elif path == "/api/home":

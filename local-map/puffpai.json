@@ -3,7 +3,7 @@
   "id": "local-map",
   "kind": "app",
   "name": "Local Map",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "An offline street map of one region you choose, with its emergency places from OpenStreetMap: fire stations, police, hospitals, clinics, pharmacies, shelters, food banks, drinking water, fuel and more. You pick the region and press Download once; after that the map, the list of places, straight-line distances from home and your own points (meeting places, water, a neighbor who can help) work with no internet. It does not give directions by road, does not update by itself, and OpenStreetMap does not list every shelter or food bank.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
@@ -110,5 +110,5 @@
   "data": {
     "keep_on_remove": "ask"
   },
-  "consent": "Local Map keeps a street map of one region you choose, and a list of emergency places there, in its own folder on this computer. Once, and only when you press Check size or Download on its page, it contacts three hosts: build-metadata.protomaps.dev is asked only for the list of map builds; build.protomaps.com sends the street map, so it can tell which map area was fetched; overpass-api.de receives the corner coordinates of the area, rounded outward to a 0.05 degree grid, and sends the emergency places. All three see this computer's internet address. Nothing else is sent. After that it works with no internet. It does not use the brain."
+  "consent": "Local Map keeps a street map of one region you choose, and a list of emergency places there, in its own folder on this computer. Once, and only when you press Check size, Download or Fetch places on its page, it contacts three hosts: build-metadata.protomaps.dev is asked only for the list of map builds; build.protomaps.com sends the street map, so it can tell which map area was fetched; overpass-api.de receives the corner coordinates of the area, rounded outward to a 0.05 degree grid, and sends the emergency places. All three see this computer's internet address. Nothing else is sent. After that it works with no internet. It does not use the brain."
 }

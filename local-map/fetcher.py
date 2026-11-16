@@ -85,7 +85,12 @@ BAD_BUILDS = "The map host's list of builds was not in the form this app knows. 
 
 
 class FetchError(RuntimeError):
-    """A plain sentence about what went wrong, for the page."""
+    """A plain sentence about what went wrong, for the page. *passing* is True when the trouble may pass by
+    itself (the host is busy or slow), so the server may try the same request again a little later."""
+
+    def __init__(self, text: str = "", passing: bool = False) -> None:
+        super().__init__(text)
+        self.passing = passing
 
 
 class Cancelled(RuntimeError):
@@ -177,7 +182,7 @@ class _Guard:
             raise Cancelled()
         self.run.check()                              # the whole job's time is up: its own sentence
         raise FetchError(f"{host} was too slow (more than {self.seconds:.0f} seconds for one answer), so Local Map "
-                         f"stopped. Nothing was changed. Try again later.")
+                         f"stopped. Nothing was changed. Try again later.", passing=True)
 
     def check(self, host: str) -> None:
         self.poll()
@@ -306,14 +311,15 @@ def _http_trouble(url: str, exc: Exception) -> FetchError:
     host = _host(url)
     if isinstance(exc, urllib.error.HTTPError):
         if exc.code == 429:
-            return FetchError(f"{host} says it is busy (too many requests). Nothing was changed. Try again later.")
+            return FetchError(f"{host} says it is busy (too many requests). Nothing was changed. Try again later.",
+                              passing=True)
         if exc.code in (406, 502, 503, 504):
             return FetchError(f"{host} turned the request down for now (error {exc.code}). Nothing was changed. "
-                              f"Try again later.")
+                              f"Try again later.", passing=exc.code != 406)
         return FetchError(f"{host} answered with error {exc.code}. If the Bridge blocks it, allow {host} for "
                           f"Local Map on the Bridge page.")
     if isinstance(exc, TimeoutError) or "timed out" in str(getattr(exc, "reason", exc)):
-        return FetchError(f"{host} took too long to answer. Nothing was changed. Try again later.")
+        return FetchError(f"{host} took too long to answer. Nothing was changed. Try again later.", passing=True)
     if isinstance(exc, http.client.HTTPException):
         return FetchError(f"{host} sent an answer that is not proper HTTP. Nothing was changed. Try again later.")
     return FetchError(f"Could not reach {host} ({type(getattr(exc, 'reason', exc)).__name__}). Is this computer "
@@ -1021,8 +1027,8 @@ def points_from_overpass(answer: dict, fetched_on: str, box: dict | None = None,
 
 def fetch_points(sources: Sources, box: dict, run=None, centre: tuple[float, float] | None = None
                  ) -> tuple[list[dict], int]:
-    """One Overpass query for the box. Sends only the box's corners. Never retries on its own.
-    (the places, how many were left out)."""
+    """One Overpass query for the box. Sends only the box's corners. Never retries on its own (the server tries
+    again when the FetchError says passing). (the places, how many were left out)."""
     run = _as_run(run)
     host = _host(sources.overpass_url)
     q = QUERY.format(s=f"{box['south']:.5f}", w=f"{box['west']:.5f}", n=f"{box['north']:.5f}", e=f"{box['east']:.5f}")
@@ -1038,14 +1044,14 @@ def fetch_points(sources: Sources, box: dict, run=None, centre: tuple[float, flo
         answer = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, ValueError, RecursionError):
         raise FetchError(f"{host} sent something that is not a list of places "
-                         f"(it may be busy). Try again later.") from None
+                         f"(it may be busy). Try again later.", passing=True) from None
     del raw
     if not isinstance(answer, dict):
         raise FetchError(f"{host} sent something that is not a list of places.")
     remark = _clip(answer.get("remark"), 500)
     if "runtime error" in remark or "timed out" in remark:
         raise FetchError(f"{host} ran out of time on this area. Nothing was changed. Try again later, "
-                         f"or choose a smaller area.")
+                         f"or choose a smaller area.", passing=True)
     run.check()
     return points_from_overpass(answer, datetime.now(timezone.utc).date().isoformat(), box, centre)
 
