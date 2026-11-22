@@ -1,0 +1,93 @@
+<!-- Dewey's face. The talking motion (attack and decay, one pulse per burst of streamed text) follows Puff's
+     face in BuildBot v2 (packages/cloud-avatar/face.html). The picture is dewey.png. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dewey</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  svg { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  @keyframes deweyNod { 0%, 100% { transform: translateY(-2px); } 50% { transform: translateY(2px); } }
+  .nod { animation: deweyNod 5s ease-in-out infinite; }
+  .nod.speaking { animation-duration: 2.6s; }
+  @media (prefers-reduced-motion: reduce) { .nod { animation: none; } }
+</style>
+</head>
+<body>
+<!-- dewey.png is 768 x 768, ink and wash on cream paper. The view is a round frame on her head and collar
+     (centre 384, 250, radius 215). While the bot answers, a small dark opening shows between her lips and
+     opens and closes. At rest it is hidden, so her painted smile shows as it is. -->
+<svg viewBox="164 30 440 440" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Dewey, your editor">
+  <defs><clipPath id="round"><circle cx="384" cy="250" r="215"/></clipPath></defs>
+  <g clip-path="url(#round)">
+    <rect x="164" y="30" width="440" height="440" fill="#fdfbee"/>
+    <g id="nod" class="nod">
+      <image href="dewey.png" x="0" y="0" width="768" height="768"/>
+      <path id="mouth" d="M345 369 Q384 381.00 423 368 Q384 381.00 345 369 Z" fill="#4a161c" stroke="#8c2f33"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" visibility="hidden"/>
+    </g>
+  </g>
+  <circle cx="384" cy="250" r="215" fill="none" stroke="#e58a78" stroke-width="5"/>
+</svg>
+<script id="dewey-mouth">
+/* The line between her lips, measured in the 768px picture: its corners at (345, 369) and (423, 368), its
+ * middle at (384, 375), so one quadratic curve with its control at (384, 381) traces it. The mouth is a lens
+ * on that line: the top edge lifts a little and the bottom edge drops into her lower lip as it opens, and
+ * never past the lip's lower rim (y 391). At openness 0 the lens has no area and is hidden.
+ *
+ * The Desktop posts {type: "puffpai.avatar", talking: true|false, pulse: <chars just streamed>} while the
+ * bot answers in chat. This page has no other input: it reads nothing and sends nothing. */
+(function (root) {
+  "use strict";
+  var LEFT_X = 345, LEFT_Y = 369, RIGHT_X = 423, RIGHT_Y = 368, MID_X = 384, REST_CY = 381;
+  var SHOWN = 0.02;                             // below this, her painted smile shows on its own
+
+  function mouthPath(open) {
+    var top = REST_CY - 6 * open, bottom = REST_CY + 26 * open;
+    return "M" + LEFT_X + " " + LEFT_Y + " Q" + MID_X + " " + top.toFixed(2) + " " + RIGHT_X + " " + RIGHT_Y +
+           " Q" + MID_X + " " + bottom.toFixed(2) + " " + LEFT_X + " " + LEFT_Y + " Z";
+  }
+  /* Fast attack, slow decay, so it is lively without jitter. */
+  function nextOpen(open, target) {
+    return target > open ? open + (target - open) * 0.5 : open * 0.85;
+  }
+  /* How far one burst of streamed text opens the mouth: never shut, never all the way. */
+  function pulseTarget(chars) {
+    var n = Math.max(0, Math.floor(Number(chars) || 0));
+    return n ? Math.min(1, 0.35 + 0.12 * (n % 6)) : 0;
+  }
+  function shown(open) { return open >= SHOWN; }
+
+  var api = { mouthPath: mouthPath, nextOpen: nextOpen, pulseTarget: pulseTarget, shown: shown };
+  if (typeof module !== "undefined" && module.exports) { module.exports = api; return; }
+
+  var doc = root.document;
+  var mouth = doc.getElementById("mouth"), nod = doc.getElementById("nod");
+  var open = 0, target = 0, talking = false, frame = null;
+  function paint() {
+    mouth.setAttribute("d", mouthPath(open));
+    mouth.setAttribute("visibility", shown(open) ? "visible" : "hidden");
+  }
+  function tick() {
+    open = nextOpen(open, target);
+    target = 0;                                  // each pulse is one sample
+    if (!talking && open < 0.005) { open = 0; paint(); frame = null; return; }
+    paint();
+    frame = root.requestAnimationFrame(tick);
+  }
+  function run() { if (frame === null) frame = root.requestAnimationFrame(tick); }
+  root.addEventListener("message", function (ev) {
+    if (ev.source !== root.parent) return;         // only the Desktop that framed this page
+    var d = ev.data;
+    if (!d || typeof d !== "object" || d.type !== "puffpai.avatar") return;
+    talking = d.talking === true;
+    nod.setAttribute("class", talking ? "nod speaking" : "nod");
+    if (talking) target = Math.max(target, pulseTarget(d.pulse));
+    run();
+  });
+  paint();
+})(this);
+</script>
+</body>
+</html>

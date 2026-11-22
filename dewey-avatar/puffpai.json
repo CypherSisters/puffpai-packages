@@ -1,0 +1,16 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "dewey-avatar",
+  "kind": "avatar",
+  "name": "Dewey",
+  "version": "1.0.0",
+  "description": "Dewey, your editor: a warm, sharp-eyed editor-in-chief with a silver bob and round glasses, in ink and wash. Her mouth moves while the bot answers in chat.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "preview.png",
+  "avatar": { "preview": "preview.png", "voice": null },
+  "ui": {
+    "pages": [ { "id": "face", "title": "Dewey", "file": "face.html", "show": "in_desktop" } ]
+  },
+  "consent": "A face for your bot. It runs nothing and uses no internet."
+}

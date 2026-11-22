@@ -50,6 +50,7 @@ The Cypher Sisters' own packages for the [PuffPAI Store](https://github.com/Cyph
 | `look-slate` | look | 1.1.0 | Slate: calm blue-grey surfaces, a teal accent and soft small corners, in Nunito. Darker slate at night, light grey by day. No glow, no clouds, a little less rounded than Puff. |
 | `avatar-block` | avatar | 1.1.0 | Block, a square terminal face with two square eyes and a cursor, as the bot's face. Flat colours that go with the Clean look. |
 | `avatar-pebble` | avatar | 1.1.0 | Pebble, a round coral stone with a small smile, as the bot's face. Flat colours that go with the Paper look. |
+| `dewey-avatar` | avatar | 1.0.0 | Dewey, your editor: a warm, sharp-eyed editor-in-chief with a silver bob and round glasses, in ink and wash. Her mouth moves while the bot answers in chat. |
 
 Every app and tool ships off. Turn one on from Apps, PuffPAI store. A tool package has no page of its own: the brain uses it in chat.
 
