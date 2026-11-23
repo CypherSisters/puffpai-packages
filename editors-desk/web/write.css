@@ -1,0 +1,116 @@
+/* The Write view: her book as one page, the chapters on the left, notes from her editor in the right margin.
+   Dense and editorial: sharp corners, hairline borders. Colors come from app.css, so every look keeps working. */
+.wview { display: flex; flex-direction: column; }
+.wview button, .wview input, .wview textarea { border-radius: 0; }
+
+.wbar { flex: none; display: flex; gap: 4px; align-items: center; flex-wrap: wrap; padding: 4px 12px; border-bottom: 1px solid var(--c-line); background: var(--c-card); }
+.wbar button { padding: 2px 9px; }
+.wbar .fmt { min-width: 30px; font-family: var(--read); }
+.wbar button[aria-pressed="false"] { color: var(--d-muted); }
+.wbar button[aria-pressed="true"] { background: var(--d-chosen); }
+.tocbtn { display: none; }
+.wstatus { margin-left: auto; font-size: 13px; color: var(--d-muted); }
+.wsaid { font-size: 13px; color: var(--c-ink); }
+.wsaid.bad { color: var(--d-error); font-weight: 600; }
+.wstatus.warn { color: var(--c-ink); }
+.wstatus.bad { color: var(--d-error); font-weight: 600; font-size: 14px; }
+
+.findbar { flex: none; padding: 4px 12px; border-bottom: 1px solid var(--c-line); background: var(--c-card); }
+.findbar .frow { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin: 2px 0; }
+.findbar input { flex: 0 1 260px; min-width: 120px; }
+.fcount { font-size: 13px; color: var(--d-muted); min-width: 70px; }
+
+.wscroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.wgrid { display: grid; grid-template-columns: 200px minmax(0, 42em) 300px; gap: 0 28px; justify-content: center; padding: 0 12px 40vh; }
+
+/* chapters */
+.toc { position: sticky; top: 0; align-self: start; max-height: calc(100vh - 90px); overflow: auto; padding: 14px 0; font-size: 13px; }
+.ttotal { color: var(--d-muted); padding: 0 6px 6px; border-bottom: 1px solid var(--c-line); }
+.tlist { list-style: none; margin: 0; padding: 0; }
+.tlist button { display: flex; width: 100%; gap: 6px; justify-content: space-between; text-align: left; border: 0; border-left: 2px solid transparent; background: none; padding: 3px 6px; }
+.tlist button:hover { background: var(--d-chosen); }
+.tlist .on button { border-left-color: var(--c-accent); font-weight: 600; }
+.tname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.twords { color: var(--d-muted); font-variant-numeric: tabular-nums; }
+
+/* the page */
+.sheet { position: relative; min-width: 0; }
+.wdoc { font-family: var(--read); font-size: 18px; line-height: 1.65; color: var(--c-ink); background: var(--c-card); border: 1px solid var(--c-line);
+  border-top: 0; border-bottom: 0; padding: 28px clamp(16px, 5%, 56px) 80px; min-height: 100%; white-space: pre-wrap; outline: none; caret-color: var(--c-accent); }
+.wdoc:focus-visible { outline: none; }
+.wdoc p { margin: 0; min-height: 1em; }
+.wdoc p.brk { text-align: center; }
+.sec { position: relative; }
+.shead { font-family: var(--ui); white-space: normal; user-select: none; }
+.shead.chap { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--c-line); display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.sec:first-child .shead.chap { margin-top: 0; border-top: 0; padding-top: 0; }
+.chead { font: 600 22px/1.3 var(--read); margin: 0 0 14px; flex: 1 1 auto; user-select: text; }
+.vbtn { font-size: 12px; border: 0; background: none; color: var(--c-accent); text-decoration: underline; padding: 0; }
+.vbox { flex-basis: 100%; font-size: 14px; border: 1px solid var(--c-line); background: var(--c-bg); padding: 6px 10px; margin: 0 0 14px; }
+.vbox h4 { margin: 6px 0 2px; font-size: 13px; }
+.vbox ul { list-style: none; margin: 4px 0; padding: 0; }
+.vbox li { display: flex; gap: 8px; flex-wrap: wrap; padding: 2px 0; }
+.vshow { margin-top: 6px; }
+.ro { font-family: var(--read); font-size: 16px; white-space: pre-wrap; background: var(--c-card); border: 1px solid var(--c-line); padding: 8px 10px; max-height: 40vh; overflow: auto; user-select: text; }
+.ro p { margin: 0; min-height: 1em; }
+.ro p.brk { text-align: center; }
+.stalebar { flex-basis: 100%; border: 1px solid var(--d-error); border-left-width: 3px; background: var(--c-bg); padding: 6px 10px; margin: 6px 0 10px; font-size: 14px; }
+.stalebar p { margin: 0 0 4px; color: var(--c-ink); }
+.stalebar .other { margin-top: 6px; }
+.lost { flex-basis: 100%; font-size: 13px; display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 10px; padding: 4px 0; border-bottom: 1px dotted var(--c-line); }
+.lost .lab { color: var(--d-muted); }
+.shead:not(.chap) .lost, .shead:not(.chap) .stalebar { margin-top: 8px; }
+
+/* highlights: they never touch the text */
+::highlight(note) { background-color: var(--d-note); color: var(--c-ink); }
+::highlight(note-big) { background-color: var(--d-note-big); color: var(--c-ink); }
+::highlight(note-q) { background-color: var(--d-note-q); color: var(--c-ink); }
+::highlight(asked) { background-color: var(--d-asked); color: var(--c-ink); }
+::highlight(note-on) { text-decoration: underline 2px var(--c-accent); }
+::highlight(find) { background-color: var(--d-note-q); color: var(--c-ink); }
+::highlight(find-now) { background-color: var(--d-mark); color: var(--d-mark-ink); }
+
+/* notes in the margin */
+.margin { position: absolute; top: 0; left: calc(100% + 28px); width: 300px; height: 100%; font-size: 13px; }
+.nonotes .margin { display: none; }
+.card { position: absolute; left: 0; right: 0; background: var(--c-card); border: 1px solid var(--c-line); border-left: 3px solid var(--c-line); padding: 6px 8px; cursor: default; }
+.card.big { border-left-color: var(--d-big); }
+.card.quiet { color: var(--d-muted); }
+.card.quiet .what { font-weight: 400; color: var(--c-ink); }
+.card.ask { border-left-color: var(--c-accent); }
+.card.on { border-color: var(--c-accent); z-index: 2; }
+.card .chead { font: 12px/1.3 var(--ui); margin: 0; display: flex; gap: 6px; color: var(--d-muted); }
+.card.big .size { color: var(--d-big); font-weight: 600; }
+.card .x { margin-left: auto; border: 0; background: none; padding: 0; color: var(--c-accent); text-decoration: underline; font-size: 12px; display: none; }
+.card .what { font-weight: 600; margin: 2px 0 4px; font-size: 14px; }
+.card p { margin: 3px 0; }
+.card .lab { font-weight: 600; color: var(--d-muted); margin-right: 4px; }
+.card .marks { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.card .marks button, .card .quick button { padding: 1px 7px; font-size: 12px; }
+.card .quick { display: flex; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
+.card .askrow { display: flex; gap: 6px; align-items: center; margin: 4px 0; font-size: 12px; }
+.card .askrow select { padding: 1px 4px; font-size: 12px; border-radius: 0; }
+.card .mynote { width: 100%; margin-top: 6px; min-height: 34px; resize: vertical; font-size: 13px; }
+.card:not(.on) .mynote:placeholder-shown { display: none; }
+.card.ask .mynote { display: block; }
+.card .answer { font-family: var(--read); font-size: 15px; line-height: 1.5; }
+.card .answer.bad { color: var(--d-error); font-family: var(--ui); font-size: 13px; }
+.card .wait { font-style: italic; }
+
+.askbtn { position: fixed; z-index: 10; padding: 3px 10px; font-size: 13px; background: var(--c-accent); color: var(--d-on); border: 1px solid var(--c-accent); }
+
+/* no margin under 1100 pixels: a tapped note opens under its paragraph */
+@media (max-width: 1099px) {
+  .wgrid { grid-template-columns: 190px minmax(0, 42em); }
+  .margin { left: 0; width: 100%; height: 0; }
+  .card { box-shadow: 0 2px 0 var(--c-line); }
+  .card .x { display: inline; }
+}
+/* narrower still: the chapters fold into a button */
+@media (max-width: 760px) {
+  .wgrid { grid-template-columns: minmax(0, 1fr); padding: 0 0 40vh; }
+  .tocbtn { display: inline-block; }
+  .toc { display: none; position: fixed; z-index: 20; left: 0; top: 80px; bottom: 0; width: min(300px, 85vw); max-height: none; background: var(--c-card); border-right: 1px solid var(--c-line); padding: 10px; }
+  .toc.open { display: block; }
+  .wdoc { border: 0; padding: 18px 14px 60px; font-size: 17px; }
+}

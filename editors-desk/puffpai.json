@@ -1,0 +1,78 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "editors-desk",
+  "kind": "app",
+  "name": "Editor's Desk",
+  "version": "0.4.3",
+  "description": "Your whole book as one page you just type in, like Word, with notes from your editor in the margin beside the words they are about. It saves as you type and keeps earlier versions. Select any words and ask your editor how they read. Behind it is a publishing house's stages of editing, big to small: the story, the facts, the prose, the polish, and getting it out. It finds plot holes and inconsistencies across the whole book and shows each at its exact words, with why it matters and one way to fix it. Mark each Fixed, Not a problem or Later. Study a book puts your book beside a book you admire: the numbers at once, and your editor's pointers on matched passages. Save a Word copy of your book any time. Your editor-in-chief runs a small staff, one person for each kind of editing: she tells you what is new, what each desk found and what to do next, and a whole desk goes over your book on your one Yes. Your editor works in the background with your bot's brain on this computer, and only when you say so. Your bot never writes your book.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/editors-desk.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true,
+                 "setup": [],
+                 "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": ["desk_run", "desk_mark", "desk_stop", "desk_study", "desk_assign", "desk_storyboard"],
+    "tools": {
+      "desk_run": "Runs one editing check in the background. It starts only after the writer said yes; asked without her yes it only tells your bot what to ask her. A check can take a long time.",
+      "desk_mark": "Marks one finding Open, Fixed, Not a problem or Later, and keeps a note of the writer's on it, by its number among the open ones or its id.",
+      "desk_stop": "Stops the check running for one manuscript, after the call in progress. Pressed again, it goes on from where it was.",
+      "desk_assign": "Sends one desk of the staff over the whole book: every check on that desk, in order, in the background. who all is the full edit, big to small, then the letter. It starts only after the writer said yes; asked without her yes it only tells your bot what to ask her, with the plan and the time. It never writes her text.",
+      "desk_study": "Compares the writer's manuscript with a book she admires, on the shelf: your editor reads matched passages of each, one pair at a time, in the background, and gives pointers on style and flow. Without theirs it lists the books she could compare with. It starts only after the writer said yes; asked without her yes it only tells your bot what to ask her. It never writes her text.",
+      "desk_storyboard": "Draws the writer's book as storyboard panels: what a picture would show, where, who, the mood and the shot, each with her own words under it. Panels are notes for pictures, never words for her book. It starts only after the writer said yes; asked without her yes it only tells your bot what to ask her.",
+      "desk_checks": "The stages of editing for one manuscript and every check in them, when each last ran, what it found, and which comes next.",
+      "desk_status": "What the writer's editor is doing now for one manuscript, how far along, and about how long is left.",
+      "desk_findings": "What the checks found in one manuscript: each with what is wrong, the section and its exact quote, why it matters and one way to fix it, biggest first.",
+      "desk_letter": "The Editor's letter for one manuscript: what the book is, what is working, its biggest problems, what to do first, and the revision plan as it stands now.",
+      "desk_ask": "Answers a question about a change the writer is planning, from what Future plans and changes found and the story bible. who picks which of her staff answers.",
+      "desk_documents": "The documents made for one manuscript: the style sheet, length note, synopsis, query letter, submission copy. Gives one by name, or the list.",
+      "desk_study_report": "How the writer's manuscript compares with a book she admires: the style numbers at once, where the two differ most and where she already matches, and, once her editor compared passages, what to try first and the notes on each pair of passages.",
+      "desk_storyboard_report": "The storyboard of the writer's book as plain lines, panel by panel.",
+      "desk_staff": "The editor-in-chief's staff for one manuscript: each one's name, role and what they do for the book, what they are doing now, and what they have open.",
+      "desk_meeting": "The editor-in-chief's meeting for one manuscript, built by code: what changed since the writer was last here, what each staff member finished and found, what is running, what is waiting, and what comes next. Call it when she says hello, sits down, or asks what is new."
+    },
+    "examples": {
+      "desk_run": ["yes, run the continuity check on my book now", "run the continuity check on my book", "check my plot for holes", "run the continuity check", "what if Elias survives"],
+      "desk_mark": ["mark finding 1 fixed", "mark the first one fixed", "that one is not a problem", "come back to that one later"],
+      "desk_stop": ["stop the check"],
+      "desk_assign": ["send the story editor over my whole book", "have the story editor go over my book", "do the full edit", "ask the copy editor to go through it"],
+      "desk_study": ["compare my book to The Salt Road", "have my editor study that book with mine", "what can I learn from that book"],
+      "desk_storyboard": ["yes, draw chapter three of my book as a storyboard now", "draw chapter three of my book as a storyboard", "storyboard my book", "draw chapter three as a storyboard"],
+      "desk_checks": ["what editing checks are there", "what should I do next on my book"],
+      "desk_status": ["how far has my editor got", "is the check done yet"],
+      "desk_findings": ["show me the open findings", "what plot holes did you find"],
+      "desk_letter": ["read me the editor's letter", "what should I fix first"],
+      "desk_ask": ["I have a question about a change I am planning: if Elias lives, who else is affected", "what would that change do to the ending", "if Elias lives, who else is affected"],
+      "desk_documents": ["show me the style sheet my editor made for my book", "show me the style sheet", "where is my synopsis"],
+      "desk_study_report": ["show me the report comparing my book with The Salt Road", "how does my style compare", "what can I learn from that book", "what did my editor say about the book I admire"],
+      "desk_storyboard_report": ["show me the storyboard panels drawn for my book", "show me the storyboard", "what panels did you draw"],
+      "desk_staff": ["who is on my staff", "what is everyone working on"],
+      "desk_meeting": ["give me my editor's meeting", "hello", "what is new with my book", "I'm sitting down to work"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "Editor's Desk", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Editor's Desk", "icon": "icons/editors-desk.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "install_hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.1, "disk_gb": 0.05 },
+    "owner_files": "write",
+    "brain": { "text": true, "images": false, "as_written": true }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "keep" },
+  "consent": "Editor's Desk reads your manuscripts and their story bibles in the Manuscripts folder in My files, and asks your bot's brain on this computer about them when you press a check, say yes to one, send a desk of your editor's staff over the book, ask for a storyboard, or ask your editor about words you selected. Your text saves by itself as you type, a moment after you stop, and when you leave the page. It keeps its findings, your questions and earlier versions of your text in its own data folder, and puts what you ask it to make (a style sheet, a synopsis, a Word copy) in an Editor's Desk folder in My files. When you ask for a storyboard, its panels are notes for pictures, kept in its own data folder; when you press to have them painted, it leaves a short list of those notes beside your book for Maps to paint from, and shows the pictures Maps makes. Your section text changes only from your own typing on this page, bringing back an earlier version, or pressing Use this; your bot has no tool that writes it, and your original upload is never touched. It doesn't use the internet."
+}

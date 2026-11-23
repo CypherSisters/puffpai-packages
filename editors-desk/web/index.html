@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:">
+<title>Editor's Desk</title>
+<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="write.css">
+<link rel="stylesheet" href="study.css">
+<link rel="stylesheet" href="office.css">
+<link rel="stylesheet" href="storyboard.css">
+</head>
+<body>
+<header class="top">
+  <nav class="views" id="views" role="tablist" aria-label="Views"></nav>
+  <label class="sr" for="book">Your book</label>
+  <select id="book" disabled></select>
+  <span class="count" id="count"></span>
+</header>
+
+<!-- Your editor: Dewey, the meeting, and her staff at their desks (office.js). -->
+<section class="view oview" id="v-office" aria-label="Your editor" hidden>
+  <main class="office" id="obody"></main>
+</section>
+
+<!-- Write: her whole book as one page she types in (write.js). -->
+<section class="view wview" id="v-write" aria-label="Write" hidden>
+  <div class="wbar">
+    <button type="button" id="tocbtn" class="tocbtn" aria-expanded="false" aria-controls="toc">Chapters</button>
+    <button type="button" id="italic" class="fmt" title="Italic (Ctrl+I)" aria-label="Italic"><i>I</i></button>
+    <button type="button" id="bold" class="fmt" title="Bold (Ctrl+B)" aria-label="Bold"><b>B</b></button>
+    <button type="button" id="findbtn" title="Find (Ctrl+F)">Find</button>
+    <button type="button" id="notesbtn" aria-pressed="true">Notes</button>
+    <button type="button" id="wordcopy" title="A Word file of your book as it stands now, to read or share. Your book is not changed.">Save a Word copy</button>
+    <span class="wsaid" id="wsaid" role="status" aria-live="polite"></span>
+    <span class="wstatus" id="wstatus" role="status" aria-live="polite"></span>
+  </div>
+  <div class="findbar" id="findbar" hidden>
+    <div class="frow">
+      <label class="sr" for="findq">Find</label>
+      <input type="text" id="findq" placeholder="Find" autocomplete="off" spellcheck="false">
+      <span class="fcount" id="fcount"></span>
+      <button type="button" id="fprev" aria-label="Previous">Previous</button>
+      <button type="button" id="fnext" aria-label="Next">Next</button>
+      <button type="button" id="fclose">Close</button>
+    </div>
+    <div class="frow">
+      <label class="sr" for="findr">Replace with</label>
+      <input type="text" id="findr" placeholder="Replace with" autocomplete="off" spellcheck="false">
+      <button type="button" id="frep">Replace</button>
+      <button type="button" id="freps">Replace all</button>
+    </div>
+  </div>
+  <div class="wscroll" id="wscroll">
+    <div class="wgrid">
+      <nav class="toc" id="toc" aria-label="Chapters"></nav>
+      <div class="sheet" id="sheet">
+        <div class="wdoc" id="doc" contenteditable="true" spellcheck="true" role="textbox" aria-multiline="true" aria-label="Your book"></div>
+        <aside class="margin" id="margin" aria-label="Notes from your editor"></aside>
+      </div>
+    </div>
+  </div>
+  <button type="button" class="askbtn" id="askbtn" hidden>Ask your editor</button>
+</section>
+
+<!-- Editor's desk: the letter, what to do next, the stages, the findings and the documents (app.js). -->
+<section class="view dview" id="v-desk" aria-label="Editor's desk" hidden>
+  <main class="desk">
+    <p class="note" id="stale" hidden></p>
+    <p class="note" id="private" hidden>This book was read before your vault was set to keep manuscripts out, so some of what your bot noted is kept private and your editor leaves it out. Read the book again in Manuscript to fix it.</p>
+    <div class="deskwho" id="deskwho" hidden></div>
+    <div class="work" id="work" aria-live="polite" hidden></div>
+
+    <section class="letter" id="letter" aria-label="Your editor's letter"></section>
+
+    <section class="next" id="next" aria-label="What to do next"></section>
+
+    <section aria-label="The stages of editing">
+      <h2>The stages</h2>
+      <div id="stages"></div>
+    </section>
+
+    <section id="anytime" aria-label="Any time"></section>
+
+    <section class="findings" aria-label="What your editor found">
+      <h2>What your editor found</h2>
+      <div class="filters" id="filters" role="tablist"></div>
+      <div id="list"></div>
+    </section>
+
+    <section id="docs" aria-label="Documents"></section>
+
+    <details class="settings">
+      <summary>Settings</summary>
+      <label class="switch"><input type="checkbox" id="vaultfree" checked> Keep manuscripts out of the vault</label>
+      <p class="fine">On: names, dates and places in your book count as the work, and go to your bot's brain as written. Off: they are filed in your vault like anything else you tell your bot.</p>
+    </details>
+  </main>
+</section>
+
+<!-- Storyboard: the book as panels, notes for pictures, never words for her book (storyboard.js). -->
+<section class="view bview" id="v-board" aria-label="Storyboard" hidden>
+  <main class="board">
+    <div class="work" id="bwork" aria-live="polite" hidden></div>
+    <div id="bbody"></div>
+  </main>
+</section>
+
+<!-- Study a book: her book beside a book she admires, the numbers at once and your editor's notes on matched passages (study.js). -->
+<section class="view sview" id="v-study" aria-label="Study a book" hidden>
+  <main class="study">
+    <div class="work" id="swork" aria-live="polite" hidden></div>
+    <div id="sbody"></div>
+  </main>
+</section>
+
+<script src="write.js"></script>
+<script src="study.js"></script>
+<script src="office.js"></script>
+<script src="storyboard.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

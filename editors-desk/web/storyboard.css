@@ -1,0 +1,59 @@
+/* Storyboard: the book as panels in a strip that wraps. Colors come from app.css, so every look keeps working; a sketch's
+   tint is a little of one hue mixed into the card color, so the figures keep the ink's contrast in every look. */
+.bview { overflow: auto; }
+.board { padding: 12px; min-width: 0; max-width: 1100px; margin: 0 auto; }
+.bnote { font-weight: 600; margin: 4px 0 10px; }
+.bsay { font-size: 13px; margin: 0 0 8px; }
+.bsay.bad { color: var(--d-error); }
+
+/* which chapters */
+.bpick { border: 1px solid var(--c-line); border-radius: 8px; background: var(--c-card); padding: 8px 12px 10px; margin: 0 0 12px; min-width: 0; }
+.bpick legend { font-weight: 600; padding: 0 4px; }
+.bsecs { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 2px 12px; margin: 4px 0; }
+.bsec { display: flex; gap: 6px; align-items: baseline; font-size: 14px; min-width: 0; cursor: pointer; }
+.bwhole { font-weight: 600; }
+.bcost { font-size: 13px; color: var(--d-muted); margin: 6px 0 0; }
+.bpaint { margin: 0 0 6px; }
+
+/* the panels */
+.bgroup { margin: 14px 0 0; }
+.bhead { font: 600 17px/1.3 var(--read); text-transform: none; letter-spacing: 0; color: var(--c-ink); margin: 0 0 6px; }
+.bchanged { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; background: var(--d-chosen); border-radius: 6px; padding: 5px 9px; margin: 0 0 8px; }
+.bstrip { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.bpanel { min-width: 0; background: var(--c-card); border: 1px solid var(--c-line); border-radius: 8px; padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; }
+.bpic { aspect-ratio: 16 / 9; width: 100%; overflow: hidden; border-radius: 4px; margin-bottom: 4px; }
+.bpic img, .bpic svg { display: block; width: 100%; height: 100%; object-fit: cover; }
+.bnum { font-size: 12px; font-weight: 600; color: var(--d-muted); }
+.bwhat { margin: 0; font-size: 14px; }
+.bchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 12px; border: 1px solid var(--c-line); border-radius: 10px; padding: 0 8px; background: var(--c-bg); color: var(--c-ink); }
+.chip .lab { color: var(--d-muted); }
+.bframe { margin: 0; font-size: 12px; color: var(--d-muted); }
+.bquote { margin: 2px 0; padding-left: 8px; border-left: 3px solid var(--c-line); font-family: var(--read); font-size: 15px; }
+.bpanel button.link { margin-top: auto; padding-top: 4px; font-size: 13px; }
+.bskip { margin: 0; padding-left: 20px; font-size: 14px; }
+
+/* the sketch */
+.sk { --sk-hue: var(--c-line); }
+.sk-bg { fill: color-mix(in srgb, var(--sk-hue) 24%, var(--c-card)); }
+.sk-frame { fill: none; stroke: var(--c-line); stroke-width: 1; }
+.sk-line { stroke: var(--c-ink); stroke-width: .8; opacity: .55; }
+.sk-fig { stroke: var(--c-ink); stroke-width: 1.3; fill: none; stroke-linecap: round; }
+.sk-fig circle { fill: var(--c-card); }
+.sk-close .sk-fig, .sk-medium .sk-fig { stroke-width: 1.6; }
+.sk-fig .sk-body { fill: color-mix(in srgb, var(--c-ink) 22%, var(--c-card)); }
+.mood-calm { --sk-hue: #3c8c78; }
+.mood-tense { --sk-hue: #c06a2b; }
+.mood-sad { --sk-hue: #4a6a9a; }
+.mood-happy { --sk-hue: #d9a514; }
+.mood-dark { --sk-hue: #2b2733; }
+.mood-warm { --sk-hue: #d0703c; }
+.mood-cold { --sk-hue: #3f8fc4; }
+.mood-fear { --sk-hue: #7a4a92; }
+.mood-angry { --sk-hue: #c03a3a; }
+.mood-quiet { --sk-hue: #8a8a78; }
+.mood-neutral { --sk-hue: var(--c-line); }
+
+@media (max-width: 600px) {
+  .bstrip, .bsecs { grid-template-columns: minmax(0, 1fr); }
+}
