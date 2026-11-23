@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src data:">
+<title>Manuscript</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<p class="sample" id="sample" hidden>This is the sample page. It shows made-up data, and nothing you do here is saved.</p>
+<div class="wrap">
+  <section class="region ms" aria-label="Manuscript">
+    <div class="picker">
+      <label class="sr" for="book">Manuscript</label>
+      <select id="book" disabled></select>
+      <label class="sr" for="sec">Section</label>
+      <select id="sec" disabled></select>
+      <button class="main" id="upload" type="button">Upload</button>
+      <button id="addstudy" type="button" title="A book you admire. Your editor compares it with yours. It is not read into a story bible.">Add a book to study</button>
+      <button id="remove" type="button" title="Put this manuscript away. Nothing is deleted." disabled>Remove</button>
+      <input type="file" id="file" accept=".docx,.pdf,.txt,.md" hidden>
+      <a class="desk-link" id="deskopen" href="#">Open Editor's Desk</a>
+    </div>
+    <p class="hint" id="studyhint">Add a book to study: a book you admire. Your editor compares it with yours. It is not read into a story bible.</p>
+    <p class="say" id="upsay" aria-live="polite"></p>
+    <div class="status" id="status" aria-live="polite"></div>
+    <div class="pbar" id="pbar" hidden>
+      <button class="pnote" id="pnote" type="button" title="Show where your bot is pointing"></button>
+      <button id="pclear" type="button">Clear</button>
+    </div>
+    <article class="reader" id="reader">
+      <p class="empty">Loading...</p>
+    </article>
+  </section>
+  <section class="region side" aria-label="Story tabs">
+    <form class="ask" id="ask" autocomplete="off">
+      <label for="askin">Show me</label>
+      <input id="askin" type="text" maxlength="300">
+      <button class="main" id="askgo" type="submit">Show</button>
+      <span class="ask-tab" id="ask-tab"></span>
+    </form>
+    <p class="say" id="asksay" aria-live="polite"></p>
+    <details class="settings" id="settings">
+      <summary>Settings</summary>
+      <label class="switch"><input type="checkbox" id="vaultfree" checked> Keep manuscripts out of the vault</label>
+      <p class="hint">On: dates, names and places in your manuscripts are treated as the work and go to your bot's brain as written. Off: they are filed in your vault like anything else you tell your bot, for someone whose manuscripts hold real people's details.</p>
+      <p class="hint" id="booksize"></p>
+      <p class="say" id="setsay" aria-live="polite"></p>
+    </details>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <p class="maps-line tab-maps"><a class="maps-link" id="maps" href="#">See in Maps</a></p>
+    <form class="correct" id="correct" autocomplete="off">
+      <label for="fixin">Something wrong?</label>
+      <input id="fixin" type="text" maxlength="400" placeholder="Say what it should be">
+      <button id="fixgo" type="submit">Fix it</button>
+      <span class="say" id="fixsay" aria-live="polite"></span>
+    </form>
+    <div id="fixes"></div>
+    <div class="blocks" id="blocks"></div>
+    <div class="views" id="views"></div>
+    <section class="notes" id="notes">
+      <h3 id="notes-h">Your notes</h3>
+      <textarea id="pad" aria-labelledby="notes-h"></textarea>
+      <div class="row">
+        <button class="main" id="save" type="button">Save</button>
+        <button id="reload" type="button">Reload</button>
+        <span class="say" id="say" aria-live="polite"></span>
+      </div>
+    </section>
+  </section>
+</div>
+<script src="blocks.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

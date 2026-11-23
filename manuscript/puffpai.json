@@ -1,0 +1,161 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "manuscript",
+  "kind": "app",
+  "name": "Manuscript",
+  "version": "0.6.0",
+  "description": "Your novel and stories, from a Word, PDF, text or Markdown file, with your italics and bold kept, read by your bot section by section into a story bible, on eight tabs beside your own notes: characters, plot and subplots, timeline, structure, world, science, themes and voice. Each tab opens with a short brief of what it adds up to. Correct any fact on any tab, in your own words or by hand, undo any correction, and it stays corrected when the book is read again. Ask it to show you something and it makes a view on the right tab, drawn in Maps too when it is a drawing, or points at the passage in your text. It keeps track of the book; editing is in the Editor's Desk app. This app never changes your text; you can, in Editor's Desk.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/manuscript.svg",
+  "run": {
+    "default": {
+      "type": "command",
+      "python": true,
+      "setup": [
+        "{python} -m pip install -r requirements.txt"
+      ],
+      "start": [
+        "{python}",
+        "server.py",
+        "--port",
+        "{port}"
+      ]
+    }
+  },
+  "health": {
+    "url": "http://127.0.0.1:{port}/health",
+    "expect": 200,
+    "every_s": 60
+  },
+  "abilities": {
+    "mcp": {
+      "transport": "http",
+      "url": "http://127.0.0.1:{port}/mcp"
+    },
+    "changes": [
+      "manuscript_notes_append",
+      "manuscript_remove",
+      "manuscript_add_file"
+    ],
+    "tools": {
+      "manuscript_list": "The writer's manuscripts on this computer, each with its sections, word counts and how far her bot has read it, and which are books to study (books she admires, kept to compare with hers, never read).",
+      "manuscript_read": "The text of one section of one of the writer's manuscripts, by its number or heading.",
+      "manuscript_status": "How far her bot has read one manuscript into its story bible, in one line.",
+      "manuscript_analyze": "If you do not know the exact title, call manuscript_list first. Start your bot reading one manuscript again to rebuild its story bible. It starts only after you said yes; asked without your yes it only tells your bot what to ask you.",
+      "manuscript_ask": "An answer to a question about one manuscript, from its story bible and the sections that match the question best, citing sections by number.",
+      "manuscript_show": "Makes a view on one tab of the Manuscript page, such as a character's arc, a timeline or a family tree, from the story bible, and keeps it on that tab.",
+      "manuscript_point": "Points the Manuscript page at a passage: it opens the section, scrolls to the words and highlights them.",
+      "manuscript_correct": "Corrects any fact in a manuscript's story bible, on any tab, in the writer's words: how a character looks, a fact on the wrong character, two names that are one person, when something happens, a wrong fact to remove, a missing one to add. It says exactly what changed, and it stays when the book is read again.",
+      "manuscript_correct_undo": "Takes one correction back when the writer says it was wrong, by its id or the last one. The story bible goes back as it was.",
+      "manuscript_corrections": "Every correction on one manuscript, with its id, what the writer said and what it came to.",
+      "manuscript_notes_read": "The writer's notes for one manuscript on characters, plot and subplots, timeline, structure, world building, science, themes or voice.",
+      "manuscript_notes_append": "Adds a dated section to the end of the writer's notes for one manuscript on one subject. Her manuscript stays as it is.",
+      "manuscript_remove": "Put one manuscript away into a Removed folder inside Manuscripts, with its original file, bible, views, notes and pictures. Nothing is deleted.",
+      "manuscript_add_file": "Adds a file from My files as a new manuscript: a Word file, PDF, text or Markdown file, by its name or its path inside My files. The reading waits for the writer's yes."
+    },
+    "examples": {
+      "manuscript_list": [
+        "which manuscripts do I have",
+        "how many words is my novel so far"
+      ],
+      "manuscript_read": [
+        "read chapter 3 of my novel",
+        "what happens in the chapter called The Storm"
+      ],
+      "manuscript_status": [
+        "has my bot finished reading my novel",
+        "how far along is the reading"
+      ],
+      "manuscript_analyze": [
+        "read my novel again",
+        "start reading my new story"
+      ],
+      "manuscript_ask": [
+        "what does the story say about the tide",
+        "is the timeline in chapter four consistent"
+      ],
+      "manuscript_show": [
+        "show me the character arc of Jennifer",
+        "show me a family tree for the Hales",
+        "show me all the supporting characters and whether any of them interact"
+      ],
+      "manuscript_point": [
+        "show me where the ferry is first mentioned",
+        "show me where she first meets Tom"
+      ],
+      "manuscript_correct": [
+        "Tom is her cousin, not her brother",
+        "Mara has grey eyes, not green",
+        "that scar belongs to Tom, not Elias",
+        "the storm is in chapter 4, not chapter 2",
+        "Anna and Annie are the same person"
+      ],
+      "manuscript_correct_undo": [
+        "that correction was wrong, take it back",
+        "undo the last correction"
+      ],
+      "manuscript_corrections": [
+        "what have I corrected so far",
+        "did that correction go through"
+      ],
+      "manuscript_notes_read": [
+        "what are my character notes for my novel",
+        "show my world building notes"
+      ],
+      "manuscript_notes_append": [
+        "add to my science notes that the moon's orbit takes 40 days",
+        "put a note in my structure notes that chapter 2 drags in the middle"
+      ],
+      "manuscript_remove": [
+        "put the test story away",
+        "remove Salt Moon from Manuscript"
+      ],
+      "manuscript_add_file": [
+        "load the converted book into Manuscript",
+        "add Converted/My Novel.docx to Manuscript"
+      ]
+    }
+  },
+  "ui": {
+    "pages": [
+      {
+        "id": "main",
+        "title": "Manuscript",
+        "path": "/",
+        "show": "in_desktop"
+      }
+    ],
+    "tray": [
+      {
+        "label": "Manuscript",
+        "icon": "icons/manuscript.svg",
+        "opens": "main"
+      }
+    ]
+  },
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "install_hosts": [
+      "pypi.org",
+      "files.pythonhosted.org"
+    ],
+    "keys": [],
+    "hardware": {
+      "ram_gb": 0.2,
+      "disk_gb": 0.1
+    },
+    "owner_files": "write",
+    "brain": {
+      "text": true,
+      "images": false,
+      "as_written": true
+    }
+  },
+  "setup_steps": [],
+  "data": {
+    "keep_on_remove": "keep"
+  },
+  "consent": "Manuscript keeps your manuscripts and your notes in a Manuscripts folder in My files. Your bot reads each manuscript with the model on this computer and keeps its notes and views in that folder too. Manuscript itself never changes your manuscript text; you can change it yourself in the Editor's Desk app, and Manuscript reads the changed section again when you say. It doesn't use the internet once it is installed, and removing it never removes your files."
+}
