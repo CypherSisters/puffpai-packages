@@ -1,0 +1,57 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "maps",
+  "kind": "app",
+  "name": "Maps",
+  "version": "2.2.0",
+  "description": "An illustrated atlas of your novel, from what Manuscript has read: the cast as a gallery of portraits, the world as a painted map with its places pinned on it, the family tree with faces, the story as a strip of painted scenes, and a cover mock. A picture program on another computer on your home network paints the pictures; Maps puts the names, pins and lines on top. Illustrate paints everything a book needs, one picture at a time, and Paint again takes a note from you. The eight drawn charts are still there under Charts: a family tree, a relationship map, a timeline, character touchpoints, arcs, the story structure, a world map and a thread board. Click anything and the manuscript pane opens that passage. It also paints the storyboard panels you ask for in Editor's Desk. It never reads or changes your manuscript text.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/maps.svg",
+
+  "run": {
+    "default": { "type": "command", "python": true,
+                 "setup": [],
+                 "start": ["{python}", "server.py", "--port", "{port}"] }
+  },
+  "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
+
+  "abilities": {
+    "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
+    "changes": [],
+    "tools": {
+      "maps_list": "The boards Maps can draw for each manuscript her bot has read: the eight standard ones and the ones drawn from earlier asks.",
+      "maps_draw": "A drawing of one manuscript in Maps, made from its story bible and saved with the ask: a family tree, a relationship map, a timeline, character touchpoints, arcs, the story structure, a world map or a thread board.",
+      "maps_point": "Points the Manuscript page at the passage behind one item on a board, such as a character, an event or a setup.",
+      "maps_picture": "A picture painted from the story bible by the picture program on the owner's home network: a character portrait, a place, a painted world map, a scene from one event or a cover mock, with an optional note from the writer.",
+      "maps_illustrate": "Every picture one manuscript needs, painted one at a time by the picture program on the owner's home network, skipping what is already painted."
+    },
+    "examples": {
+      "maps_list": ["which maps are there for my novel", "what boards have I made"],
+      "maps_draw": ["draw the family tree", "show me who interacts with whom", "draw the timeline of Short story"],
+      "maps_point": ["show me where Quill is on the touchpoints", "take me to the badge setup on the thread board"],
+      "maps_picture": ["paint a portrait of Tamsin", "make a cover mock for Salt Moon", "paint the world map", "paint the scene where the Lantern goes dark"],
+      "maps_illustrate": ["illustrate Salt Moon", "paint pictures for my whole book"]
+    }
+  },
+
+  "ui": {
+    "pages": [ { "id": "main", "title": "Maps", "path": "/", "show": "in_desktop" } ],
+    "tray": [ { "label": "Maps", "icon": "icons/maps.svg", "opens": "main" } ]
+  },
+
+  "needs": {
+    "packages": [],
+    "hosts": [],
+    "install_hosts": [],
+    "keys": [],
+    "hardware": { "ram_gb": 0.1, "disk_gb": 0.01 },
+    "owner_files": "write",
+    "addresses": "lan",
+    "brain": { "text": false, "images": false }
+  },
+
+  "setup_steps": [],
+  "data": { "keep_on_remove": "keep" },
+  "consent": "Maps draws from what Manuscript read, in the Manuscripts folder in My files. It writes only its own boards, its pictures, each book's style line and Illustrate progress, and the pointer that tells Manuscript where to scroll, and never reads or changes your manuscript text. It doesn't use the internet. Pictures are made by a picture program on another computer on your home network, at the one address you type and allow on the Bridge page; it gets only short descriptions built from the story bible or from your storyboard's notes, never your text."
+}

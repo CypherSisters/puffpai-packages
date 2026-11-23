@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src data: blob:">
+<title>Maps</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<p class="sample" id="sample" hidden>This is the sample page. It shows made-up data, and nothing you do here is saved.</p>
+<div class="wrap" id="wrap">
+  <nav class="list" id="list" aria-label="Manuscripts">
+    <h1>Maps <span class="ver">2.2.0</span></h1>
+    <p class="say" id="listsay" aria-live="polite"></p>
+    <div id="books"><p class="empty">Loading...</p></div>
+    <section class="maker" aria-labelledby="makerh">
+      <h2 id="makerh">Picture maker</h2>
+      <p class="meta">Pictures are painted by a picture program on another computer on your home network. Type its address once, then say Yes on the Bridge page. It gets only short descriptions from the story bible, never your text. Each book can have its own style line on its page; this one is the start for every book.</p>
+      <form id="makerform" autocomplete="off">
+        <label for="maddr">Address</label>
+        <input type="text" id="maddr" maxlength="200" placeholder="http://192.168.1.20:8188">
+        <label for="mstyle">Style</label>
+        <input type="text" id="mstyle" maxlength="200">
+        <span class="row"><button type="submit" class="main">Save</button><button type="button" id="mtestbtn">Test</button></span>
+      </form>
+      <p class="say" id="mask" aria-live="polite"></p>
+      <p class="say" id="mtest" aria-live="polite"></p>
+    </section>
+  </nav>
+  <main class="pane" id="pane" aria-label="Atlas">
+    <div class="bar">
+      <button id="back" type="button">Back</button>
+      <h2 id="btitle">Pick a manuscript</h2>
+      <span class="tools" id="tools">
+        <button id="zout" type="button" title="Zoom out" aria-label="Zoom out">-</button>
+        <button id="zin" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+        <button id="fit" type="button">Fit</button>
+        <button id="savelayout" type="button" class="main" hidden>Save layout</button>
+        <button id="resetlayout" type="button" hidden>Drawn layout</button>
+        <button id="png" type="button">Export PNG</button>
+      </span>
+    </div>
+    <p class="note" id="bnote"></p>
+    <p class="say" id="bsay" aria-live="polite"></p>
+    <div class="atlas" id="atlas"><p class="empty">Pick a manuscript to open its atlas: the cast, the world, the family, the story and the cover.</p></div>
+    <div class="board" id="board" hidden></div>
+    <div class="gallery" id="gallery" hidden></div>
+    <ul class="legend" id="legend"></ul>
+  </main>
+</div>
+<script src="boards.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
