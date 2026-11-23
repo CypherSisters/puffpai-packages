@@ -1,8 +1,8 @@
 # Harvested from HomeBotFounders@b77fc40:src/puffpai/agents/toolsmith.py (rewritten-from)
 # Harvested from HomeBotFounders@b77fc40:src/puffpai/capability_registry.py (rewritten-from)
-"""Document convert: office files to PDF, and plain text out of them, as a PuffPAI package.
+"""Document convert: office files to PDF, a PDF to Word, and plain text out of them, as a PuffPAI package.
 
-One small server, Python standard library only, bound to 127.0.0.1:
+One small server, bound to 127.0.0.1, standard library apart from pypdf and python-docx for PDFs:
 - ``/health``      "ok"
 - ``/mcp``         the MCP server (JSON-RPC over HTTP)
 
@@ -16,7 +16,15 @@ folder of its own inside PUFFPAI_DATA, and 120 seconds. Without LibreOffice
 every tool that needs it answers one plain sentence.
 
 ``read_document_text`` needs no LibreOffice: a .docx, .xlsx or .pptx is a zip of
-XML, read here with zipfile and xml.etree.
+XML, read here with zipfile and xml.etree; a .pdf goes through pdf_text.py.
+
+``pdf_to_word`` needs no LibreOffice either: pdf_text.py turns a PDF into paragraphs
+with heading marks, python-docx writes them with Word's own heading styles, and the
+file goes to ``My files/Converted``, which the writer can reach from her window. The
+Core says where My files is (``GET /v1/owner-files``). Its manifest says
+``needs.owner_files: "read"``, not "write": with "write", the Core treats any listed
+change with a ``file_name`` argument as changing her file, and it hides and refuses
+every such tool here until she turns on changing her documents.
 
 HomeBot ran the same LibreOffice call inside a bubblewrap jail with no network.
 This package has no jail: LibreOffice runs as the owner's own user, like any
@@ -41,6 +49,8 @@ import signal
 import subprocess
 import sys
 import threading
+import urllib.error
+import urllib.request
 import uuid
 import zipfile
 from datetime import datetime
@@ -48,8 +58,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from xml.etree import ElementTree
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))      # its own module, also when started with python -I
+import pdf_text  # noqa: E402
+
 NAME = "document-convert"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 MCP_VERSIONS = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 MAX_FILE = 25 * 1024 * 1024                    # one input file, in bytes
 MAX_BODY = MAX_FILE * 4 // 3 + 64 * 1024       # the file as base64, plus the JSON around it
@@ -57,7 +70,9 @@ MAX_UNZIPPED = 200 * 1024 * 1024               # what a .docx/.xlsx/.pptx may un
 MAX_TEXT = 20_000                              # characters read_document_text answers
 TIMEOUT_S = 120
 CONVERTS = (".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".txt", ".md")
-READS = (".docx", ".xlsx", ".pptx", ".txt", ".md")
+READS = (".docx", ".xlsx", ".pptx", ".txt", ".md", ".pdf")
+PDFS = (".pdf",)
+CONVERTED = "Converted"                        # in My files, beside "Made by <bot name>"
 MISSING = ("LibreOffice is not installed on this computer, so I cannot make a PDF yet. "
            "Install it from https://www.libreoffice.org/download/ and ask again.")
 
@@ -166,6 +181,56 @@ def run_soffice(argv: list[str], timeout: float) -> tuple[int | None, str]:
         return None, ""
 
 
+# ---------------------------------------------------------------- PDFs
+
+class CoreFiles:
+    """Asks the Core where My files is, each time: she may rename the bot or move her data folder while this runs."""
+
+    def __init__(self, api: str | None, token: str | None) -> None:
+        self.api = (api or "").rstrip("/")
+        self.token = token or ""
+
+    def converted(self) -> Path:
+        req = urllib.request.Request(self.api + "/v1/owner-files", headers={"Authorization": f"Bearer {self.token}"})
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))      # the Core is on this computer
+        try:
+            with opener.open(req, timeout=10) as r:
+                made = str(json.loads(r.read().decode("utf-8")).get("made") or "")
+        except (OSError, ValueError, AttributeError, urllib.error.URLError):
+            made = ""
+        if not made:
+            raise pdf_text.Refused("I could not ask BuildBot where your files are, so no Word file was made.")
+        return Path(made).parent / CONVERTED
+
+
+def read_pdf(raw: bytes) -> pdf_text.Book:
+    try:
+        return pdf_text.read_pdf(raw)
+    except ImportError:
+        raise pdf_text.Refused("Document convert is missing a part it needs. Remove it and add it again from Apps.") from None
+
+
+def word_bytes(book: pdf_text.Book, title: str) -> bytes:
+    """The book as a Word file: real Heading 1 and Heading 2, each paragraph its own, blank paragraphs kept."""
+    try:
+        import docx
+    except ImportError:
+        raise pdf_text.Refused("Document convert is missing a part it needs. Remove it and add it again from Apps.") from None
+    doc = docx.Document()
+    doc.core_properties.title = title
+    doc.core_properties.author = ""
+    parts = any(p.heading == pdf_text.PART for p in book.paragraphs)
+    for p in book.paragraphs:
+        if p.heading:
+            level = 1 if p.heading == pdf_text.PART or not parts else 2
+            doc.add_paragraph(p.text, style=f"Heading {level}")
+        else:
+            doc.add_paragraph(p.text)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------- reading office files
 
 def _local(tag: str) -> str:
@@ -258,8 +323,9 @@ def office_text(raw: bytes, ext: str) -> str:
 # ---------------------------------------------------------------- the tools
 
 class Converter:
-    def __init__(self, folder: Path | str) -> None:
+    def __init__(self, folder: Path | str, files: CoreFiles | None = None) -> None:
         self.folder = Path(folder)
+        self.files = files
         self.made = self.folder / "made"
         self.work = self.folder / "work"
         self.profile = self.folder / "libreoffice-profile"
@@ -302,6 +368,26 @@ class Converter:
             finally:
                 shutil.rmtree(job, ignore_errors=True)
 
+    def pdf_to_word(self, file_name: str = "", mime: str = "", content_b64: str = "") -> str:
+        name, _, raw = _file_bytes(file_name, mime, content_b64, "", PDFS)
+        book = read_pdf(raw)
+        stem = os.path.splitext(name)[0]
+        made = word_bytes(book, stem)
+        if self.files is None:
+            raise pdf_text.Refused("I could not ask BuildBot where your files are, so no Word file was made.")
+        folder = self.files.converted()
+        folder.mkdir(parents=True, exist_ok=True)
+        with self.lock:
+            target = folder / f"{stem}.docx"
+            n = 2
+            while target.exists():
+                target = folder / f"{stem} ({n}).docx"
+                n += 1
+            target.write_bytes(made)
+        return (f"Made {target.name}, a Word file with real headings, in the Converted folder in My files. "
+                f"{pdf_text.report_line(book.report)} In the window it is under Knowledge and documents, Your files. "
+                f"Manuscript can take it from there with manuscript_add_file and Converted/{target.name}. It is at {target}")
+
     def read_document_text(self, file_name: str = "", mime: str = "", content_b64: str = "", text: str = "") -> str:
         name = _safe_name(_text(file_name, "file_name", 255))
         ext = os.path.splitext(name)[1].lower()
@@ -309,8 +395,13 @@ class Converter:
             return (f"I cannot read {ext or 'that kind of file'} without LibreOffice. I read "
                     f"{', '.join(READS)}. Converting it to a PDF may help.")
         name, ext, raw = _file_bytes(file_name, mime, content_b64, text, READS)
+        said = ""
         if ext in (".txt", ".md"):
             body = raw.decode("utf-8-sig", "replace")
+        elif ext == ".pdf":
+            book = read_pdf(raw)
+            body = pdf_text.plain_text(book)
+            said = pdf_text.report_line(book.report) + "\n\n"
         else:
             body = office_text(raw, ext)
         body = re.sub(r"\n{3,}", "\n\n", body).strip()
@@ -318,17 +409,30 @@ class Converter:
             return f"{name} has no text in it."
         cut = len(body) > MAX_TEXT
         body = body[:MAX_TEXT]
-        return f"Text of {name}{' (the first part only)' if cut else ''}:\n\n{body}"
+        return f"{said}Text of {name}{' (the first part only)' if cut else ''}:\n\n{body}"
 
     def list_converted(self) -> str:
         files = sorted((p for p in self.made.glob("*.pdf") if p.is_file()),
                        key=lambda p: p.stat().st_mtime, reverse=True)
+        words = self._word_list()
         if not files:
-            return "No PDFs made yet."
+            return "No PDFs made yet." + words
         lines = [f"- {p.name} ({_size(p.stat().st_size)}, "
                  f"{datetime.fromtimestamp(p.stat().st_mtime).strftime('%Y-%m-%d %H:%M')})" for p in files[:50]]
         more = f"\n...and {len(files) - 50} more." if len(files) > 50 else ""
-        return f"{len(files)} PDF{'s' if len(files) != 1 else ''} made, newest first, in {self.made}:\n" + "\n".join(lines) + more
+        return f"{len(files)} PDF{'s' if len(files) != 1 else ''} made, newest first, in {self.made}:\n" + "\n".join(lines) + more + words
+
+    def _word_list(self) -> str:
+        """The Word files made from PDFs, as more lines; none when the Core can't be asked."""
+        try:
+            folder = self.files.converted() if self.files is not None else None
+        except pdf_text.Refused:
+            folder = None
+        found = sorted(folder.glob("*.docx"), key=lambda p: p.stat().st_mtime, reverse=True) if folder else []
+        if not found:
+            return ""
+        return "\n\nWord files made from PDFs, in the Converted folder in My files:\n" + "\n".join(
+            f"- {p.name} ({_size(p.stat().st_size)})" for p in found[:50])
 
 
 # --------------------------------------------------------------- MCP tools
@@ -344,14 +448,19 @@ FILE_ARGS = {
     "text": _p("string", "For a .txt or .md file: its text, instead of content_b64."),
 }
 
+PDF_ARGS = {k: v for k, v in FILE_ARGS.items() if k != "text"}
+
 TOOLS = [
     ("convert_to_pdf", "Turn a document (Word .docx, Excel .xlsx, PowerPoint .pptx, .odt, .ods, .odp, .txt or .md) "
      "into a PDF with LibreOffice on this computer, and say where the PDF is.", FILE_ARGS, ["file_name"]),
-    ("read_document_text", "Read the plain text out of a Word .docx, Excel .xlsx or PowerPoint .pptx (or a .txt or .md) "
-     "without changing it.", FILE_ARGS, ["file_name"]),
-    ("list_converted", "List the PDFs this tool has made, newest first.", {}, []),
+    ("read_document_text", "Read the plain text out of a Word .docx, Excel .xlsx, PowerPoint .pptx or a PDF (or a .txt or "
+     ".md) without changing it.", FILE_ARGS, ["file_name"]),
+    ("pdf_to_word", "Turn a PDF of a book into a Word file with real chapter headings, saved in the Converted folder in "
+     "My files. Line wraps are joined, running heads and page numbers come out, and no word is changed. It says what it "
+     "found and where the file is. It needs no LibreOffice.", PDF_ARGS, ["file_name"]),
+    ("list_converted", "List the PDFs this tool has made, newest first, and the Word files it made from PDFs.", {}, []),
 ]
-CHANGES = ["convert_to_pdf"]
+CHANGES = ["convert_to_pdf", "pdf_to_word"]
 
 
 def tool_list() -> list[dict]:
@@ -388,6 +497,8 @@ def mcp_answer(app: Converter, msg: dict) -> dict | None:
         try:
             text = getattr(app, name)(**args)
             return ok({"content": [{"type": "text", "text": text}], "isError": False})
+        except pdf_text.Refused as exc:      # one plain line for the writer, as pdf_text wrote it
+            return ok({"content": [{"type": "text", "text": str(exc)}], "isError": True})
         except (TypeError, ValueError) as exc:
             return ok({"content": [{"type": "text", "text": f"Those arguments did not fit {name}: {exc}"}], "isError": True})
         except Exception as exc:  # noqa: BLE001 - any other failure is a plain tool error, never a crash
@@ -511,9 +622,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(405, b"", "text/plain")
 
 
-def make_server(port: int, data: Path | str, token: str | None) -> ThreadingHTTPServer:
+def make_server(port: int, data: Path | str, token: str | None, files: CoreFiles | None = None) -> ThreadingHTTPServer:
     """The server, bound to 127.0.0.1 only. Call serve_forever(); stop with shutdown()."""
-    app = Converter(data)
+    app = Converter(data, files)
     handler = type("ConvertHandler", (Handler,), {"app": app, "token": token or ""})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)
     server.daemon_threads = True
@@ -527,7 +638,9 @@ def main(argv: list[str] | None = None) -> int:
     data = os.environ.get("PUFFPAI_DATA")
     if not args.port or not data:
         p.error("PuffPAI starts Document convert with PUFFPAI_PORT (or --port) and PUFFPAI_DATA set.")
-    server = make_server(args.port, data, os.environ.get("PUFFPAI_TOKEN"))
+    token = os.environ.get("PUFFPAI_TOKEN")
+    api = os.environ.get("PUFFPAI_API")
+    server = make_server(args.port, data, token, CoreFiles(api, token) if api else None)
     try:
         server.serve_forever()
     except KeyboardInterrupt:

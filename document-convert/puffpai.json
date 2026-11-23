@@ -3,46 +3,53 @@
   "id": "document-convert",
   "kind": "tool",
   "name": "Document convert",
-  "version": "1.0.0",
-  "description": "Turns Word, Excel, PowerPoint and OpenDocument files into PDFs with LibreOffice on this computer, and reads the plain text out of a .docx, .xlsx or .pptx without it. It does not edit documents, convert to any format but PDF, or read PDFs, and making a PDF needs LibreOffice installed.",
+  "version": "1.1.0",
+  "description": "Turns a PDF of a book into a Word file with real chapter headings, turns Word, Excel, PowerPoint and OpenDocument files into PDFs with LibreOffice on this computer, and reads the plain text out of a PDF, .docx, .xlsx or .pptx. Only making a PDF needs LibreOffice. It does not edit documents, and it cannot read a PDF that is only pictures of pages.",
   "author": "Cypher Sisters",
   "license": "Apache-2.0",
   "homepage": "https://github.com/CypherSisters/puffpai-packages",
   "icon": "icons/page-arrow.svg",
 
   "run": {
-    "default": { "type": "command", "python": true, "start": ["{python}", "server.py", "--port", "{port}"] }
+    "default": { "type": "command", "python": true, "setup": ["{python} -m pip install -r requirements.txt"], "start": ["{python}", "server.py", "--port", "{port}"] }
   },
   "health": { "url": "http://127.0.0.1:{port}/health", "expect": 200, "every_s": 60 },
 
   "abilities": {
     "mcp": { "transport": "http", "url": "http://127.0.0.1:{port}/mcp" },
-    "changes": ["convert_to_pdf"],
+    "changes": ["convert_to_pdf", "pdf_to_word"],
     "tools": {
       "convert_to_pdf": "Turn a document (Word .docx, Excel .xlsx, PowerPoint .pptx, .odt, .ods, .odp, .txt or .md) into a PDF with LibreOffice on this computer, and say where the PDF is.",
-      "read_document_text": "Read the plain text out of a Word .docx, Excel .xlsx or PowerPoint .pptx (or a .txt or .md) without changing it.",
-      "list_converted": "List the PDFs this tool has made, newest first."
+      "read_document_text": "Read the plain text out of a Word .docx, Excel .xlsx, PowerPoint .pptx or a PDF (or a .txt or .md) without changing it.",
+      "pdf_to_word": "Turn a PDF of a book into a Word file with real chapter headings, saved in the Converted folder in My files. Line wraps are joined, running heads and page numbers come out, and no word is changed. It says what it found and where the file is. It needs no LibreOffice.",
+      "list_converted": "List the PDFs this tool has made, newest first, and the Word files it made from PDFs."
     },
     "examples": {
-      "convert_to_pdf": ["turn this Word document into a PDF", "make a PDF of my spreadsheet"],
-      "read_document_text": ["read me what is in this Word doc", "what does this PowerPoint say"],
-      "list_converted": ["which PDFs have you made"]
+      "convert_to_pdf": ["turn report.docx into a PDF", "turn this Word document into a PDF", "make a PDF of my spreadsheet"],
+      "read_document_text": ["read me the text of notes.docx", "read me what is in this Word doc", "what does this PowerPoint say", "read me what is in this PDF"],
+      "pdf_to_word": ["convert chapters.pdf to a Word file", "convert this PDF of my novel to Word", "turn my PDF into a Word file with chapters"],
+      "list_converted": ["which PDFs have you made", "which Word files did you make from PDFs"]
     }
   },
 
   "needs": {
     "packages": [],
     "hosts": [],
+    "install_hosts": ["pypi.org", "files.pythonhosted.org"],
     "keys": [],
-    "hardware": { "ram_gb": 0.2 }
+    "hardware": { "ram_gb": 0.2 },
+    "owner_files": "read"
   },
 
-  "accepts": [ { "types": [".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".txt", ".md"], "tool": "convert_to_pdf" } ],
+  "accepts": [
+    { "types": [".docx", ".xlsx", ".pptx", ".odt", ".ods", ".odp", ".txt", ".md"], "tool": "convert_to_pdf" },
+    { "types": [".pdf"], "tool": "pdf_to_word" }
+  ],
   "setup_steps": [
     { "id": "libreoffice", "kind": "confirm", "title": "Install LibreOffice",
-      "why": "Making a PDF uses LibreOffice, a free office suite, on this computer. Reading text out of a .docx, .xlsx or .pptx works without it.",
+      "why": "Making a PDF uses LibreOffice, a free office suite, on this computer. Turning a PDF into Word, and reading text out of a PDF, .docx, .xlsx or .pptx, work without it.",
       "get_it": "https://www.libreoffice.org/download/" }
   ],
   "data": { "keep_on_remove": "ask" },
-  "consent": "Your files stay on this computer: LibreOffice on this computer converts them, and the PDFs are kept in this tool's own data folder (made). It does not use the internet."
+  "consent": "Your files stay on this computer. LibreOffice on this computer makes PDFs, and they are kept in this tool's own data folder (made). A PDF you turn into Word is saved as a new file in a Converted folder in My files, and it changes none of your other files. It doesn't use the internet once it is installed."
 }
