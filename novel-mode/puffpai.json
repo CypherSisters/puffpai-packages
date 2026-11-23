@@ -1,0 +1,12 @@
+{
+  "schema": "puffpai-package/1",
+  "id": "novel-mode",
+  "kind": "skill",
+  "name": "Novel mode",
+  "version": "1.0.8",
+  "description": "Teaches your bot to be the writer's editor-in-chief for a whole novel or short story with the Manuscript, Maps and Editor's Desk apps: ask for the book, read it, walk the eight tabs, take corrections and notes, go through what Editor's Desk found, one finding at a time, study a book she admires beside hers, run the editing house with a staff (a meeting when she sits down, a whole desk over the book on her yes, a storyboard on her yes), show and draw on request, and never write the book itself. It adds no tools of its own and fetches nothing itself.",
+  "author": "Cypher Sisters",
+  "license": "Apache-2.0",
+  "icon": "icons/novel.svg",
+  "consent": "This skill is text your bot reads. It runs nothing and uses no internet. It only tells your bot how to use Manuscript, Maps and Editor's Desk for a book."
+}
